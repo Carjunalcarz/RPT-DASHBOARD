@@ -9,6 +9,7 @@ import TaxAssessment from '@/pages/TaxAssessment';
 import Payments from '@/pages/Payments';
 import Reports from '@/pages/Reports';
 import Settings from '@/pages/Settings';
+import DataEntry from '@/pages/DataEntry';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
