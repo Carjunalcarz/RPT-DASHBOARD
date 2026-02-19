@@ -60,7 +60,7 @@ const DataEntry: React.FC = () => {
       {/* Tab Content */}
       <div>
         {activeTab === 'property-info' && <PropertyInformationForm />}
-        {activeTab === 'assessment' && <AssessmentForm />}
+        {activeTab === 'assessment' && <AssessmentTable />}
         {activeTab === 'reference' && (
           <div className="bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800 p-6 text-center text-slate-500 dark:text-slate-400">
             <p className="text-sm">Reference form will be displayed here</p>
