@@ -104,7 +104,9 @@ const AppRouter: React.FC = () => {
           path="/data-entry"
           element={
             <ProtectedRoute>
-              <DataEntry />
+              <Layout>
+                <DataEntry />
+              </Layout>
             </ProtectedRoute>
           }
         />
