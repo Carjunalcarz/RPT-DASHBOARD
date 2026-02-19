@@ -8,16 +8,16 @@ interface PageHeaderProps {
 
 const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle }) => {
   return (
-    <div className="bg-white border-b border-gray-200 py-6 px-6">
+    <div className="mb-8">
       <div className="flex items-center gap-4">
-        <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
+        <div className="w-12 h-12 bg-blue-600 dark:bg-blue-500 rounded-lg flex items-center justify-center">
           <FileText size={24} className="text-white" />
         </div>
         <div>
-          <h1 className="text-2xl font-semibold text-slate-800 uppercase tracking-wide">
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-1">
             {title}
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>
+          <p className="text-slate-600 dark:text-slate-400">{subtitle}</p>
         </div>
       </div>
     </div>
