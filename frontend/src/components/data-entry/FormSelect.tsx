@@ -27,12 +27,12 @@ const FormSelect: React.FC<FormSelectProps> = ({
 }) => {
   return (
     <div>
-      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+      <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       <select
         {...register(name, { required })}
-        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 text-slate-900 dark:text-slate-100"
+        className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-600 text-slate-900 dark:text-slate-100"
       >
         <option value="">{placeholder}</option>
         {options.map((option) => (
