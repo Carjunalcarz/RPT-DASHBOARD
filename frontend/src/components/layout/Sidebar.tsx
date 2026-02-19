@@ -36,24 +36,6 @@ const Sidebar: React.FC = () => {
       }`}
     >
       <div className="flex flex-col h-full">
-        {/* Logo Section */}
-        <div className="h-16 flex items-center px-4 border-b border-slate-200 dark:border-slate-800">
-          {isCollapsed ? (
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">RP</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">RP</span>
-              </div>
-              <span className="font-semibold text-slate-800 dark:text-slate-100 text-sm">
-                Tax Admin System
-              </span>
-            </div>
-          )}
-        </div>
-
         {/* Navigation Menu */}
         <nav className="flex-1 px-2 py-4 overflow-y-auto">
           {menuItems.map((item) => {
