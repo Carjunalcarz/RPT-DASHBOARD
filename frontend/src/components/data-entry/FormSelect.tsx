@@ -41,7 +41,7 @@ const FormSelect: React.FC<FormSelectProps> = ({
           </option>
         ))}
       </select>
-      {error && <p className="text-red-500 dark:text-red-400 text-xs mt-1">{error.message}</p>}
+      {error && <p className="text-red-500 dark:text-red-400 text-xs mt-1">{error.message || 'This field is required'}</p>}
     </div>
   );
 };
