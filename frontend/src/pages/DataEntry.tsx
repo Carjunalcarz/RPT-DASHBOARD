@@ -3,6 +3,7 @@ import PageHeader from '@/components/data-entry/PageHeader';
 import SearchCard from '@/components/data-entry/SearchCard';
 import Tabs from '@/components/data-entry/Tabs';
 import PropertyInformationForm from '@/components/data-entry/PropertyInformationForm';
+import AssessmentForm from '@/components/data-entry/AssessmentForm';
 import { Settings, FileJson } from 'lucide-react';
 
 const DataEntry: React.FC = () => {
