@@ -27,73 +27,74 @@ const DataEntry: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div data-testid="data-entry-page">
       {/* Header */}
       <PageHeader
         title="REAL PROPERTY DATA ENTRY"
         subtitle="Tubay - FAAS/TDN Management"
       />
 
-      {/* Main Content */}
-      <div className="max-w-[1600px] mx-auto px-6 py-6">
-        {/* Search Card */}
-        <SearchCard
-          onPinSearch={handlePinSearch}
-          onLocationSearch={handleLocationSearch}
-        />
+      {/* Search Card */}
+      <SearchCard
+        onPinSearch={handlePinSearch}
+        onLocationSearch={handleLocationSearch}
+      />
 
-        {/* Tabs */}
-        <div className="flex items-center justify-between mb-0">
+      {/* Tabs with View JSON Button */}
+      <div className="flex items-start justify-between gap-4 mb-6">
+        <div className="flex-1">
           <Tabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
-          
-          {/* View JSON Data Button */}
-          <button
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium text-sm mb-6"
-          >
-            <FileJson size={18} />
-            View JSON Data
-          </button>
         </div>
+        
+        {/* View JSON Data Button */}
+        <button
+          data-testid="view-json-button"
+          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center gap-2 font-medium text-sm shadow-sm"
+        >
+          <FileJson size={18} />
+          View JSON Data
+        </button>
+      </div>
 
-        {/* Tab Content */}
-        <div className="mt-0">
-          {activeTab === 'property-info' && <PropertyInformationForm />}
-          {activeTab === 'assessment' && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-slate-500">
-              <p>Assessment form will be displayed here</p>
-            </div>
-          )}
-          {activeTab === 'reference' && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-slate-500">
-              <p>Reference form will be displayed here</p>
-            </div>
-          )}
-          {activeTab === 'signatories' && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-slate-500">
-              <p>Signatories / Memorandum form will be displayed here</p>
-            </div>
-          )}
-          {activeTab === 'other-property' && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-slate-500">
-              <p>Other Property Information form will be displayed here</p>
-            </div>
-          )}
-          {activeTab === 'previous-tdns' && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-slate-500">
-              <p>Previous TDNs list will be displayed here</p>
-            </div>
-          )}
-          {activeTab === 'tag-dec' && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center text-slate-500">
-              <p>Tag Dec. Sheet will be displayed here</p>
-            </div>
-          )}
-        </div>
+      {/* Tab Content */}
+      <div>
+        {activeTab === 'property-info' && <PropertyInformationForm />}
+        {activeTab === 'assessment' && (
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-8 text-center text-slate-500 dark:text-slate-400">
+            <p className="text-base">Assessment form will be displayed here</p>
+          </div>
+        )}
+        {activeTab === 'reference' && (
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-8 text-center text-slate-500 dark:text-slate-400">
+            <p className="text-base">Reference form will be displayed here</p>
+          </div>
+        )}
+        {activeTab === 'signatories' && (
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-8 text-center text-slate-500 dark:text-slate-400">
+            <p className="text-base">Signatories / Memorandum form will be displayed here</p>
+          </div>
+        )}
+        {activeTab === 'other-property' && (
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-8 text-center text-slate-500 dark:text-slate-400">
+            <p className="text-base">Other Property Information form will be displayed here</p>
+          </div>
+        )}
+        {activeTab === 'previous-tdns' && (
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-8 text-center text-slate-500 dark:text-slate-400">
+            <p className="text-base">Previous TDNs list will be displayed here</p>
+          </div>
+        )}
+        {activeTab === 'tag-dec' && (
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-8 text-center text-slate-500 dark:text-slate-400">
+            <p className="text-base">Tag Dec. Sheet will be displayed here</p>
+          </div>
+        )}
       </div>
 
       {/* Floating Settings Button */}
       <button
-        className="fixed right-6 bottom-6 w-12 h-12 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg transition-all hover:scale-110 flex items-center justify-center"
+        data-testid="settings-floating-button"
+        className="fixed right-6 bottom-6 w-12 h-12 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-full shadow-lg transition-all hover:scale-110 flex items-center justify-center z-50"
         aria-label="Settings"
       >
         <Settings size={20} />

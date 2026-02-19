@@ -54,11 +54,11 @@ const PropertyInformationForm: React.FC = () => {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="mb-8">
       {/* Property Information Section */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-6">
-        <div className="bg-blue-600 px-6 py-4 rounded-t-lg">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden mb-6">
+        <div className="bg-blue-600 dark:bg-blue-500 px-6 py-4">
           <h3 className="text-lg font-semibold text-white">Property Information</h3>
         </div>
-        <div className="p-6 bg-slate-50">
+        <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Row 1 */}
             <DateInput
@@ -186,7 +186,7 @@ const PropertyInformationForm: React.FC = () => {
               error={errors.blockNo}
             />
 
-            {/* Row 7 - Lot Area spans 1 column */}
+            {/* Row 7 - Lot Area */}
             <FormInput
               label="Lot Area:"
               name="lotArea"
@@ -200,11 +200,11 @@ const PropertyInformationForm: React.FC = () => {
       </div>
 
       {/* Property Owner and Administrator Section */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-6">
-        <div className="bg-blue-600 px-6 py-4 rounded-t-lg">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden mb-6">
+        <div className="bg-blue-600 dark:bg-blue-500 px-6 py-4">
           <h3 className="text-lg font-semibold text-white">Property Owner and Administrator</h3>
         </div>
-        <div className="p-6 bg-slate-50">
+        <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
             <FormSelect
               label="Owner Code:"
@@ -233,11 +233,11 @@ const PropertyInformationForm: React.FC = () => {
       </div>
 
       {/* Property Boundaries Section */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-6">
-        <div className="bg-blue-600 px-6 py-4 rounded-t-lg">
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden mb-6">
+        <div className="bg-blue-600 dark:bg-blue-500 px-6 py-4">
           <h3 className="text-lg font-semibold text-white">Property Boundaries</h3>
         </div>
-        <div className="p-6 bg-slate-50">
+        <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <FormInput label="Street:" name="boundaryStreet" register={register} />
             <FormInput label="Location:" name="boundaryLocation" register={register} />
@@ -253,13 +253,13 @@ const PropertyInformationForm: React.FC = () => {
       <div className="flex justify-end gap-4">
         <button
           type="button"
-          className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-slate-700 rounded-lg transition-colors font-medium"
+          className="px-6 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors font-medium"
         >
           Cancel
         </button>
         <button
           type="submit"
-          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
+          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors font-medium"
         >
           Save Property Information
         </button>
