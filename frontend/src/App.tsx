@@ -4,6 +4,7 @@ import { SidebarProvider } from '@/context/SidebarContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import AppRouter from '@/router/AppRouter';
 import '@/App.css';
+import '@/styles/print.css';
 
 function App() {
   return (
