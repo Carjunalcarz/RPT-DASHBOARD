@@ -174,6 +174,18 @@ const AssessmentTable: React.FC = () => {
 
   const summary = calculateSummary();
 
+  // Mock property info (in real app, this would come from props or context)
+  const propertyInfo = {
+    ownerName: 'Sample Owner Name',
+    pin: '053-07-0002-003-32',
+    tdNo: 'TD-2024-001',
+    arpNo: 'ARP-2024-001',
+    municipality: 'Tubay',
+    barangay: 'Poblacion',
+    effectivityDate: '2024-01-01',
+    declarationDate: '2024-01-15',
+  };
+
   return (
     <div className="space-y-4">
       {/* Toolbar */}
