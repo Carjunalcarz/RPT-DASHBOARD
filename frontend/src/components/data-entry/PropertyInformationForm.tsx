@@ -52,14 +52,14 @@ const PropertyInformationForm: React.FC = () => {
   ];
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="mb-8">
+    <form onSubmit={handleSubmit(onSubmit)} className="mb-6">
       {/* Property Information Section */}
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden mb-6">
-        <div className="bg-blue-600 dark:bg-blue-500 px-6 py-4">
-          <h3 className="text-lg font-semibold text-white">Property Information</h3>
+      <div className="bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden mb-4">
+        <div className="bg-blue-600 dark:bg-blue-500 px-4 py-3">
+          <h3 className="text-base font-semibold text-white">Property Information</h3>
         </div>
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Row 1 */}
             <DateInput
               label="Effectivity Date:"
@@ -200,12 +200,12 @@ const PropertyInformationForm: React.FC = () => {
       </div>
 
       {/* Property Owner and Administrator Section */}
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden mb-6">
-        <div className="bg-blue-600 dark:bg-blue-500 px-6 py-4">
-          <h3 className="text-lg font-semibold text-white">Property Owner and Administrator</h3>
+      <div className="bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden mb-4">
+        <div className="bg-blue-600 dark:bg-blue-500 px-4 py-3">
+          <h3 className="text-base font-semibold text-white">Property Owner and Administrator</h3>
         </div>
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <div className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
             <FormSelect
               label="Owner Code:"
               name="ownerCode"
@@ -217,7 +217,7 @@ const PropertyInformationForm: React.FC = () => {
             <FormInput label="Name:" name="ownerName" register={register} />
             <FormInput label="Address:" name="ownerAddress" register={register} />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <FormSelect
               label="Administrator Code:"
               name="adminCode"
@@ -233,12 +233,12 @@ const PropertyInformationForm: React.FC = () => {
       </div>
 
       {/* Property Boundaries Section */}
-      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden mb-6">
-        <div className="bg-blue-600 dark:bg-blue-500 px-6 py-4">
-          <h3 className="text-lg font-semibold text-white">Property Boundaries</h3>
+      <div className="bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden mb-4">
+        <div className="bg-blue-600 dark:bg-blue-500 px-4 py-3">
+          <h3 className="text-base font-semibold text-white">Property Boundaries</h3>
         </div>
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="p-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormInput label="Street:" name="boundaryStreet" register={register} />
             <FormInput label="Location:" name="boundaryLocation" register={register} />
             <FormInput label="North:" name="boundaryNorth" register={register} />
@@ -250,16 +250,16 @@ const PropertyInformationForm: React.FC = () => {
       </div>
 
       {/* Submit Button */}
-      <div className="flex justify-end gap-4">
+      <div className="flex justify-end gap-3">
         <button
           type="button"
-          className="px-6 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors font-medium"
+          className="px-4 py-2 text-sm bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors font-medium"
         >
           Cancel
         </button>
         <button
           type="submit"
-          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors font-medium"
+          className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors font-medium"
         >
           Save Property Information
         </button>
