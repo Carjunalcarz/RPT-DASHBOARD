@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { AssessmentRow, AssessmentSummary } from './types';
 import TableToolbar from './TableToolbar';
 import EditableCell from './EditableCell';
+import PrintDocument from './PrintDocument';
+import '@/styles/print.css';
 
 const AssessmentTable: React.FC = () => {
   const [rows, setRows] = useState<AssessmentRow[]>([]);
