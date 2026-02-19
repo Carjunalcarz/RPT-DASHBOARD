@@ -421,6 +421,19 @@ const AssessmentTable: React.FC = () => {
         assessmentRows={rows}
         summary={summary}
       />
+
+      {/* Selection Modal */}
+      <SelectionModal
+        isOpen={isModalOpen}
+        type={modalType}
+        onClose={closeModal}
+        onSelect={handleModalSelect}
+        currentValue={
+          activeRowId && activeField
+            ? rows.find((r) => r.id === activeRowId)?.[activeField as keyof AssessmentRow] || ''
+            : ''
+        }
+      />
     </div>
   );
 };
