@@ -8,6 +8,7 @@ import {
   CreditCard,
   BarChart3,
   Settings,
+  ClipboardEdit,
 } from 'lucide-react';
 
 interface MenuItem {
