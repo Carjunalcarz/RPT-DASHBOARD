@@ -33,7 +33,7 @@ const Header: React.FC = () => {
   return (
     <header
       data-testid="header"
-      className="fixed top-0 right-0 left-0 h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-30"
+      className="fixed top-0 right-0 left-0 h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 z-40"
     >
       <div className="flex items-center justify-between h-full px-4">
         {/* Left Section */}
@@ -45,6 +45,16 @@ const Header: React.FC = () => {
           >
             <Menu size={20} className="text-slate-600 dark:text-slate-400" />
           </button>
+          
+          {/* Logo */}
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">RP</span>
+            </div>
+            <span className="font-semibold text-slate-800 dark:text-slate-100 text-sm hidden sm:block">
+              Tax Admin System
+            </span>
+          </div>
         </div>
 
         {/* Center Section - Search */}
