@@ -66,6 +66,16 @@ async def get_status_checks():
     
     return status_checks
 
+@api_router.get("/dashboard/stats")
+async def get_dashboard_stats():
+    # Mock dashboard statistics
+    return {
+        "totalProperties": 15847,
+        "collectedTax": 2847950,
+        "pendingPayments": 324,
+        "delinquentAccounts": 89,
+    }
+
 # Include the router in the main app
 app.include_router(api_router)
 
