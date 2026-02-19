@@ -13,6 +13,17 @@ const AssessmentTable: React.FC = () => {
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [originalRowBackup, setOriginalRowBackup] = useState<AssessmentRow | null>(null);
 
+  // Selection modal hook
+  const {
+    isModalOpen,
+    modalType,
+    activeRowId,
+    activeField,
+    openModal,
+    closeModal,
+    selectValue,
+  } = useSelectionModal();
+
   // Generate unique ID
   const generateId = () => `row-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
