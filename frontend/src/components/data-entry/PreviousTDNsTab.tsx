@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, Edit2, Save, X } from 'lucide-react';
 
 interface TDN {
   id: string;
@@ -13,7 +13,7 @@ interface PreviousTDNsTabProps {
   onEnterEdit: () => void;
   onSave: () => void;
   onCancel: () => void;
-  onDataChange: (hasChanges: boolean) => void;
+  onDataChange?: (hasChanges: boolean) => void;
 }
 
 const PreviousTDNsTab: React.FC<PreviousTDNsTabProps> = ({
@@ -31,7 +31,7 @@ const PreviousTDNsTab: React.FC<PreviousTDNsTabProps> = ({
   const [originalTdns, setOriginalTdns] = useState(tdns);
 
   useEffect(() => {
-    if (isEditing) {
+    if (isEditing && onDataChange) {
       const hasChanges = JSON.stringify(tdns) !== JSON.stringify(originalTdns);
       onDataChange(hasChanges);
     }
@@ -75,20 +75,40 @@ const PreviousTDNsTab: React.FC<PreviousTDNsTabProps> = ({
           {isEditing && (
             <button
               onClick={handleAddTDN}
-              className="px-3 py-2 text-xs bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center gap-2 font-medium"
+              className="px-3 py-2 text-xs bg-slate-600 hover:bg-slate-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium"
             >
               <Plus size={14} />
               Add TDN
             </button>
           )}
-          {!isEditing && (
+          {!isEditing ? (
             <button
               onClick={onEnterEdit}
-              className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors font-medium"
+              className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors font-medium flex items-center gap-2"
               data-testid="edit-previous-tdns-button"
             >
+              <Edit2 size={14} />
               Edit TDNs
             </button>
+          ) : (
+            <>
+              <button
+                onClick={handleCancel}
+                className="px-4 py-2 text-sm bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors font-medium flex items-center gap-2"
+                data-testid="cancel-previous-tdns-button"
+              >
+                <X size={14} />
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium flex items-center gap-2"
+                data-testid="save-previous-tdns-button"
+              >
+                <Save size={14} />
+                Save Changes
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -181,25 +201,6 @@ const PreviousTDNsTab: React.FC<PreviousTDNsTabProps> = ({
           </tbody>
         </table>
       </div>
-
-      {isEditing && (
-        <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
-          <button
-            onClick={handleCancel}
-            className="px-4 py-2 text-sm bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors font-medium"
-            data-testid="cancel-previous-tdns-button"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors font-medium"
-            data-testid="save-previous-tdns-button"
-          >
-            Save Changes
-          </button>
-        </div>
-      )}
     </div>
   );
 };

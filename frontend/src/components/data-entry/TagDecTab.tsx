@@ -6,9 +6,16 @@ interface TagDecTabProps {
   onEnterEdit: () => void;
   onSave: () => void;
   onCancel: () => void;
+  onDataChange?: (hasChanges: boolean) => void;
 }
 
-const TagDecTab: React.FC<TagDecTabProps> = ({ isEditing, onEnterEdit, onSave, onCancel }) => {
+const TagDecTab: React.FC<TagDecTabProps> = ({ 
+  isEditing, 
+  onEnterEdit, 
+  onSave, 
+  onCancel,
+  onDataChange 
+}) => {
   return (
     <div className="bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800 p-6">
       <div className="flex items-center justify-between mb-6">
