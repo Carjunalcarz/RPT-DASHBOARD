@@ -3,6 +3,8 @@ import { AssessmentRow, AssessmentSummary } from './types';
 import TableToolbar from './TableToolbar';
 import EditableCell from './EditableCell';
 import PrintDocument from './PrintDocument';
+import SelectionModal from './SelectionModal';
+import { useSelectionModal } from './useSelectionModal';
 import '@/styles/print.css';
 
 const AssessmentTable: React.FC = () => {
