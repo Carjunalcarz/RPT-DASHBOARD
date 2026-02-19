@@ -31,7 +31,7 @@ const Sidebar: React.FC = () => {
   return (
     <aside
       data-testid="sidebar"
-      className={`fixed left-0 top-0 h-full bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 ease-in-out z-40 ${
+      className={`fixed left-0 top-16 h-[calc(100%-4rem)] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 ease-in-out z-20 ${
         isCollapsed ? 'w-16' : 'w-64'
       }`}
     >
