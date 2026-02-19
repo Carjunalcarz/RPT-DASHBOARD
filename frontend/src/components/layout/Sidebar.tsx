@@ -23,6 +23,7 @@ const menuItems: MenuItem[] = [
   { path: '/assessment', label: 'Tax Assessment', icon: FileText },
   { path: '/payments', label: 'Payments', icon: CreditCard },
   { path: '/reports', label: 'Reports', icon: BarChart3 },
+  { path: '/data-entry', label: 'Data Entry', icon: ClipboardEdit },
   { path: '/settings', label: 'Settings', icon: Settings },
 ];
 
