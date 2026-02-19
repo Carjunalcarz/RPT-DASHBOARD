@@ -373,6 +373,13 @@ const AssessmentTable: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Hidden Print Document */}
+      <PrintDocument
+        propertyInfo={propertyInfo}
+        assessmentRows={rows}
+        summary={summary}
+      />
     </div>
   );
 };
