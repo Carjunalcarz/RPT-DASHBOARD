@@ -172,6 +172,26 @@ const AssessmentTable: React.FC = () => {
     );
   };
 
+  // Handler: Open selection modal
+  const handleOpenModal = (
+    rowId: string,
+    field: string,
+    modalType: 'kind' | 'class' | 'actualUse' | 'subClass'
+  ) => {
+    // Only allow modal if row is being edited
+    if (editingRowId !== rowId) {
+      return;
+    }
+    openModal(modalType, rowId, field);
+  };
+
+  // Handler: Select value from modal
+  const handleModalSelect = (value: string) => {
+    if (activeRowId && activeField) {
+      handleFieldChange(activeRowId, activeField as keyof AssessmentRow, value);
+    }
+  };
+
   // Calculate summary totals
   const calculateSummary = (): AssessmentSummary => {
     return rows.reduce(
