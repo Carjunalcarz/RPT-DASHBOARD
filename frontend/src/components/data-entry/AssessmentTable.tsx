@@ -282,6 +282,8 @@ const AssessmentTable: React.FC = () => {
                           value={row.kind}
                           onChange={(val) => handleFieldChange(row.id, 'kind', val)}
                           isEditing={isEditing}
+                          hasModal={true}
+                          onDoubleClick={() => handleOpenModal(row.id, 'kind', 'kind')}
                         />
                       </td>
                       <td className="border-r border-slate-200 dark:border-slate-700">
@@ -289,6 +291,8 @@ const AssessmentTable: React.FC = () => {
                           value={row.class}
                           onChange={(val) => handleFieldChange(row.id, 'class', val)}
                           isEditing={isEditing}
+                          hasModal={true}
+                          onDoubleClick={() => handleOpenModal(row.id, 'class', 'class')}
                         />
                       </td>
                       <td className="border-r border-slate-200 dark:border-slate-700">
@@ -296,6 +300,8 @@ const AssessmentTable: React.FC = () => {
                           value={row.actualUse}
                           onChange={(val) => handleFieldChange(row.id, 'actualUse', val)}
                           isEditing={isEditing}
+                          hasModal={true}
+                          onDoubleClick={() => handleOpenModal(row.id, 'actualUse', 'actualUse')}
                         />
                       </td>
                       <td className="border-r border-slate-200 dark:border-slate-700">
@@ -303,6 +309,8 @@ const AssessmentTable: React.FC = () => {
                           value={row.subClass}
                           onChange={(val) => handleFieldChange(row.id, 'subClass', val)}
                           isEditing={isEditing}
+                          hasModal={true}
+                          onDoubleClick={() => handleOpenModal(row.id, 'subClass', 'subClass')}
                         />
                       </td>
                       <td className="border-r border-slate-200 dark:border-slate-700">
