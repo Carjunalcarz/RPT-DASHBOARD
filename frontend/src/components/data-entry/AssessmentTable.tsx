@@ -240,8 +240,8 @@ const AssessmentTable: React.FC = () => {
                         isEditing
                           ? 'bg-white dark:bg-slate-900 cursor-default'
                           : isSelected
-                          ? 'bg-blue-50 dark:bg-blue-900/20 cursor-pointer'
-                          : 'bg-slate-50 dark:bg-slate-800/30 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/50'
+                          ? 'bg-slate-100 dark:bg-slate-800 cursor-pointer'
+                          : 'bg-slate-50 dark:bg-slate-800/30 cursor-pointer'
                       } ${!isEditing ? 'cursor-not-allowed' : ''}`}
                     >
                       <td className="border-r border-slate-200 dark:border-slate-700">
