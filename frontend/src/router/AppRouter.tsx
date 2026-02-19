@@ -100,6 +100,14 @@ const AppRouter: React.FC = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/data-entry"
+          element={
+            <ProtectedRoute>
+              <DataEntry />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Default Route */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
