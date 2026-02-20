@@ -1,24 +1,14 @@
 import React, { useState } from 'react';
 import { Building2, TreePine, Cog } from 'lucide-react';
-import { BuildingAssessment } from './building';
+import { BuildingAssessment } from '../building';
 
-interface AssessmentTabProps {
-  isEditing: boolean;
-  onEnterEdit: () => void;
-  onSave: () => void;
-  onCancel: () => void;
-  onDataChange?: (hasChanges: boolean) => void;
+interface AssessmentSectionProps {
+  isEnabled?: boolean;
 }
 
 type AssessmentType = 'land' | 'building' | 'machinery';
 
-const AssessmentTab: React.FC<AssessmentTabProps> = ({
-  isEditing,
-  onEnterEdit,
-  onSave,
-  onCancel,
-  onDataChange,
-}) => {
+const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled }) => {
   const [activeType, setActiveType] = useState<AssessmentType>('building');
 
   return (
@@ -97,4 +87,4 @@ const AssessmentTab: React.FC<AssessmentTabProps> = ({
   );
 };
 
-export default AssessmentTab;
+export default AssessmentSection;

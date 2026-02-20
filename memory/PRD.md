@@ -80,13 +80,36 @@ Build a production-ready enterprise dashboard web application for a "Real Proper
 ### P1 - High Priority
 - [ ] Connect tabs to real backend API
 - [ ] Implement actual data persistence
+- [ ] Implement Land Assessment module
+- [ ] Implement Machinery Assessment module
 
 ### P2 - Medium Priority  
 - [ ] Implement remaining pages (Properties, Payments, Reports, Settings)
 - [ ] Add breadcrumb navigation
 - [ ] User management functionality
+- [ ] Add form validation for Building Assessment
 
 ### P3 - Low Priority
 - [ ] Fix React hydration warnings in console
-- [ ] Add more comprehensive form validation
 - [ ] Export/Import functionality
+
+## What's Been Implemented (February 2025)
+
+### Building Assessment Module (NEW)
+- Complete Building Assessment UI with government-style form layout
+- **Features:**
+  - Assessment type selector (Land, Building, Machinery)
+  - Building records table with 11 columns
+  - CRUD operations (Add, Edit, Delete, Save, Cancel, Refresh, Print)
+  - Form section with dropdowns and inputs
+  - Auto-computed readonly fields:
+    - Base Market Value = Area × Unit Value
+    - Adjusted Market Value = Base Market Value × (Assessment Level / 100)
+    - Assessed Value = Adjusted Market Value
+  - Checkboxes: Taxable, Beneficial Use, Idle Land
+  - Structure sub-tab with CRUD for building components
+  - Adjustment sub-tab with CRUD for value adjustments
+- **Files:**
+  - `/app/frontend/src/components/data-entry/building/BuildingAssessment.tsx`
+  - `/app/frontend/src/components/data-entry/building/StructureTab.tsx`
+  - `/app/frontend/src/components/data-entry/building/AdjustmentTab.tsx`
