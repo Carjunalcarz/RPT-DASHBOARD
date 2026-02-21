@@ -1,6 +1,7 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useSidebar } from '@/context/SidebarContext';
+import { useAuth } from '@/context/AuthContext';
 import {
   LayoutDashboard,
   Building2,
@@ -9,6 +10,8 @@ import {
   BarChart3,
   Settings,
   ClipboardEdit,
+  LogOut,
+  User,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -29,11 +32,18 @@ const menuItems: MenuItem[] = [
 
 const Sidebar: React.FC = () => {
   const { isCollapsed } = useSidebar();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <aside
       data-testid="sidebar"
-      className={`fixed left-0 top-16 h-[calc(100%-4rem)] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 ease-in-out z-20 ${
+      className={`fixed left-0 top-16 h-[calc(100%-4rem)] bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl border-r border-white/30 dark:border-slate-800/70 shadow-[0_8px_30px_rgba(15,23,42,0.08)] transition-all duration-300 ease-in-out z-20 ${
         isCollapsed ? 'w-16' : 'w-64'
       }`}
     >
@@ -63,6 +73,43 @@ const Sidebar: React.FC = () => {
             );
           })}
         </nav>
+        <div className="px-2 py-3 border-t border-slate-200 dark:border-slate-800">
+          {isCollapsed ? (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex items-center justify-center rounded-lg px-2 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                data-testid="sidebar-logout"
+              >
+                <LogOut size={16} />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 rounded-lg px-3 py-2">
+              <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                <User size={16} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-slate-900 dark:text-slate-100 truncate">
+                  {user?.name || 'Guest'}
+                </p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                  {user?.role || 'Signed out'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex items-center gap-2 rounded-lg px-2 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                data-testid="sidebar-logout"
+              >
+                <LogOut size={16} />
+                <span>Logout</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </aside>
   );

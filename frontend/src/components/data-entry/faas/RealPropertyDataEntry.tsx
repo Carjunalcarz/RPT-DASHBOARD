@@ -271,16 +271,16 @@ const RealPropertyDataEntry: React.FC = () => {
 
         {/* Search and Filter Section */}
         <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-4 gap-4">
             {/* Search Field */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 min-w-0">
               <label className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
                 Search Field:
               </label>
               <select
                 value={searchField}
                 onChange={(e) => setSearchField(e.target.value)}
-                className="flex-1 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full sm:flex-1 min-w-0 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 data-testid="search-field"
               >
                 <option value="TDN">TDN</option>
@@ -291,7 +291,7 @@ const RealPropertyDataEntry: React.FC = () => {
             </div>
 
             {/* Filter Value */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 min-w-0">
               <label className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
                 Filter Value:
               </label>
@@ -299,23 +299,23 @@ const RealPropertyDataEntry: React.FC = () => {
                 type="text"
                 value={filterValue}
                 onChange={(e) => setFilterValue(e.target.value)}
-                className="flex-1 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full sm:flex-1 min-w-0 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 data-testid="filter-value"
               />
-              <button className="px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
+              <button className="w-full sm:w-auto px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
                 APPLY FILTER
               </button>
             </div>
 
             {/* Additional Search */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 min-w-0">
               <label className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
                 Additional Search:
               </label>
               <select
                 value={additionalSearch}
                 onChange={(e) => setAdditionalSearch(e.target.value)}
-                className="flex-1 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full sm:flex-1 min-w-0 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 data-testid="additional-search"
               >
                 <option value="All Records">All Records</option>
@@ -325,7 +325,7 @@ const RealPropertyDataEntry: React.FC = () => {
             </div>
 
             {/* Search */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 min-w-0">
               <label className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
                 Search:
               </label>
@@ -334,10 +334,10 @@ const RealPropertyDataEntry: React.FC = () => {
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
                 placeholder="Enter search text..."
-                className="flex-1 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full sm:flex-1 min-w-0 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 data-testid="search-text"
               />
-              <button className="px-3 py-2 text-xs bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-medium transition-colors whitespace-nowrap">
+              <button className="w-full sm:w-auto px-3 py-2 text-xs bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-medium transition-colors whitespace-nowrap">
                 SEARCH BY OWNER INDEX
               </button>
             </div>

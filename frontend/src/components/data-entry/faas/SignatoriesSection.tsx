@@ -1,6 +1,32 @@
-import React, { useState } from 'react';
-import { Save, X, RefreshCw, Users, Paperclip } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Save, X, RefreshCw, Users, Paperclip, Search, Eye, Mail, Download } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
+import { useAuth } from '@/context/AuthContext';
+import TableToolbar from '@/components/data-entry/TableToolbar';
+import {
+  addAuditEntry,
+  createMemorandum,
+  createSignatory,
+  createSwornStatement,
+  filterMemorandums,
+  filterSignatories,
+  filterSwornStatements,
+  MemorandumRecord,
+  SignatoryRecord,
+  SignatoryStatus,
+  SwornStatementRecord,
+  softDeleteMemorandum,
+  softDeleteSignatory,
+  softDeleteSwornStatement,
+  updateMemorandum,
+  updateSignatory,
+  updateSwornStatement,
+  validateMemorandum,
+  validateSignatory,
+  validateSwornStatement,
+  Attachment,
+  AuditEntry,
+} from './signatoriesCrud';
 
 interface DocumentationData {
   preparedBy: string;
@@ -11,22 +37,6 @@ interface RemarksData {
   remarks: string;
 }
 
-interface SwornStatementData {
-  landMarketValue: string;
-  improvementsMarketValue: string;
-  signatory: string;
-  tin1: string;
-  dateSubscribed: string;
-  taxCertNo: string;
-  taxCertDateIssued: string;
-  taxCertPlaceIssued: string;
-  officialAdministeringOath: string;
-  officialTitle: string;
-  tin2: string;
-  representativeName: string;
-  swornStatementNo: string;
-  swornStatementDate: string;
-}
 
 interface SignatoriesFormData {
   // Appraised By
@@ -99,22 +109,6 @@ const defaultRemarksData: RemarksData = {
   remarks: '',
 };
 
-const defaultSwornData: SwornStatementData = {
-  landMarketValue: '0.00',
-  improvementsMarketValue: '0.00',
-  signatory: 'REVISED FOR THE OWNER PURSUANT TO SEC. 204 OF R.A. 7160',
-  tin1: '',
-  dateSubscribed: '',
-  taxCertNo: '',
-  taxCertDateIssued: '',
-  taxCertPlaceIssued: '',
-  officialAdministeringOath: '',
-  officialTitle: '',
-  tin2: '',
-  representativeName: '',
-  swornStatementNo: '',
-  swornStatementDate: '',
-};
 
 const defaultFormData: SignatoriesFormData = {
   appraisedBy: '',
@@ -171,16 +165,173 @@ const defaultFormData: SignatoriesFormData = {
 
 const SignatoriesSection: React.FC = () => {
   const { headerColor, headerColorDark } = useThemeColor();
+  const { user } = useAuth();
   const [activeSubTab, setActiveSubTab] = useState<'signatories' | 'memorandum' | 'sworn' | 'documentation' | 'remarks'>('signatories');
   const [formData, setFormData] = useState<SignatoriesFormData>(defaultFormData);
-  const [swornData, setSwornData] = useState<SwornStatementData>(defaultSwornData);
   const [documentationData, setDocumentationData] = useState<DocumentationData>(defaultDocumentationData);
   const [remarksData, setRemarksData] = useState<RemarksData>(defaultRemarksData);
   const [isEditing, setIsEditing] = useState(false);
+  const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
+  const [isSavingSignatory, setIsSavingSignatory] = useState(false);
+  const [isSavingMemo, setIsSavingMemo] = useState(false);
+  const [isSavingSworn, setIsSavingSworn] = useState(false);
+
+  const currentUser = user?.name || 'System';
+  const canEdit = user?.role === 'Administrator';
+
+  const [signatories, setSignatories] = useState<SignatoryRecord[]>([
+    {
+      id: 'sig-1',
+      name: 'Junie P. Vinatero',
+      title: 'Provincial Assessor',
+      status: 'Approved',
+      dateSigned: '2024-01-15',
+      sgd: true,
+      tpd: false,
+      notes: 'Approved after review',
+      createdAt: '2024-01-10T09:00:00.000Z',
+      updatedAt: '2024-01-15T10:30:00.000Z',
+      deletedAt: null,
+      createdBy: 'Admin User',
+      updatedBy: 'Admin User',
+    },
+    {
+      id: 'sig-2',
+      name: 'Norma C. Sarigumba',
+      title: 'Municipal Assessor',
+      status: 'Pending',
+      dateSigned: '',
+      sgd: false,
+      tpd: true,
+      notes: 'Pending final approval',
+      createdAt: '2024-01-12T09:00:00.000Z',
+      updatedAt: '2024-01-12T09:00:00.000Z',
+      deletedAt: null,
+      createdBy: 'Admin User',
+      updatedBy: 'Admin User',
+    },
+  ]);
+  const [memorandums, setMemorandums] = useState<MemorandumRecord[]>([
+    {
+      id: 'mem-1',
+      subject: 'General Revision Note',
+      body: 'Revised pursuant to Sec. 219 of R.A. 7160 and implemented by S.P. Ordinance No. 737-2025.',
+      status: 'Approved',
+      effectiveDate: '2025-01-01',
+      attachments: [],
+      createdAt: '2024-12-20T08:00:00.000Z',
+      updatedAt: '2024-12-20T08:00:00.000Z',
+      deletedAt: null,
+      createdBy: 'Admin User',
+      updatedBy: 'Admin User',
+    },
+  ]);
+
+  const [selectedSignatoryId, setSelectedSignatoryId] = useState<string | null>(null);
+  const [editingSignatoryId, setEditingSignatoryId] = useState<string | null>(null);
+  const [signatoryDraft, setSignatoryDraft] = useState<SignatoryRecord>({
+    id: '',
+    name: '',
+    title: '',
+    status: 'Draft',
+    dateSigned: '',
+    sgd: false,
+    tpd: false,
+    notes: '',
+    createdAt: '',
+    updatedAt: '',
+    deletedAt: null,
+    createdBy: '',
+    updatedBy: '',
+  });
+  const [signatoryErrors, setSignatoryErrors] = useState<Record<string, string>>({});
+  const [signatoryQuery, setSignatoryQuery] = useState('');
+  const [signatoryStatusFilter, setSignatoryStatusFilter] = useState<SignatoryStatus | 'All'>('All');
+  const [signatoryShowDeleted, setSignatoryShowDeleted] = useState(false);
+  const [viewSignatoryId, setViewSignatoryId] = useState<string | null>(null);
+
+  const [selectedMemoId, setSelectedMemoId] = useState<string | null>(null);
+  const [editingMemoId, setEditingMemoId] = useState<string | null>(null);
+  const [memoDraft, setMemoDraft] = useState<MemorandumRecord>({
+    id: '',
+    subject: '',
+    body: '',
+    status: 'Draft',
+    effectiveDate: '',
+    attachments: [],
+    createdAt: '',
+    updatedAt: '',
+    deletedAt: null,
+    createdBy: '',
+    updatedBy: '',
+  });
+  const [memoErrors, setMemoErrors] = useState<Record<string, string>>({});
+  const [memoQuery, setMemoQuery] = useState('');
+  const [memoStatusFilter, setMemoStatusFilter] = useState<SignatoryStatus | 'All'>('All');
+  const [memoShowDeleted, setMemoShowDeleted] = useState(false);
+  const [viewMemoId, setViewMemoId] = useState<string | null>(null);
+  const [swornStatements, setSwornStatements] = useState<SwornStatementRecord[]>([
+    {
+      id: 'sworn-1',
+      signatory: 'Revised for the owner pursuant to Sec. 204 of R.A. 7160',
+      status: 'Pending',
+      dateSubscribed: '',
+      tin1: '',
+      tin2: '',
+      officialAdministeringOath: '',
+      officialTitle: '',
+      representativeName: '',
+      swornStatementNo: 'SSA-2025-001',
+      swornStatementDate: '',
+      landMarketValue: '0.00',
+      improvementsMarketValue: '0.00',
+      taxCertNo: '',
+      taxCertDateIssued: '',
+      taxCertPlaceIssued: '',
+      notes: '',
+      createdAt: '2025-01-10T08:30:00.000Z',
+      updatedAt: '2025-01-10T08:30:00.000Z',
+      deletedAt: null,
+      createdBy: 'Admin User',
+      updatedBy: 'Admin User',
+    },
+  ]);
+  const [selectedSwornId, setSelectedSwornId] = useState<string | null>(null);
+  const [editingSwornId, setEditingSwornId] = useState<string | null>(null);
+  const [swornDraft, setSwornDraft] = useState<SwornStatementRecord>({
+    id: '',
+    signatory: '',
+    status: 'Draft',
+    dateSubscribed: '',
+    tin1: '',
+    tin2: '',
+    officialAdministeringOath: '',
+    officialTitle: '',
+    representativeName: '',
+    swornStatementNo: '',
+    swornStatementDate: '',
+    landMarketValue: '',
+    improvementsMarketValue: '',
+    taxCertNo: '',
+    taxCertDateIssued: '',
+    taxCertPlaceIssued: '',
+    notes: '',
+    createdAt: '',
+    updatedAt: '',
+    deletedAt: null,
+    createdBy: '',
+    updatedBy: '',
+  });
+  const [swornErrors, setSwornErrors] = useState<Record<string, string>>({});
+  const [swornQuery, setSwornQuery] = useState('');
+  const [swornStatusFilter, setSwornStatusFilter] = useState<SignatoryStatus | 'All'>('All');
+  const [swornShowDeleted, setSwornShowDeleted] = useState(false);
+  const [viewSwornId, setViewSwornId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ type: 'signatory' | 'memorandum' | 'sworn'; id: string } | null>(null);
 
   const handleSave = () => {
     setIsEditing(false);
-    // Save logic here
   };
 
   const handleCancel = () => {
@@ -189,7 +340,435 @@ const SignatoriesSection: React.FC = () => {
   };
 
   const handleRefresh = () => {
-    // Refresh logic here
+    setFormData(defaultFormData);
+    setDocumentationData(defaultDocumentationData);
+    setRemarksData(defaultRemarksData);
+  };
+
+  const pushNotice = (type: 'success' | 'error', message: string) => {
+    setNotice({ type, message });
+    setTimeout(() => setNotice(null), 2500);
+  };
+
+  const handleSignatoryAdd = () => {
+    if (!canEdit || editingSignatoryId) return;
+    setEditingSignatoryId('new');
+    setSelectedSignatoryId(null);
+    setSignatoryDraft({
+      id: '',
+      name: '',
+      title: '',
+      status: 'Draft',
+      dateSigned: '',
+      sgd: false,
+      tpd: false,
+      notes: '',
+      createdAt: '',
+      updatedAt: '',
+      deletedAt: null,
+      createdBy: '',
+      updatedBy: '',
+    });
+    setSignatoryErrors({});
+  };
+
+  const handleSignatoryEdit = () => {
+    if (!canEdit || !selectedSignatoryId || editingSignatoryId) return;
+    const record = signatories.find((item) => item.id === selectedSignatoryId);
+    if (!record) return;
+    setEditingSignatoryId(record.id);
+    setSignatoryDraft({ ...record });
+    setSignatoryErrors({});
+  };
+
+  const handleSignatorySave = () => {
+    if (!canEdit || !editingSignatoryId) return;
+    const errors = validateSignatory(signatoryDraft);
+    if (Object.keys(errors).length > 0) {
+      setSignatoryErrors(errors);
+      pushNotice('error', 'Please complete required fields.');
+      return;
+    }
+    setIsSavingSignatory(true);
+    if (editingSignatoryId === 'new') {
+      const result = createSignatory(signatories, signatoryDraft, currentUser);
+      setSignatories(result.list);
+      setAuditLog((prev) => addAuditEntry(prev, result.audit));
+      setSelectedSignatoryId(result.record.id);
+    } else {
+      const result = updateSignatory(signatories, editingSignatoryId, signatoryDraft, currentUser);
+      if (result.record && result.audit) {
+        const audit = result.audit;
+        setSignatories(result.list);
+        setAuditLog((prev) => addAuditEntry(prev, audit));
+      }
+    }
+    setTimeout(() => {
+      setIsSavingSignatory(false);
+      setEditingSignatoryId(null);
+      pushNotice('success', 'Signatory saved.');
+    }, 600);
+  };
+
+  const handleSignatoryCancel = () => {
+    setEditingSignatoryId(null);
+    setSignatoryErrors({});
+    if (selectedSignatoryId) {
+      const record = signatories.find((item) => item.id === selectedSignatoryId);
+      if (record) setSignatoryDraft({ ...record });
+    }
+  };
+
+  const handleSignatoryDelete = () => {
+    if (!canEdit || !selectedSignatoryId || editingSignatoryId) return;
+    setPendingDelete({ type: 'signatory', id: selectedSignatoryId });
+  };
+
+  const handleSignatoryRefresh = () => {
+    setSignatoryQuery('');
+    setSignatoryStatusFilter('All');
+    setSignatoryShowDeleted(false);
+  };
+
+  const handleMemoAdd = () => {
+    if (!canEdit || editingMemoId) return;
+    setEditingMemoId('new');
+    setSelectedMemoId(null);
+    setMemoDraft({
+      id: '',
+      subject: '',
+      body: '',
+      status: 'Draft',
+      effectiveDate: '',
+      attachments: [],
+      createdAt: '',
+      updatedAt: '',
+      deletedAt: null,
+      createdBy: '',
+      updatedBy: '',
+    });
+    setMemoErrors({});
+  };
+
+  const handleMemoEdit = () => {
+    if (!canEdit || !selectedMemoId || editingMemoId) return;
+    const record = memorandums.find((item) => item.id === selectedMemoId);
+    if (!record) return;
+    setEditingMemoId(record.id);
+    setMemoDraft({ ...record, attachments: [...record.attachments] });
+    setMemoErrors({});
+  };
+
+  const handleMemoSave = () => {
+    if (!canEdit || !editingMemoId) return;
+    const errors = validateMemorandum(memoDraft);
+    if (Object.keys(errors).length > 0) {
+      setMemoErrors(errors);
+      pushNotice('error', 'Please complete required fields.');
+      return;
+    }
+    setIsSavingMemo(true);
+    if (editingMemoId === 'new') {
+      const result = createMemorandum(memorandums, memoDraft, currentUser);
+      setMemorandums(result.list);
+      setAuditLog((prev) => addAuditEntry(prev, result.audit));
+      setSelectedMemoId(result.record.id);
+    } else {
+      const result = updateMemorandum(memorandums, editingMemoId, memoDraft, currentUser);
+      if (result.record && result.audit) {
+        const audit = result.audit;
+        setMemorandums(result.list);
+        setAuditLog((prev) => addAuditEntry(prev, audit));
+      }
+    }
+    setTimeout(() => {
+      setIsSavingMemo(false);
+      setEditingMemoId(null);
+      pushNotice('success', 'Memorandum saved.');
+    }, 600);
+  };
+
+  const handleMemoCancel = () => {
+    setEditingMemoId(null);
+    setMemoErrors({});
+    if (selectedMemoId) {
+      const record = memorandums.find((item) => item.id === selectedMemoId);
+      if (record) setMemoDraft({ ...record, attachments: [...record.attachments] });
+    }
+  };
+
+  const handleMemoDelete = () => {
+    if (!canEdit || !selectedMemoId || editingMemoId) return;
+    setPendingDelete({ type: 'memorandum', id: selectedMemoId });
+  };
+
+  const handleMemoRefresh = () => {
+    setMemoQuery('');
+    setMemoStatusFilter('All');
+    setMemoShowDeleted(false);
+  };
+
+  const handleSwornAdd = () => {
+    if (!canEdit || editingSwornId) return;
+    setEditingSwornId('new');
+    setSelectedSwornId(null);
+    setSwornDraft({
+      id: '',
+      signatory: '',
+      status: 'Draft',
+      dateSubscribed: '',
+      tin1: '',
+      tin2: '',
+      officialAdministeringOath: '',
+      officialTitle: '',
+      representativeName: '',
+      swornStatementNo: '',
+      swornStatementDate: '',
+      landMarketValue: '',
+      improvementsMarketValue: '',
+      taxCertNo: '',
+      taxCertDateIssued: '',
+      taxCertPlaceIssued: '',
+      notes: '',
+      createdAt: '',
+      updatedAt: '',
+      deletedAt: null,
+      createdBy: '',
+      updatedBy: '',
+    });
+    setSwornErrors({});
+  };
+
+  const handleSwornEdit = () => {
+    if (!canEdit || !selectedSwornId || editingSwornId) return;
+    const record = swornStatements.find((item) => item.id === selectedSwornId);
+    if (!record) return;
+    setEditingSwornId(record.id);
+    setSwornDraft({ ...record });
+    setSwornErrors({});
+  };
+
+  const handleSwornSave = () => {
+    if (!canEdit || !editingSwornId) return;
+    const errors = validateSwornStatement(swornDraft);
+    if (Object.keys(errors).length > 0) {
+      setSwornErrors(errors);
+      pushNotice('error', 'Please complete required fields.');
+      return;
+    }
+    setIsSavingSworn(true);
+    if (editingSwornId === 'new') {
+      const result = createSwornStatement(swornStatements, swornDraft, currentUser);
+      setSwornStatements(result.list);
+      setAuditLog((prev) => addAuditEntry(prev, result.audit));
+      setSelectedSwornId(result.record.id);
+    } else {
+      const result = updateSwornStatement(swornStatements, editingSwornId, swornDraft, currentUser);
+      if (result.record && result.audit) {
+        const audit = result.audit;
+        setSwornStatements(result.list);
+        setAuditLog((prev) => addAuditEntry(prev, audit));
+      }
+    }
+    setTimeout(() => {
+      setIsSavingSworn(false);
+      setEditingSwornId(null);
+      pushNotice('success', 'Sworn statement saved.');
+    }, 600);
+  };
+
+  const handleSwornCancel = () => {
+    setEditingSwornId(null);
+    setSwornErrors({});
+    if (selectedSwornId) {
+      const record = swornStatements.find((item) => item.id === selectedSwornId);
+      if (record) setSwornDraft({ ...record });
+    }
+  };
+
+  const handleSwornDelete = () => {
+    if (!canEdit || !selectedSwornId || editingSwornId) return;
+    setPendingDelete({ type: 'sworn', id: selectedSwornId });
+  };
+
+  const handleSwornRefresh = () => {
+    setSwornQuery('');
+    setSwornStatusFilter('All');
+    setSwornShowDeleted(false);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!pendingDelete) return;
+    if (pendingDelete.type === 'signatory') {
+      const result = softDeleteSignatory(signatories, pendingDelete.id, currentUser);
+      if (result.record && result.audit) {
+        const audit = result.audit;
+        setSignatories(result.list);
+        setAuditLog((prev) => addAuditEntry(prev, audit));
+        setSelectedSignatoryId(null);
+      }
+    } else if (pendingDelete.type === 'memorandum') {
+      const result = softDeleteMemorandum(memorandums, pendingDelete.id, currentUser);
+      if (result.record && result.audit) {
+        const audit = result.audit;
+        setMemorandums(result.list);
+        setAuditLog((prev) => addAuditEntry(prev, audit));
+        setSelectedMemoId(null);
+      }
+    } else {
+      const result = softDeleteSwornStatement(swornStatements, pendingDelete.id, currentUser);
+      if (result.record && result.audit) {
+        const audit = result.audit;
+        setSwornStatements(result.list);
+        setAuditLog((prev) => addAuditEntry(prev, audit));
+        setSelectedSwornId(null);
+      }
+    }
+    setPendingDelete(null);
+    pushNotice('success', 'Record deleted.');
+  };
+
+  const handleAttachmentAdd = (file: File) => {
+    const attachment: Attachment = {
+      id: `att-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: file.name,
+      size: file.size,
+    };
+    setMemoDraft((prev) => ({ ...prev, attachments: [...prev.attachments, attachment] }));
+  };
+
+  const handleAttachmentRemove = (id: string) => {
+    setMemoDraft((prev) => ({ ...prev, attachments: prev.attachments.filter((item) => item.id !== id) }));
+  };
+
+  const downloadFile = (filename: string, content: string) => {
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  const handleExportSignatories = () => {
+    downloadFile('signatories.json', JSON.stringify(signatories, null, 2));
+  };
+
+  const handleExportMemorandums = () => {
+    downloadFile('memorandums.json', JSON.stringify(memorandums, null, 2));
+  };
+
+  const handleExportSwornStatements = () => {
+    downloadFile('sworn-statements.json', JSON.stringify(swornStatements, null, 2));
+  };
+
+  const handleNotify = (type: 'signatory' | 'memorandum' | 'sworn', id: string, label: string) => {
+    setAuditLog((prev) =>
+      addAuditEntry(
+        prev,
+        {
+          id: `${type}-${id}-notify-${Date.now()}`,
+          entity: type,
+          entityId: id,
+          action: 'notify',
+          user: currentUser,
+          timestamp: new Date().toISOString(),
+          details: `Notification sent for ${label}`,
+        }
+      )
+    );
+    pushNotice('success', 'Notification queued.');
+  };
+
+  const handleViewRecord = (type: 'signatory' | 'memorandum' | 'sworn', id: string) => {
+    if (type === 'signatory') {
+      setViewSignatoryId(id);
+    } else if (type === 'memorandum') {
+      setViewMemoId(id);
+    } else {
+      setViewSwornId(id);
+    }
+    setAuditLog((prev) =>
+      addAuditEntry(
+        prev,
+        {
+          id: `${type}-${id}-view-${Date.now()}`,
+          entity: type,
+          entityId: id,
+          action: 'view',
+          user: currentUser,
+          timestamp: new Date().toISOString(),
+          details: `Viewed ${type} record`,
+        }
+      )
+    );
+  };
+
+  const filteredSignatories = useMemo(
+    () => filterSignatories(signatories, signatoryQuery, signatoryStatusFilter, signatoryShowDeleted),
+    [signatories, signatoryQuery, signatoryStatusFilter, signatoryShowDeleted]
+  );
+
+  const filteredMemorandums = useMemo(
+    () => filterMemorandums(memorandums, memoQuery, memoStatusFilter, memoShowDeleted),
+    [memorandums, memoQuery, memoStatusFilter, memoShowDeleted]
+  );
+
+  const filteredSwornStatements = useMemo(
+    () => filterSwornStatements(swornStatements, swornQuery, swornStatusFilter, swornShowDeleted),
+    [swornStatements, swornQuery, swornStatusFilter, swornShowDeleted]
+  );
+
+  const signatorySummary = useMemo(
+    () =>
+      signatories.reduce(
+        (acc, item) => {
+          acc.total += 1;
+          if (item.status === 'Approved') acc.approved += 1;
+          if (item.status === 'Pending') acc.pending += 1;
+          if (item.status === 'Rejected') acc.rejected += 1;
+          return acc;
+        },
+        { total: 0, approved: 0, pending: 0, rejected: 0 }
+      ),
+    [signatories]
+  );
+
+  const memoSummary = useMemo(
+    () =>
+      memorandums.reduce(
+        (acc, item) => {
+          acc.total += 1;
+          if (item.status === 'Approved') acc.approved += 1;
+          if (item.status === 'Pending') acc.pending += 1;
+          if (item.status === 'Rejected') acc.rejected += 1;
+          return acc;
+        },
+        { total: 0, approved: 0, pending: 0, rejected: 0 }
+      ),
+    [memorandums]
+  );
+
+  const swornSummary = useMemo(
+    () =>
+      swornStatements.reduce(
+        (acc, item) => {
+          acc.total += 1;
+          if (item.status === 'Approved') acc.approved += 1;
+          if (item.status === 'Pending') acc.pending += 1;
+          if (item.status === 'Rejected') acc.rejected += 1;
+          return acc;
+        },
+        { total: 0, approved: 0, pending: 0, rejected: 0 }
+      ),
+    [swornStatements]
+  );
+
+  const statusBadgeClass = (status: SignatoryStatus) => {
+    if (status === 'Approved') return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-200';
+    if (status === 'Pending') return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-200';
+    if (status === 'Rejected') return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-200';
+    return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200';
   };
 
   const subTabs = [
@@ -342,40 +921,266 @@ const SignatoriesSection: React.FC = () => {
 
       {/* Content */}
       <div className="p-3">
+        {notice && (
+          <div className={`mb-3 rounded-lg px-3 py-2 text-xs font-medium ${notice.type === 'success' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-200' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-200'}`}>
+            {notice.message}
+          </div>
+        )}
         {activeSubTab === 'signatories' && (
-          <div className="space-y-0">
-            {renderSignatoryRow('Appraised By', 'appraisedBy', 'appraisedPosition', 'appraisedDate', 'appraisedSGD', 'appraisedTPD')}
-            {renderSignatoryRow('Assessed By', 'assessedBy', 'assessedPosition', 'assessedDate', 'assessedSGD', 'assessedTPD')}
-            {renderSignatoryRow('Checked and Reviewed', 'checkedBy', 'checkedPosition', 'checkedDate', 'checkedSGD', 'checkedTPD')}
-            {renderSignatoryRow('Recommending Approval', 'recommendingBy', 'recommendingPosition', 'recommendingDate', 'recommendingSGD', 'recommendingTPD')}
-            {renderSignatoryRow('Approved By', 'approvedBy', 'approvedPosition', 'approvedDate', 'approvedSGD', 'approvedTPD')}
-            {renderSignatoryRow('Provincial Assessor', 'provincialAssessor', 'provincialPosition', 'provincialDate', 'provincialSGD', 'provincialTPD')}
-            {renderSignatoryRow('City/Municipal Assessor', 'cityAssessor', 'cityPosition', 'cityDate', 'citySGD', 'cityTPD')}
-            {renderSignatoryRow('Deputy', 'deputy', 'deputyPosition', 'deputyDate', 'deputySGD', 'deputyTPD')}
-            
-            {/* Entry Date Row */}
-            <div className="grid grid-cols-12 gap-2 items-center py-2 mt-4 border-t-2 border-slate-300 dark:border-slate-600">
-              <div className="col-span-2"></div>
-              <div className="col-span-3">
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Entry Date:</label>
-                <input
-                  type="date"
-                  value={formData.entryDate}
-                  onChange={(e) => setFormData({ ...formData, entryDate: e.target.value })}
-                  disabled={!isEditing}
-                  className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
-                />
+          <div className="space-y-3">
+            <TableToolbar
+              onAdd={handleSignatoryAdd}
+              onEdit={handleSignatoryEdit}
+              onDelete={handleSignatoryDelete}
+              onSave={handleSignatorySave}
+              onCancel={handleSignatoryCancel}
+              onRefresh={handleSignatoryRefresh}
+              onPrint={handleExportSignatories}
+              isEditing={!!editingSignatoryId}
+              hasSelection={!!selectedSignatoryId}
+            />
+            {!canEdit && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-200">
+                You have view-only access to signatories.
               </div>
-              <div className="col-span-7">
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">By:</label>
-                <select
-                  value={formData.entryBy}
-                  onChange={(e) => setFormData({ ...formData, entryBy: e.target.value })}
-                  disabled={!isEditing}
-                  className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
-                >
-                  <option value=""></option>
-                </select>
+            )}
+            {isSavingSignatory && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:border-blue-700/40 dark:bg-blue-900/20 dark:text-blue-200">
+                Saving signatory changes...
+              </div>
+            )}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <div className="lg:col-span-2 space-y-3">
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <div className="relative flex-1 min-w-[180px]">
+                      <Search size={14} className="absolute left-2 top-2.5 text-slate-400" />
+                      <input
+                        value={signatoryQuery}
+                        onChange={(e) => setSignatoryQuery(e.target.value)}
+                        placeholder="Search signatories..."
+                        className="w-full pl-7 pr-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <select
+                      value={signatoryStatusFilter}
+                      onChange={(e) => setSignatoryStatusFilter(e.target.value as SignatoryStatus | 'All')}
+                      className="px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
+                    >
+                      <option value="All">All Status</option>
+                      <option value="Draft">Draft</option>
+                      <option value="Pending">Pending</option>
+                      <option value="Approved">Approved</option>
+                      <option value="Rejected">Rejected</option>
+                    </select>
+                    <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                      <input
+                        type="checkbox"
+                        checked={signatoryShowDeleted}
+                        onChange={(e) => setSignatoryShowDeleted(e.target.checked)}
+                        className="h-3 w-3 rounded border-slate-300 dark:border-slate-600"
+                      />
+                      Show deleted
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleExportSignatories}
+                      className="px-3 py-2 text-xs bg-slate-600 hover:bg-slate-700 text-white rounded-lg flex items-center gap-2"
+                    >
+                      <Download size={14} />
+                      Export
+                    </button>
+                    {selectedSignatoryId && (
+                      <button
+                        type="button"
+                        onClick={() => handleNotify('signatory', selectedSignatoryId, 'signatory')}
+                        className="px-3 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2"
+                      >
+                        <Mail size={14} />
+                        Notify
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Name</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Title</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Status</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Date Signed</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredSignatories.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
+                              No signatories found.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredSignatories.map((item) => (
+                            <tr
+                              key={item.id}
+                              onClick={() => setSelectedSignatoryId(item.id)}
+                              className={`border-b border-slate-200 dark:border-slate-700 cursor-pointer ${
+                                selectedSignatoryId === item.id ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                              }`}
+                            >
+                              <td className="px-3 py-2 text-slate-700 dark:text-slate-200">
+                                {item.name}
+                                {item.deletedAt && <span className="ml-2 text-[10px] text-red-500">Deleted</span>}
+                              </td>
+                              <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{item.title}</td>
+                              <td className="px-3 py-2">
+                                <span className={`px-2 py-1 rounded-full text-[10px] font-semibold ${statusBadgeClass(item.status)}`}>
+                                  {item.status}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{item.dateSigned || '--'}</td>
+                              <td className="px-3 py-2">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewRecord('signatory', item.id);
+                                  }}
+                                  className="px-2 py-1 text-[11px] bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center gap-1"
+                                >
+                                  <Eye size={12} />
+                                  View
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                  <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">
+                    {editingSignatoryId ? 'Edit Signatory' : 'Signatory Details'}
+                  </h4>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Name</label>
+                      <input
+                        value={signatoryDraft.name}
+                        onChange={(e) => setSignatoryDraft({ ...signatoryDraft, name: e.target.value })}
+                        disabled={!editingSignatoryId}
+                        className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                      />
+                      {signatoryErrors.name && (
+                        <p className="text-[11px] text-red-600 mt-1">{signatoryErrors.name}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Title</label>
+                      <input
+                        value={signatoryDraft.title}
+                        onChange={(e) => setSignatoryDraft({ ...signatoryDraft, title: e.target.value })}
+                        disabled={!editingSignatoryId}
+                        className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                      />
+                      {signatoryErrors.title && (
+                        <p className="text-[11px] text-red-600 mt-1">{signatoryErrors.title}</p>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Status</label>
+                        <select
+                          value={signatoryDraft.status}
+                          onChange={(e) => setSignatoryDraft({ ...signatoryDraft, status: e.target.value as SignatoryStatus })}
+                          disabled={!editingSignatoryId}
+                          className="w-full px-2 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                        >
+                          <option value="Draft">Draft</option>
+                          <option value="Pending">Pending</option>
+                          <option value="Approved">Approved</option>
+                          <option value="Rejected">Rejected</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Date Signed</label>
+                        <input
+                          type="date"
+                          value={signatoryDraft.dateSigned}
+                          onChange={(e) => setSignatoryDraft({ ...signatoryDraft, dateSigned: e.target.value })}
+                          disabled={!editingSignatoryId}
+                          className="w-full px-2 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                        />
+                        {signatoryErrors.dateSigned && (
+                          <p className="text-[11px] text-red-600 mt-1">{signatoryErrors.dateSigned}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-300">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={signatoryDraft.sgd}
+                          onChange={(e) => setSignatoryDraft({ ...signatoryDraft, sgd: e.target.checked })}
+                          disabled={!editingSignatoryId}
+                          className="h-3 w-3 rounded border-slate-300 dark:border-slate-600"
+                        />
+                        SGD
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={signatoryDraft.tpd}
+                          onChange={(e) => setSignatoryDraft({ ...signatoryDraft, tpd: e.target.checked })}
+                          disabled={!editingSignatoryId}
+                          className="h-3 w-3 rounded border-slate-300 dark:border-slate-600"
+                        />
+                        TPD
+                      </label>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Notes</label>
+                      <textarea
+                        value={signatoryDraft.notes}
+                        onChange={(e) => setSignatoryDraft({ ...signatoryDraft, notes: e.target.value })}
+                        disabled={!editingSignatoryId}
+                        rows={3}
+                        className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                      />
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Updated by {signatoryDraft.updatedBy || '--'} at {signatoryDraft.updatedAt || '--'}
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
+                  <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+                    <span>Total: {signatorySummary.total}</span>
+                    <span>Approved: {signatorySummary.approved}</span>
+                    <span>Pending: {signatorySummary.pending}</span>
+                    <span>Rejected: {signatorySummary.rejected}</span>
+                  </div>
+                </div>
+                <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                  <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">Audit Trail</h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {auditLog.length === 0 ? (
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">No audit entries yet.</p>
+                    ) : (
+                      auditLog.map((entry) => (
+                        <div key={entry.id} className="text-[11px] text-slate-600 dark:text-slate-300">
+                          <div className="font-medium">{entry.details}</div>
+                          <div>{entry.user} • {new Date(entry.timestamp).toLocaleString()}</div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -383,264 +1188,603 @@ const SignatoriesSection: React.FC = () => {
 
         {activeSubTab === 'memorandum' && (
           <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                Other Memorandum
-              </label>
-              <textarea
-                value="Revised pursuant to Sec. 219 of R.A. 7160 and as implemented by S.P. Ordinance No. 737-2025- 6th General Revision. NOTE: THIS BLDG. IS CONSTRUCTED ON THE LOT OF THE SAME OWNER UNDER T.D. NO. 25-07-0001-00004."
-                onChange={(e) => {}}
-                disabled={!isEditing}
-                rows={15}
-                className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60 font-mono"
-              />
+            <TableToolbar
+              onAdd={handleMemoAdd}
+              onEdit={handleMemoEdit}
+              onDelete={handleMemoDelete}
+              onSave={handleMemoSave}
+              onCancel={handleMemoCancel}
+              onRefresh={handleMemoRefresh}
+              onPrint={handleExportMemorandums}
+              isEditing={!!editingMemoId}
+              hasSelection={!!selectedMemoId}
+            />
+            {!canEdit && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-200">
+                You have view-only access to memorandums.
+              </div>
+            )}
+            {isSavingMemo && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:border-blue-700/40 dark:bg-blue-900/20 dark:text-blue-200">
+                Saving memorandum changes...
+              </div>
+            )}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <div className="lg:col-span-2 space-y-3">
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <div className="relative flex-1 min-w-[180px]">
+                      <Search size={14} className="absolute left-2 top-2.5 text-slate-400" />
+                      <input
+                        value={memoQuery}
+                        onChange={(e) => setMemoQuery(e.target.value)}
+                        placeholder="Search memorandums..."
+                        className="w-full pl-7 pr-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <select
+                      value={memoStatusFilter}
+                      onChange={(e) => setMemoStatusFilter(e.target.value as SignatoryStatus | 'All')}
+                      className="px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
+                    >
+                      <option value="All">All Status</option>
+                      <option value="Draft">Draft</option>
+                      <option value="Pending">Pending</option>
+                      <option value="Approved">Approved</option>
+                      <option value="Rejected">Rejected</option>
+                    </select>
+                    <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                      <input
+                        type="checkbox"
+                        checked={memoShowDeleted}
+                        onChange={(e) => setMemoShowDeleted(e.target.checked)}
+                        className="h-3 w-3 rounded border-slate-300 dark:border-slate-600"
+                      />
+                      Show deleted
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleExportMemorandums}
+                      className="px-3 py-2 text-xs bg-slate-600 hover:bg-slate-700 text-white rounded-lg flex items-center gap-2"
+                    >
+                      <Download size={14} />
+                      Export
+                    </button>
+                    {selectedMemoId && (
+                      <button
+                        type="button"
+                        onClick={() => handleNotify('memorandum', selectedMemoId, 'memorandum')}
+                        className="px-3 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2"
+                      >
+                        <Mail size={14} />
+                        Notify
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Subject</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Status</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Effective Date</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredMemorandums.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
+                              No memorandums found.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredMemorandums.map((item) => (
+                            <tr
+                              key={item.id}
+                              onClick={() => setSelectedMemoId(item.id)}
+                              className={`border-b border-slate-200 dark:border-slate-700 cursor-pointer ${
+                                selectedMemoId === item.id ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                              }`}
+                            >
+                              <td className="px-3 py-2 text-slate-700 dark:text-slate-200">
+                                {item.subject}
+                                {item.deletedAt && <span className="ml-2 text-[10px] text-red-500">Deleted</span>}
+                              </td>
+                              <td className="px-3 py-2">
+                                <span className={`px-2 py-1 rounded-full text-[10px] font-semibold ${statusBadgeClass(item.status)}`}>
+                                  {item.status}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{item.effectiveDate || '--'}</td>
+                              <td className="px-3 py-2">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewRecord('memorandum', item.id);
+                                  }}
+                                  className="px-2 py-1 text-[11px] bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center gap-1"
+                                >
+                                  <Eye size={12} />
+                                  View
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                  <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">
+                    {editingMemoId ? 'Edit Memorandum' : 'Memorandum Details'}
+                  </h4>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Subject</label>
+                      <input
+                        value={memoDraft.subject}
+                        onChange={(e) => setMemoDraft({ ...memoDraft, subject: e.target.value })}
+                        disabled={!editingMemoId}
+                        className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                      />
+                      {memoErrors.subject && (
+                        <p className="text-[11px] text-red-600 mt-1">{memoErrors.subject}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Effective Date</label>
+                      <input
+                        type="date"
+                        value={memoDraft.effectiveDate}
+                        onChange={(e) => setMemoDraft({ ...memoDraft, effectiveDate: e.target.value })}
+                        disabled={!editingMemoId}
+                        className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Status</label>
+                      <select
+                        value={memoDraft.status}
+                        onChange={(e) => setMemoDraft({ ...memoDraft, status: e.target.value as SignatoryStatus })}
+                        disabled={!editingMemoId}
+                        className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                      >
+                        <option value="Draft">Draft</option>
+                        <option value="Pending">Pending</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Rejected">Rejected</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Body</label>
+                      <textarea
+                        value={memoDraft.body}
+                        onChange={(e) => setMemoDraft({ ...memoDraft, body: e.target.value })}
+                        disabled={!editingMemoId}
+                        rows={4}
+                        className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                      />
+                      {memoErrors.body && (
+                        <p className="text-[11px] text-red-600 mt-1">{memoErrors.body}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300">
+                        <label className="flex items-center gap-2">
+                          <Paperclip size={12} />
+                          Attachments
+                        </label>
+                        <input
+                          type="file"
+                          disabled={!editingMemoId}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleAttachmentAdd(file);
+                          }}
+                          className="text-[11px]"
+                        />
+                      </div>
+                      {memoDraft.attachments.length === 0 ? (
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">No attachments.</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {memoDraft.attachments.map((att) => (
+                            <div key={att.id} className="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-300">
+                              <span>{att.name}</span>
+                              {editingMemoId && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleAttachmentRemove(att.id)}
+                                  className="text-red-500"
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Updated by {memoDraft.updatedBy || '--'} at {memoDraft.updatedAt || '--'}
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
+                  <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+                    <span>Total: {memoSummary.total}</span>
+                    <span>Approved: {memoSummary.approved}</span>
+                    <span>Pending: {memoSummary.pending}</span>
+                    <span>Rejected: {memoSummary.rejected}</span>
+                  </div>
+                </div>
+                <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                  <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">Audit Trail</h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {auditLog.length === 0 ? (
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">No audit entries yet.</p>
+                    ) : (
+                      auditLog.map((entry) => (
+                        <div key={entry.id} className="text-[11px] text-slate-600 dark:text-slate-300">
+                          <div className="font-medium">{entry.details}</div>
+                          <div>{entry.user} • {new Date(entry.timestamp).toLocaleString()}</div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
         {activeSubTab === 'sworn' && (
-          <div className="space-y-2">
-            {/* Land and Improvements Market Value */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 text-right pr-2">
-                  Land Market Value:
-                </label>
+          <div className="space-y-3">
+            <TableToolbar
+              onAdd={handleSwornAdd}
+              onEdit={handleSwornEdit}
+              onDelete={handleSwornDelete}
+              onSave={handleSwornSave}
+              onCancel={handleSwornCancel}
+              onRefresh={handleSwornRefresh}
+              onPrint={handleExportSwornStatements}
+              isEditing={!!editingSwornId}
+              hasSelection={!!selectedSwornId}
+            />
+            {!canEdit && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-200">
+                You have view-only access to sworn statements.
               </div>
-              <div>
-                <input
-                  type="text"
-                  value={swornData.landMarketValue}
-                  onChange={(e) => setSwornData({ ...swornData, landMarketValue: e.target.value })}
-                  disabled={!isEditing}
-                  className="w-full px-2 py-1 text-xs text-right bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
-                />
+            )}
+            {isSavingSworn && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:border-blue-700/40 dark:bg-blue-900/20 dark:text-blue-200">
+                Saving sworn statement changes...
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 text-right pr-2">
-                  Improvements Market Value:
-                </label>
+            )}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              <div className="lg:col-span-2 space-y-3">
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <div className="relative flex-1 min-w-[180px]">
+                      <Search size={14} className="absolute left-2 top-2.5 text-slate-400" />
+                      <input
+                        value={swornQuery}
+                        onChange={(e) => setSwornQuery(e.target.value)}
+                        placeholder="Search sworn statements..."
+                        className="w-full pl-7 pr-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <select
+                      value={swornStatusFilter}
+                      onChange={(e) => setSwornStatusFilter(e.target.value as SignatoryStatus | 'All')}
+                      className="px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
+                    >
+                      <option value="All">All Status</option>
+                      <option value="Draft">Draft</option>
+                      <option value="Pending">Pending</option>
+                      <option value="Approved">Approved</option>
+                      <option value="Rejected">Rejected</option>
+                    </select>
+                    <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                      <input
+                        type="checkbox"
+                        checked={swornShowDeleted}
+                        onChange={(e) => setSwornShowDeleted(e.target.checked)}
+                        className="h-3 w-3 rounded border-slate-300 dark:border-slate-600"
+                      />
+                      Show deleted
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleExportSwornStatements}
+                      className="px-3 py-2 text-xs bg-slate-600 hover:bg-slate-700 text-white rounded-lg flex items-center gap-2"
+                    >
+                      <Download size={14} />
+                      Export
+                    </button>
+                    {selectedSwornId && (
+                      <button
+                        type="button"
+                        onClick={() => handleNotify('sworn', selectedSwornId, 'sworn statement')}
+                        className="px-3 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2"
+                      >
+                        <Mail size={14} />
+                        Notify
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Signatory</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Status</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Statement No.</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Date Subscribed</th>
+                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredSwornStatements.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
+                              No sworn statements found.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredSwornStatements.map((item) => (
+                            <tr
+                              key={item.id}
+                              onClick={() => setSelectedSwornId(item.id)}
+                              className={`border-b border-slate-200 dark:border-slate-700 cursor-pointer ${
+                                selectedSwornId === item.id ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                              }`}
+                            >
+                              <td className="px-3 py-2 text-slate-700 dark:text-slate-200">
+                                {item.signatory}
+                                {item.deletedAt && <span className="ml-2 text-[10px] text-red-500">Deleted</span>}
+                              </td>
+                              <td className="px-3 py-2">
+                                <span className={`px-2 py-1 rounded-full text-[10px] font-semibold ${statusBadgeClass(item.status)}`}>
+                                  {item.status}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{item.swornStatementNo || '--'}</td>
+                              <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{item.dateSubscribed || '--'}</td>
+                              <td className="px-3 py-2">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewRecord('sworn', item.id);
+                                  }}
+                                  className="px-2 py-1 text-[11px] bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center gap-1"
+                                >
+                                  <Eye size={12} />
+                                  View
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
-              <div>
-                <input
-                  type="text"
-                  value={swornData.improvementsMarketValue}
-                  onChange={(e) => setSwornData({ ...swornData, improvementsMarketValue: e.target.value })}
-                  disabled={!isEditing}
-                  className="w-full px-2 py-1 text-xs text-right bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
-                />
-              </div>
-            </div>
-
-            {/* Signatory */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 text-right pr-2">
-                  Signatory:
-                </label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={swornData.signatory}
-                  onChange={(e) => setSwornData({ ...swornData, signatory: e.target.value })}
-                  disabled={!isEditing}
-                  className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
-                />
-              </div>
-            </div>
-
-            {/* TIN */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 text-right pr-2">
-                  TIN:
-                </label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={swornData.tin1}
-                  onChange={(e) => setSwornData({ ...swornData, tin1: e.target.value })}
-                  disabled={!isEditing}
-                  className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
-                />
-              </div>
-            </div>
-
-            {/* Date Subscribed */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 text-right pr-2">
-                  Date Subscribed:
-                </label>
-              </div>
-              <div>
-                <input
-                  type="date"
-                  value={swornData.dateSubscribed}
-                  onChange={(e) => setSwornData({ ...swornData, dateSubscribed: e.target.value })}
-                  disabled={!isEditing}
-                  className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
-                />
-              </div>
-            </div>
-
-            {/* Tax Cert. No. */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 text-right pr-2">
-                  Tax Cert. No.:
-                </label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={swornData.taxCertNo}
-                  onChange={(e) => setSwornData({ ...swornData, taxCertNo: e.target.value })}
-                  disabled={!isEditing}
-                  className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
-                />
-              </div>
-            </div>
-
-            {/* Tax Cert. Date Issued */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 text-right pr-2">
-                  Tax Cert. Date Issued:
-                </label>
-              </div>
-              <div>
-                <input
-                  type="date"
-                  value={swornData.taxCertDateIssued}
-                  onChange={(e) => setSwornData({ ...swornData, taxCertDateIssued: e.target.value })}
-                  disabled={!isEditing}
-                  className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
-                />
-              </div>
-            </div>
-
-            {/* Tax Cert. Place Issued */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 text-right pr-2">
-                  Tax Cert. Place Issued:
-                </label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={swornData.taxCertPlaceIssued}
-                  onChange={(e) => setSwornData({ ...swornData, taxCertPlaceIssued: e.target.value })}
-                  disabled={!isEditing}
-                  className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
-                />
-              </div>
-            </div>
-
-            {/* Official Administering Oath */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 text-right pr-2">
-                  Official Administering Oath:
-                </label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={swornData.officialAdministeringOath}
-                  onChange={(e) => setSwornData({ ...swornData, officialAdministeringOath: e.target.value })}
-                  disabled={!isEditing}
-                  className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
-                />
-              </div>
-            </div>
-
-            {/* Official Title */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 text-right pr-2">
-                  Official Title:
-                </label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={swornData.officialTitle}
-                  onChange={(e) => setSwornData({ ...swornData, officialTitle: e.target.value })}
-                  disabled={!isEditing}
-                  className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
-                />
-              </div>
-            </div>
-
-            {/* TIN (second) */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 text-right pr-2">
-                  TIN:
-                </label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={swornData.tin2}
-                  onChange={(e) => setSwornData({ ...swornData, tin2: e.target.value })}
-                  disabled={!isEditing}
-                  className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
-                />
-              </div>
-            </div>
-
-            {/* Representative Name */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 text-right pr-2">
-                  Representative Name:
-                </label>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={swornData.representativeName}
-                  onChange={(e) => setSwornData({ ...swornData, representativeName: e.target.value })}
-                  disabled={!isEditing}
-                  className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
-                />
-              </div>
-            </div>
-
-            {/* Sworn Statement No and Date */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1 text-right pr-2">
-                  Sworn Statement No:
-                </label>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="text"
-                  value={swornData.swornStatementNo}
-                  onChange={(e) => setSwornData({ ...swornData, swornStatementNo: e.target.value })}
-                  disabled={!isEditing}
-                  className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
-                />
-                <div>
-                  <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Sworn Statement Date:
-                  </label>
-                  <input
-                    type="date"
-                    value={swornData.swornStatementDate}
-                    onChange={(e) => setSwornData({ ...swornData, swornStatementDate: e.target.value })}
-                    disabled={!isEditing}
-                    className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
-                  />
+              <div className="space-y-3">
+                <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                  <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">
+                    {editingSwornId ? 'Edit Sworn Statement' : 'Sworn Statement Details'}
+                  </h4>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Signatory</label>
+                      <input
+                        value={swornDraft.signatory}
+                        onChange={(e) => setSwornDraft({ ...swornDraft, signatory: e.target.value })}
+                        disabled={!editingSwornId}
+                        className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                      />
+                      {swornErrors.signatory && (
+                        <p className="text-[11px] text-red-600 mt-1">{swornErrors.signatory}</p>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Status</label>
+                        <select
+                          value={swornDraft.status}
+                          onChange={(e) => setSwornDraft({ ...swornDraft, status: e.target.value as SignatoryStatus })}
+                          disabled={!editingSwornId}
+                          className="w-full px-2 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                        >
+                          <option value="Draft">Draft</option>
+                          <option value="Pending">Pending</option>
+                          <option value="Approved">Approved</option>
+                          <option value="Rejected">Rejected</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Date Subscribed</label>
+                        <input
+                          type="date"
+                          value={swornDraft.dateSubscribed}
+                          onChange={(e) => setSwornDraft({ ...swornDraft, dateSubscribed: e.target.value })}
+                          disabled={!editingSwornId}
+                          className="w-full px-2 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                        />
+                        {swornErrors.dateSubscribed && (
+                          <p className="text-[11px] text-red-600 mt-1">{swornErrors.dateSubscribed}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Statement No.</label>
+                        <input
+                          value={swornDraft.swornStatementNo}
+                          onChange={(e) => setSwornDraft({ ...swornDraft, swornStatementNo: e.target.value })}
+                          disabled={!editingSwornId}
+                          className="w-full px-2 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Statement Date</label>
+                        <input
+                          type="date"
+                          value={swornDraft.swornStatementDate}
+                          onChange={(e) => setSwornDraft({ ...swornDraft, swornStatementDate: e.target.value })}
+                          disabled={!editingSwornId}
+                          className="w-full px-2 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Land Market Value</label>
+                        <input
+                          value={swornDraft.landMarketValue}
+                          onChange={(e) => setSwornDraft({ ...swornDraft, landMarketValue: e.target.value })}
+                          disabled={!editingSwornId}
+                          className="w-full px-2 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-right"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Improvements Market Value</label>
+                        <input
+                          value={swornDraft.improvementsMarketValue}
+                          onChange={(e) => setSwornDraft({ ...swornDraft, improvementsMarketValue: e.target.value })}
+                          disabled={!editingSwornId}
+                          className="w-full px-2 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-right"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">TIN</label>
+                        <input
+                          value={swornDraft.tin1}
+                          onChange={(e) => setSwornDraft({ ...swornDraft, tin1: e.target.value })}
+                          disabled={!editingSwornId}
+                          className="w-full px-2 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">TIN (Secondary)</label>
+                        <input
+                          value={swornDraft.tin2}
+                          onChange={(e) => setSwornDraft({ ...swornDraft, tin2: e.target.value })}
+                          disabled={!editingSwornId}
+                          className="w-full px-2 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Tax Cert. No.</label>
+                        <input
+                          value={swornDraft.taxCertNo}
+                          onChange={(e) => setSwornDraft({ ...swornDraft, taxCertNo: e.target.value })}
+                          disabled={!editingSwornId}
+                          className="w-full px-2 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Tax Cert. Date Issued</label>
+                        <input
+                          type="date"
+                          value={swornDraft.taxCertDateIssued}
+                          onChange={(e) => setSwornDraft({ ...swornDraft, taxCertDateIssued: e.target.value })}
+                          disabled={!editingSwornId}
+                          className="w-full px-2 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Tax Cert. Place Issued</label>
+                      <input
+                        value={swornDraft.taxCertPlaceIssued}
+                        onChange={(e) => setSwornDraft({ ...swornDraft, taxCertPlaceIssued: e.target.value })}
+                        disabled={!editingSwornId}
+                        className="w-full px-2 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Official Administering Oath</label>
+                      <input
+                        value={swornDraft.officialAdministeringOath}
+                        onChange={(e) => setSwornDraft({ ...swornDraft, officialAdministeringOath: e.target.value })}
+                        disabled={!editingSwornId}
+                        className="w-full px-2 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Official Title</label>
+                        <input
+                          value={swornDraft.officialTitle}
+                          onChange={(e) => setSwornDraft({ ...swornDraft, officialTitle: e.target.value })}
+                          disabled={!editingSwornId}
+                          className="w-full px-2 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Representative Name</label>
+                        <input
+                          value={swornDraft.representativeName}
+                          onChange={(e) => setSwornDraft({ ...swornDraft, representativeName: e.target.value })}
+                          disabled={!editingSwornId}
+                          className="w-full px-2 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Notes</label>
+                      <textarea
+                        value={swornDraft.notes}
+                        onChange={(e) => setSwornDraft({ ...swornDraft, notes: e.target.value })}
+                        disabled={!editingSwornId}
+                        rows={3}
+                        className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
+                      />
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Updated by {swornDraft.updatedBy || '--'} at {swornDraft.updatedAt || '--'}
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
+                  <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+                    <span>Total: {swornSummary.total}</span>
+                    <span>Approved: {swornSummary.approved}</span>
+                    <span>Pending: {swornSummary.pending}</span>
+                    <span>Rejected: {swornSummary.rejected}</span>
+                  </div>
+                </div>
+                <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
+                  <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">Audit Trail</h4>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {auditLog.length === 0 ? (
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">No audit entries yet.</p>
+                    ) : (
+                      auditLog.map((entry) => (
+                        <div key={entry.id} className="text-[11px] text-slate-600 dark:text-slate-300">
+                          <div className="font-medium">{entry.details}</div>
+                          <div>{entry.user} • {new Date(entry.timestamp).toLocaleString()}</div>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -710,6 +1854,112 @@ const SignatoriesSection: React.FC = () => {
           </div>
         )}
       </div>
+      {pendingDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setPendingDelete(null)}></div>
+          <div className="relative bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2">Confirm delete</h3>
+            <p className="text-xs text-slate-600 dark:text-slate-300 mb-4">
+              This will soft delete the selected record. You can still view deleted entries if enabled.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setPendingDelete(null)}
+                className="px-3 py-2 text-xs bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="px-3 py-2 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {viewSignatoryId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setViewSignatoryId(null)}></div>
+          <div className="relative bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg mx-4 p-6">
+            {(() => {
+              const record = signatories.find((item) => item.id === viewSignatoryId);
+              if (!record) return null;
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Signatory Details</h3>
+                    <button className="text-slate-500" onClick={() => setViewSignatoryId(null)}>Close</button>
+                  </div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300">Name: {record.name}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300">Title: {record.title}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300">Status: {record.status}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300">Date Signed: {record.dateSigned || '--'}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300">SGD: {record.sgd ? 'Yes' : 'No'} | TPD: {record.tpd ? 'Yes' : 'No'}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300">Notes: {record.notes || '--'}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Updated by {record.updatedBy} • {new Date(record.updatedAt).toLocaleString()}</div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+      {viewMemoId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setViewMemoId(null)}></div>
+          <div className="relative bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg mx-4 p-6">
+            {(() => {
+              const record = memorandums.find((item) => item.id === viewMemoId);
+              if (!record) return null;
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Memorandum Details</h3>
+                    <button className="text-slate-500" onClick={() => setViewMemoId(null)}>Close</button>
+                  </div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300">Subject: {record.subject}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300">Status: {record.status}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300">Effective Date: {record.effectiveDate || '--'}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300">Body: {record.body}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300">
+                    Attachments: {record.attachments.length ? record.attachments.map((att) => att.name).join(', ') : '--'}
+                  </div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Updated by {record.updatedBy} • {new Date(record.updatedAt).toLocaleString()}</div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+      {viewSwornId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setViewSwornId(null)}></div>
+          <div className="relative bg-white dark:bg-slate-900 rounded-lg shadow-xl w-full max-w-lg mx-4 p-6">
+            {(() => {
+              const record = swornStatements.find((item) => item.id === viewSwornId);
+              if (!record) return null;
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Sworn Statement Details</h3>
+                    <button className="text-slate-500" onClick={() => setViewSwornId(null)}>Close</button>
+                  </div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300">Signatory: {record.signatory}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300">Status: {record.status}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300">Date Subscribed: {record.dateSubscribed || '--'}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300">Statement No.: {record.swornStatementNo || '--'}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300">Land Market Value: {record.landMarketValue || '--'}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300">Improvements Market Value: {record.improvementsMarketValue || '--'}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300">TIN: {record.tin1 || '--'}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-300">Representative: {record.representativeName || '--'}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400">Updated by {record.updatedBy} • {new Date(record.updatedAt).toLocaleString()}</div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
