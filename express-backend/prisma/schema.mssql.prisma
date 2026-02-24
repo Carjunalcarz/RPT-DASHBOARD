@@ -1,0 +1,49 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/mssql-client"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("MSSQL_CONNECTION_STRING")
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  tableName   String
+  recordId    String
+  action      String
+  oldValues   String?  @db.NVarChar(Max)
+  newValues   String?  @db.NVarChar(Max)
+  userId      String?
+  ipAddress   String?  @db.VarChar(45)
+  timestamp   DateTime @default(now())
+  details     String?  @db.NVarChar(Max)
+
+  @@index([tableName, recordId])
+  @@index([timestamp])
+}
+
+model Item {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.NVarChar(255)
+  description String?  @db.NVarChar(Max)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model TestTask {
+  id          Int       @id @default(autoincrement())
+  title       String    @db.NVarChar(255)
+  description String?   @db.NVarChar(Max)
+  status      String    @default("pending") @db.NVarChar(50)
+  priority    String    @default("medium") @db.NVarChar(50)
+  dueDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([status])
+  @@index([priority])
+  @@index([dueDate])
+}

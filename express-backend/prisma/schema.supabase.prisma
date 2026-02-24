@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/supabase-client"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("SUPABASE_DB_URL")
+  directUrl = env("SUPABASE_DIRECT_URL")
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  tableName   String
+  recordId    String
+  action      String
+  oldValues   Json?
+  newValues   Json?
+  userId      String?
+  ipAddress   String?
+  timestamp   DateTime @default(now())
+  details     Json?
+
+  @@index([tableName, recordId])
+  @@index([timestamp])
+}
+
+model Item {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model TestTask {
+  id          Int       @id @default(autoincrement())
+  title       String    @db.VarChar(255)
+  description String?
+  status      String    @default("pending")
+  priority    String    @default("medium")
+  dueDate     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([status])
+  @@index([priority])
+  @@index([dueDate])
+}
+
+/// A comprehensive user profile model that mirrors auth.users
+/// This table is managed via triggers from Supabase Auth
+model User {
+  id          String   @id @db.Uuid // Foreign Key to auth.users.id
+  email       String   @unique
+  username    String?  @unique
+  displayName String?  @map("display_name")
+  avatarUrl   String?  @map("avatar_url")
+  bio         String?
+  role        String   @default("user") // 'admin', 'user', etc.
+  
+  // Timestamps
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  lastLoginAt DateTime? @map("last_login_at")
+
+  @@map("users") // Maps to public.users table
+}

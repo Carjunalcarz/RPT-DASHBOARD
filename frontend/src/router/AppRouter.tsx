@@ -10,6 +10,9 @@ import Payments from '@/pages/Payments';
 import Reports from '@/pages/Reports';
 import Settings from '@/pages/Settings';
 import DataEntry from '@/pages/DataEntry';
+import AuditTrail from '@/pages/AuditTrail';
+import Items from '@/pages/Items';
+import Tasks from '@/pages/Tasks';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -106,6 +109,36 @@ const AppRouter: React.FC = () => {
             <ProtectedRoute>
               <Layout>
                 <DataEntry />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/audit-trail"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <AuditTrail />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/items"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Items />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tasks"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Tasks />
               </Layout>
             </ProtectedRoute>
           }

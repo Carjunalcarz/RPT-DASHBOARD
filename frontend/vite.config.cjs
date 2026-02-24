@@ -173,5 +173,10 @@ module.exports = defineConfig(async ({ command, mode }) => {
         ],
       },
     },
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: './src/setupTests.ts',
+    },
   };
 });

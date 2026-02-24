@@ -18,11 +18,11 @@ const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      const success = await login(email, password);
-      if (success) {
+      const result = await login(email, password);
+      if (result.success) {
         navigate('/dashboard');
       } else {
-        setError('Invalid email or password');
+        setError(result.message || 'Invalid email or password');
       }
     } catch (err) {
       setError('An error occurred during login');

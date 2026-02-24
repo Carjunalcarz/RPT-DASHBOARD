@@ -1,0 +1,54 @@
+{
+  "name": "rpt-dashboard-backend",
+  "version": "1.0.0",
+  "description": "Node.js Express backend for RPT Dashboard with MSSQL and Supabase support",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src/**/*.js",
+    "prisma:generate:mssql": "prisma generate --schema=./prisma/schema.mssql.prisma",
+    "prisma:generate:supabase": "prisma generate --schema=./prisma/schema.supabase.prisma",
+    "prisma:generate": "npm run prisma:generate:mssql && npm run prisma:generate:supabase",
+    "prisma:migrate:mssql": "prisma migrate dev --schema=./prisma/schema.mssql.prisma",
+    "prisma:migrate:supabase": "prisma migrate dev --schema=./prisma/schema.supabase.prisma",
+    "prisma:seed:mssql": "node prisma/seed.mssql.js",
+    "prisma:seed:supabase": "node prisma/seed.supabase.js",
+    "seed": "npm run prisma:seed:mssql && npm run prisma:seed:supabase"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "express": "^4.22.1",
+    "express-rate-limit": "^7.0.0",
+    "express-validator": "^7.0.0",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.0",
+    "jwks-rsa": "^3.2.2",
+    "mssql": "^10.0.4",
+    "pg": "^8.18.0",
+    "supabase": "^2.76.12",
+    "swagger-jsdoc": "^6.2.0",
+    "swagger-ui-express": "^5.0.0",
+    "winston": "^3.11.0",
+    "winston-daily-rotate-file": "^5.0.0"
+  },
+  "devDependencies": {
+    "@prisma/client": "5.10.0",
+    "jest": "^29.7.0",
+    "nodemon": "^3.0.0",
+    "prisma": "5.10.0",
+    "supertest": "^6.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
