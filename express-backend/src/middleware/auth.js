@@ -38,6 +38,8 @@ function getKey(header, callback) {
   });
 }
 
+const { supabasePrisma } = require('../database/prisma');
+
 const protect = async (req, res, next) => {
   let token;
   
@@ -60,20 +62,22 @@ const protect = async (req, res, next) => {
      return next(new AppError('Invalid token format.', 401));
   }
 
+  const verifyCallback = async (err, decoded) => {
+    if (err) {
+       logger.error(`JWT Verification Failed: ${err.message}`);
+       return next(new AppError('Invalid token. Please log in again.', 401));
+    }
+    await processUser(req, next, decoded);
+  };
+
   // If alg is ES256, use JWKS. If HS256, use Secret.
   if (decodedToken.header.alg === 'ES256' && jwksUri) {
-     jwt.verify(token, getKey, { algorithms: ['ES256'] }, (err, decoded) => {
-        if (err) {
-           logger.error(`JWT Verification (ES256) Failed: ${err.message}`);
-           return next(new AppError('Invalid token. Please log in again.', 401));
-        }
-        processUser(req, next, decoded);
-     });
+     jwt.verify(token, getKey, { algorithms: ['ES256'] }, verifyCallback);
   } else {
      // Fallback to HS256 (Legacy)
      try {
        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-       processUser(req, next, decoded);
+       await processUser(req, next, decoded);
      } catch (err) {
        logger.error(`JWT Verification (HS256) Failed: ${err.message}`);
        return next(new AppError('Invalid token. Please log in again.', 401));
@@ -81,9 +85,24 @@ const protect = async (req, res, next) => {
   }
 };
 
-function processUser(req, next, decoded) {
-    req.user = decoded;
-    runWithContext({ user: decoded, ip: req.ip || req.connection.remoteAddress }, () => {
+async function processUser(req, next, decoded) {
+    // Fetch user role from database
+    let dbUser = null;
+    try {
+      // decoded.sub is the user ID in Supabase JWTs
+      if (decoded.sub) {
+        dbUser = await supabasePrisma.user.findUnique({
+          where: { id: decoded.sub },
+          select: { role: true, email: true }
+        });
+      }
+    } catch (err) {
+      logger.warn(`Failed to fetch user details from DB: ${err.message}`);
+    }
+
+    req.user = { ...decoded, ...dbUser };
+    
+    runWithContext({ user: req.user, ip: req.ip || req.connection.remoteAddress }, () => {
       next();
     });
 }

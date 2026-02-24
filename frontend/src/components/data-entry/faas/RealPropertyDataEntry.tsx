@@ -1,10 +1,11 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Plus, Edit2, Trash2, Save, X, RefreshCw, Printer,
   FileText, CreditCard, Search, ChevronDown, Building2,
   User, MapPin, Info, DollarSign
 } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
+import { getRptMastDataDirect, RptMastRecord } from '@/services/rptMastService';
 import PropertyInformationSection from './PropertyInformationSection';
 import PropertyOwnerSection from './PropertyOwnerSection';
 import PropertyBoundariesSection from './PropertyBoundariesSection';
@@ -14,6 +15,7 @@ import SignatoriesSection from './SignatoriesSection';
 import PreviousTDNsSection from './PreviousTDNsSection';
 import TaxDecSheetSection from './TaxDecSheetSection';
 import OtherPropertyTab from '../OtherPropertyTab';
+import { toast } from 'sonner';
 
 // Types
 interface PropertyRecord {
@@ -23,25 +25,20 @@ interface PropertyRecord {
   pin: string;
   ownerNo: string;
   owner: string;
-}
+  barangay: string;
+  barangayCode: string;
+} // Add new field for display
 
-// Sample data
-const sampleRecords: PropertyRecord[] = [
-  { id: '1', tdn: '25-07-0001-00002', arp: '25-07-0001-0000', pin: '053-07-0001-002-01', ownerNo: 'MGS07-2007-07-', owner: 'RICAFORTE, FELIX' },
-  { id: '2', tdn: '25-07-0001-00003', arp: '25-07-0001-0000', pin: '053-07-0001-002-01-1001', ownerNo: 'MGS07-2007-07-', owner: 'MASENDO, ZOILO' },
-  { id: '3', tdn: '25-07-0001-00004', arp: '25-07-0001-0000', pin: '053-07-0001-002-02', ownerNo: 'MGS07-2007-07-', owner: 'MASINDO, ZOILO' },
-  { id: '4', tdn: '25-07-0001-00005', arp: '25-07-0001-0000', pin: '053-07-0001-002-02-1001', ownerNo: 'MGS07-2007-07-', owner: 'MASENDO, ZOILO' },
-  { id: '5', tdn: '25-07-0001-00006', arp: '25-07-0001-0000', pin: '053-07-0001-002-03', ownerNo: 'MGS07-2011-07-', owner: 'CABINTOY, BERNADITA B. HRS. OF' },
-  { id: '6', tdn: '25-07-0001-00007', arp: '25-07-0001-0000', pin: '053-07-0001-002-04', ownerNo: 'MGS07-2011-07-', owner: 'JUSTAN, RUFINA B. HRS. OF' },
-];
 
 const RealPropertyDataEntry: React.FC = () => {
   const { headerColor, headerColorDark } = useThemeColor();
   
   // Records state
-  const [records, setRecords] = useState<PropertyRecord[]>(sampleRecords);
-  const [selectedRecord, setSelectedRecord] = useState<PropertyRecord | null>(sampleRecords[4]);
-  const [totalRecords] = useState(6529);
+  const [records, setRecords] = useState<PropertyRecord[]>([]);
+  const [selectedRecord, setSelectedRecord] = useState<PropertyRecord | null>(null);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [pagination, setPagination] = useState({ page: 1, limit: 100, totalPages: 1 });
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
@@ -55,6 +52,53 @@ const RealPropertyDataEntry: React.FC = () => {
 
   // Active tab state
   const [activeTab, setActiveTab] = useState('property-info');
+
+  // Load Data
+  const loadData = useCallback(async (page = 1) => {
+    setIsLoading(true);
+    try {
+      const response = await getRptMastDataDirect({ page, limit: 100 });
+      
+      if (response.success) {
+        // Map backend RPTMAST data to frontend PropertyRecord format
+        // We spread the entire item into the record so child components can access all fields
+        const mappedRecords: PropertyRecord[] = response.data.map((item, index) => ({
+          ...item, // Spread all backend properties
+          id: item.TDN || `temp-${index}`,
+          tdn: item.TDN || '',
+          arp: item.ARP || '',
+          pin: item.PIN || '',
+          ownerNo: item.OWNER_NO || '',
+          owner: item.Owner_Name || 'N/A',
+          barangay: item.BARANGAY || 'N/A',
+          barangayCode: item['BRGY.CODE'] || ''
+        }));
+
+        setRecords(mappedRecords);
+        setTotalRecords(response.pagination.total);
+        setPagination({
+          page: response.pagination.page,
+          limit: response.pagination.limit,
+          totalPages: response.pagination.totalPages
+        });
+
+        // Select first record by default if none selected
+        if (mappedRecords.length > 0 && !selectedRecord) {
+          setSelectedRecord(mappedRecords[0]);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load RPTMAST data:', error);
+      toast.error('Failed to load records from database');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Initial Load
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // Handlers
   const handleRowSelect = (record: PropertyRecord) => {
@@ -86,6 +130,7 @@ const RealPropertyDataEntry: React.FC = () => {
     // Save logic here
     setIsEditing(false);
     setIsAdding(false);
+    toast.success('Record saved successfully');
   };
 
   const handleCancel = () => {
@@ -94,7 +139,14 @@ const RealPropertyDataEntry: React.FC = () => {
   };
 
   const handleRefresh = () => {
-    console.log('Refreshing data...');
+    loadData(pagination.page);
+    toast.success('Data refreshed');
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= pagination.totalPages) {
+      loadData(newPage);
+    }
   };
 
   const handlePrint = () => {
@@ -236,11 +288,13 @@ const RealPropertyDataEntry: React.FC = () => {
                   }
                 `}</style>
                 <tr>
-                  <th className="px-4 py-3 text-left font-semibold tracking-wide">TDN</th>
-                  <th className="px-4 py-3 text-left font-semibold tracking-wide">ARP</th>
-                  <th className="px-4 py-3 text-left font-semibold tracking-wide">PIN</th>
-                  <th className="px-4 py-3 text-left font-semibold tracking-wide">OWNER NO.</th>
-                  <th className="px-4 py-3 text-left font-semibold tracking-wide">OWNER</th>
+                  <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[180px]">TDN</th>
+                  <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[180px]">ARP</th>
+                  <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[200px]">PIN</th>
+                  <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[180px]">OWNER NO.</th>
+                  <th className="px-4 py-3 text-left font-semibold tracking-wide min-w-[250px]">OWNER</th>
+                  <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[100px]">BRGY CODE</th>
+                  <th className="px-4 py-3 text-left font-semibold tracking-wide min-w-[150px]">BARANGAY</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -257,11 +311,13 @@ const RealPropertyDataEntry: React.FC = () => {
                     }`}
                     data-testid={`record-row-${record.id}`}
                   >
-                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider">{record.tdn}</td>
-                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider">{record.arp}</td>
-                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider">{record.pin}</td>
-                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider">{record.ownerNo}</td>
-                    <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100">{record.owner}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.tdn}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.arp}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.pin}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.ownerNo}</td>
+                    <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap truncate max-w-xs">{record.owner}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap text-center">{record.barangayCode}</td>
+                    <td className="px-4 py-3 text-slate-600 dark:text-slate-400 whitespace-nowrap truncate max-w-xs">{record.barangay}</td>
                   </tr>
                 ))}
               </tbody>
@@ -269,80 +325,80 @@ const RealPropertyDataEntry: React.FC = () => {
           </div>
         </div>
 
-        {/* Search and Filter Section */}
-        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-4 gap-4">
-            {/* Search Field */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 min-w-0">
-              <label className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                Search Field:
-              </label>
-              <select
-                value={searchField}
-                onChange={(e) => setSearchField(e.target.value)}
-                className="w-full sm:flex-1 min-w-0 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                data-testid="search-field"
-              >
-                <option value="TDN">TDN</option>
-                <option value="ARP">ARP</option>
-                <option value="PIN">PIN</option>
-                <option value="OWNER">OWNER</option>
-              </select>
-            </div>
+          {/* Search and Filter Section */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-4">
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Search Field */}
+              <div className="flex items-center gap-2 min-w-[200px]">
+                <label className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                  Search Field:
+                </label>
+                <select
+                  value={searchField}
+                  onChange={(e) => setSearchField(e.target.value)}
+                  className="flex-1 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  data-testid="search-field"
+                >
+                  <option value="TDN">TDN</option>
+                  <option value="ARP">ARP</option>
+                  <option value="PIN">PIN</option>
+                  <option value="OWNER">OWNER</option>
+                </select>
+              </div>
 
-            {/* Filter Value */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 min-w-0">
-              <label className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                Filter Value:
-              </label>
-              <input
-                type="text"
-                value={filterValue}
-                onChange={(e) => setFilterValue(e.target.value)}
-                className="w-full sm:flex-1 min-w-0 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                data-testid="filter-value"
-              />
-              <button className="w-full sm:w-auto px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
-                APPLY FILTER
-              </button>
-            </div>
+              {/* Filter Value */}
+              <div className="flex items-center gap-2 flex-1 min-w-[300px]">
+                <label className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                  Filter Value:
+                </label>
+                <input
+                  type="text"
+                  value={filterValue}
+                  onChange={(e) => setFilterValue(e.target.value)}
+                  className="flex-1 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  data-testid="filter-value"
+                />
+                <button className="px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors whitespace-nowrap">
+                  APPLY FILTER
+                </button>
+              </div>
 
-            {/* Additional Search */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 min-w-0">
-              <label className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                Additional Search:
-              </label>
-              <select
-                value={additionalSearch}
-                onChange={(e) => setAdditionalSearch(e.target.value)}
-                className="w-full sm:flex-1 min-w-0 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                data-testid="additional-search"
-              >
-                <option value="All Records">All Records</option>
-                <option value="Active">Active Records</option>
-                <option value="Cancelled">Cancelled Records</option>
-              </select>
-            </div>
+              {/* Additional Search */}
+              <div className="flex items-center gap-2 min-w-[200px]">
+                <label className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                  Additional Search:
+                </label>
+                <select
+                  value={additionalSearch}
+                  onChange={(e) => setAdditionalSearch(e.target.value)}
+                  className="flex-1 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  data-testid="additional-search"
+                >
+                  <option value="All Records">All Records</option>
+                  <option value="Active">Active Records</option>
+                  <option value="Cancelled">Cancelled Records</option>
+                </select>
+              </div>
 
-            {/* Search */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 min-w-0">
-              <label className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                Search:
-              </label>
-              <input
-                type="text"
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                placeholder="Enter search text..."
-                className="w-full sm:flex-1 min-w-0 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                data-testid="search-text"
-              />
-              <button className="w-full sm:w-auto px-3 py-2 text-xs bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-medium transition-colors whitespace-nowrap">
-                SEARCH BY OWNER INDEX
-              </button>
+              {/* Search */}
+              <div className="flex items-center gap-2 flex-1 min-w-[300px]">
+                <label className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                  Search:
+                </label>
+                <input
+                  type="text"
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  placeholder="Enter search text..."
+                  className="flex-1 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  data-testid="search-text"
+                />
+                <button className="px-3 py-2 text-xs bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-medium transition-colors whitespace-nowrap">
+                  SEARCH BY OWNER INDEX
+                </button>
+              </div>
             </div>
           </div>
-        </div>
 
         {/* Tabs Navigation */}
         <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
@@ -379,9 +435,11 @@ const RealPropertyDataEntry: React.FC = () => {
                 />
                 <PropertyOwnerSection
                   isEnabled={isFormEnabled}
+                  selectedRecord={selectedRecord}
                 />
                 <PropertyBoundariesSection
                   isEnabled={isFormEnabled}
+                  selectedRecord={selectedRecord}
                 />
               </>
             )}

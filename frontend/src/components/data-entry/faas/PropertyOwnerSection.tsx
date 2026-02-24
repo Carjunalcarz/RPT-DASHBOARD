@@ -1,9 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Search } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 
+interface PropertyRecord {
+  id: string;
+  tdn: string;
+  arp: string;
+  pin: string;
+  ownerNo: string;
+  owner: string;
+}
+
 interface PropertyOwnerSectionProps {
   isEnabled: boolean;
+  selectedRecord: PropertyRecord | null;
 }
 
 interface OwnerData {
@@ -42,9 +52,45 @@ const codeOptions = [
   { value: 'HRS', label: 'HRS - Heirs' },
 ];
 
-const PropertyOwnerSection: React.FC<PropertyOwnerSectionProps> = ({ isEnabled }) => {
+const PropertyOwnerSection: React.FC<PropertyOwnerSectionProps> = ({ isEnabled, selectedRecord }) => {
   const { headerColor, headerColorDark } = useThemeColor();
-  const [data, setData] = useState<OwnerAdminData>(defaultData);
+  const [data, setData] = useState<OwnerAdminData>({
+    owner: {
+      code: '',
+      number: '',
+      name: '',
+      address: '',
+    },
+    administrator: {
+      code: '',
+      number: '',
+      name: '',
+      address: '',
+    }
+  });
+
+  // Auto-fill from selectedRecord when it changes
+  useEffect(() => {
+    if (selectedRecord) {
+      // Cast selectedRecord to any to access the extended properties from the API
+      const record = selectedRecord as any;
+
+      setData({
+        owner: {
+          code: record.OWN_CD || '',
+          number: record.OWNER_NO || '',
+          name: record.Owner_Name || '',
+          address: record.Owner_Address || '',
+        },
+        administrator: {
+          code: record.ADM_CD || '',
+          number: record.ADMIN_NO || '',
+          name: '', // We would need to join rptOWNER again as 'Admin' to get this
+          address: '',
+        }
+      });
+    }
+  }, [selectedRecord]);
 
   const handleOwnerChange = (field: keyof OwnerData, value: string) => {
     setData(prev => ({

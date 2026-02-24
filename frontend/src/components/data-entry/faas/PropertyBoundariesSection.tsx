@@ -1,9 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapPin, Navigation } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 
+interface PropertyRecord {
+  id: string;
+  tdn: string;
+  arp: string;
+  pin: string;
+  ownerNo: string;
+  owner: string;
+}
+
 interface PropertyBoundariesSectionProps {
   isEnabled: boolean;
+  selectedRecord: PropertyRecord | null;
 }
 
 interface BoundaryData {
@@ -26,9 +36,27 @@ const defaultData: BoundaryData = {
   west: 'BARANGAY STO. ROSARIO / PROVINCIAL ROAD',
 };
 
-const PropertyBoundariesSection: React.FC<PropertyBoundariesSectionProps> = ({ isEnabled }) => {
+const PropertyBoundariesSection: React.FC<PropertyBoundariesSectionProps> = ({ isEnabled, selectedRecord }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const [data, setData] = useState<BoundaryData>(defaultData);
+
+  // Auto-fill from selectedRecord when it changes
+  useEffect(() => {
+    if (selectedRecord) {
+      // Cast selectedRecord to any to access the extended properties from the API
+      const record = selectedRecord as any;
+
+      setData(prev => ({
+        street: record.STREET_CD || '',
+        streetName: record.STREET || '',
+        location: record.LOCATION || '',
+        north: record.NORTH || '',
+        south: record.SOUTH || '',
+        east: record.EAST || '',
+        west: record.WEST || '',
+      }));
+    }
+  }, [selectedRecord]);
 
   const handleChange = (field: keyof BoundaryData, value: string) => {
     setData(prev => ({ ...prev, [field]: value }));

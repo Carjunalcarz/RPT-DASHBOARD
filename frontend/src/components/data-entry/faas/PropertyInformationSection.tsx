@@ -95,6 +95,51 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
   const { headerColor, headerColorDark } = useThemeColor();
   const [data, setData] = useState<PropertyInfoData>(defaultData);
 
+  // Auto-fill from selectedRecord when it changes
+  useEffect(() => {
+    if (selectedRecord) {
+      // Helper to format date string to YYYY-MM-DD
+      const formatDate = (dateStr?: string) => {
+        if (!dateStr) return '';
+        try {
+          return new Date(dateStr).toISOString().split('T')[0];
+        } catch {
+          return '';
+        }
+      };
+
+      // Cast selectedRecord to any to access the extended properties from the API
+      const record = selectedRecord as any;
+
+      setData(prev => ({
+        ...prev,
+        effectivityDate: formatDate(record.EFF_DATE) || prev.effectivityDate,
+        declarationDate: formatDate(record.DEC_DATE) || prev.declarationDate,
+        cancelledDate: formatDate(record.EFF_CANC) || '',
+        district: record.DIST_NO || prev.district,
+        barangay: record.BCODE || prev.barangay,
+        barangayName: record.Barangay || prev.barangayName, // Mapped from backend query
+        ccn: record.CCN || '',
+        motherTdn: false, // Need logic if this exists in DB
+        tdNo: record.tdn || record.TDN || prev.tdNo,
+        arpNo: record.arp || record.ARP || prev.arpNo,
+        propertyIndexNo: record.pin || record.PIN || prev.propertyIndexNo,
+        improvementNo: record.IMP_NO || '',
+        buildingName: record.BLDGNAME || '',
+        buildingUnit: record.BLDGUNIT || '',
+        updateCode: record.TRANS_CD || prev.updateCode,
+        // Find description for update code
+        updateCodeDesc: updateCodeOptions.find(c => c.value === record.TRANS_CD)?.desc || '',
+        tctOctCct: record.CER_TIT_NO || '',
+        tctDate: formatDate(record.TCT_DATE) || '',
+        cadLotNo: record.CAD_LOT_NO || '',
+        surveyNo: record.ASS_LOT_NO || '', // Assuming ASS_LOT_NO maps to Survey No based on sample
+        blockNo: record.BLOCK_NO || '',
+        lotNo: record.LOTE_NO || '',
+      }));
+    }
+  }, [selectedRecord]);
+
   const handleChange = (field: keyof PropertyInfoData, value: string | boolean) => {
     setData(prev => {
       const newData = { ...prev, [field]: value };

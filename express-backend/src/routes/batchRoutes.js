@@ -11,7 +11,8 @@ const router = express.Router();
  * /api/v1/batch/update-task-item:
  *   put:
  *     summary: Simultaneously update a Task and an Item
- *     tags: [Batch]
+ *     tags:
+ *       - Batch
  *     security:
  *       - cookieAuth: []
  *     requestBody:

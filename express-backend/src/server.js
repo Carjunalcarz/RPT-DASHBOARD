@@ -22,6 +22,7 @@ const testTaskRoutes = require('./routes/testTasks');
 const batchRoutes = require('./routes/batchRoutes');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/users');
+const rptMastRoutes = require('./routes/rptMastRoutes');
 
 const app = express();
 
@@ -45,14 +46,6 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Debug Middleware to trace Cookie/Token flow
-app.use((req, res, next) => {
-  if (process.env.NODE_ENV === 'development') {
-    logger.debug(`[${req.method} ${req.url}] Cookies: ${JSON.stringify(req.cookies)} | Auth Header: ${req.headers.authorization ? 'Present' : 'Missing'}`);
-  }
-  next();
-});
-
 // Rate Limiting
 app.use(rateLimiter);
 
@@ -65,6 +58,14 @@ app.use(express.urlencoded({ extended: true }));
 
 // Cookie Parser
 app.use(cookieParser());
+
+// Debug Middleware to trace Cookie/Token flow (After Cookie Parser)
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV === 'development') {
+    logger.debug(`[${req.method} ${req.url}] Cookies: ${JSON.stringify(req.cookies || {})} | Auth Header: ${req.headers.authorization ? 'Present' : 'Missing'}`);
+  }
+  next();
+});
 
 // Swagger Documentation
 const swaggerOptions = {
@@ -95,16 +96,26 @@ const swaggerOptions = {
       },
     ],
   },
-  apis: ['./src/routes/*.js'], // Path to the API docs
+  apis: [path.join(__dirname, './routes/*.js').replace(/\\/g, '/')], // Path to the API docs (normalized for Windows)
 };
 const swaggerDocs = swaggerJsdoc(swaggerOptions);
+logger.info(`Swagger Docs loaded: ${Object.keys(swaggerDocs.paths || {}).length} paths found`);
+
+app.get('/api-docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerDocs);
+});
+
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs, {
-  explorer: true,
+  explorer: false, // Disabled explorer bar to avoid confusion
   swaggerOptions: {
     filter: true,
     displayRequestDuration: true,
-    docExpansion: "none",
+    docExpansion: "list",
+    persistAuthorization: true,
+    tryItOutEnabled: true,
   },
+  customSiteTitle: "RPT Dashboard API Docs",
   customCss: '.swagger-ui .topbar { display: block }'
 }));
 
@@ -113,8 +124,10 @@ app.use('/health', healthRoutes);
 app.use('/api/v1/items', itemRoutes);
 app.use('/api/v1/audit', auditRoutes);
 app.use('/api/v1/test-tasks', testTaskRoutes);
+app.use('/api/v1/batch', batchRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
+app.use('/api/rptmast', rptMastRoutes);
 
 // Error Handler
 app.use(errorHandler);

@@ -18,6 +18,7 @@ const protect = require('../middleware/auth');
  *           type: integer
  *         title:
  *           type: string
+ *           description: The task title
  *         description:
  *           type: string
  *         status:

@@ -17,6 +17,7 @@ model AuditLog {
   oldValues   Json?
   newValues   Json?
   userId      String?
+  userEmail   String?
   ipAddress   String?
   timestamp   DateTime @default(now())
   details     Json?

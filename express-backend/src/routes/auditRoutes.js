@@ -3,6 +3,7 @@ const { query } = require('express-validator');
 const router = express.Router();
 const auditController = require('../controllers/auditController');
 const protect = require('../middleware/auth');
+const restrictTo = require('../middleware/roleMiddleware');
 const validate = require('../middleware/validate');
 
 /**
@@ -129,6 +130,34 @@ router.get(
     query('endDate').optional().isISO8601().withMessage('Invalid end date')
   ]),
   auditController.getAuditLogs
+);
+
+/**
+ * @swagger
+ * /api/v1/audit:
+ *   delete:
+ *     summary: Clear all audit logs
+ *     tags: [Audit]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: source
+ *         schema:
+ *           type: string
+ *           enum: [mssql, supabase]
+ *         description: "Database source (default: supabase)"
+ *     responses:
+ *       200:
+ *         description: Logs cleared successfully
+ *       403:
+ *         description: Forbidden (Admin only)
+ */
+router.delete(
+  '/',
+  protect,
+  restrictTo('admin', 'superadmin'),
+  auditController.deleteAuditLogs
 );
 
 module.exports = router;
