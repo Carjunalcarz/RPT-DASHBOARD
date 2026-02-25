@@ -136,6 +136,8 @@ export interface RptMastResponse {
 export interface RptMastParams {
   page?: number;
   limit?: number;
+  searchField?: string;
+  filterValue?: string;
 }
 
 export const getRptMastData = async (params: RptMastParams = { page: 1, limit: 100 }): Promise<RptMastResponse> => {
@@ -164,6 +166,21 @@ export const getRptMastData = async (params: RptMastParams = { page: 1, limit: 1
 // Helper to fetch directly using absolute path if the relative trick is risky
 export const getRptMastDataDirect = async (params: RptMastParams = { page: 1, limit: 100 }): Promise<RptMastResponse> => {
   const API_BASE = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/v1', '') : 'http://localhost:3000/api';
-  const response = await api.get(`${API_BASE}/rptmast/RPTAS_AGUSAN`, { params });
-  return response.data;
+  try {
+    // Add delay/debounce handling or check if request is already pending?
+    // 429 Too Many Requests usually means we are hitting it too fast.
+    // However, the best fix here is to ensure the UI doesn't spam this.
+    // For now, let's just make the call.
+    const response = await api.get(`${API_BASE}/rptmast/RPTAS_AGUSAN`, { params });
+    return response.data;
+  } catch (error: any) {
+    if (error.response && error.response.status === 429) {
+      console.warn('Rate limited (429). Retrying after delay...');
+      // Simple retry logic
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await api.get(`${API_BASE}/rptmast/RPTAS_AGUSAN`, { params });
+      return response.data;
+    }
+    throw error;
+  }
 };

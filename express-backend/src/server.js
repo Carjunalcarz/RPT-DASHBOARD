@@ -23,6 +23,9 @@ const batchRoutes = require('./routes/batchRoutes');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/users');
 const rptMastRoutes = require('./routes/rptMastRoutes');
+const rptAssRoutes = require('./routes/rptAssRoutes');
+const bldgAdjRoutes = require('./routes/bldgAdjRoutes');
+const bldgStrucRoutes = require('./routes/bldgStrucRoutes');
 
 const app = express();
 
@@ -128,6 +131,9 @@ app.use('/api/v1/batch', batchRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/rptmast', rptMastRoutes);
+app.use('/api/rpt-ass', rptAssRoutes);
+app.use('/api/bldg-adj', bldgAdjRoutes);
+app.use('/api/bldg-struc', bldgStrucRoutes);
 
 // Error Handler
 app.use(errorHandler);

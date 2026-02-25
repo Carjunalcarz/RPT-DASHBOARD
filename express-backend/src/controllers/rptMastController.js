@@ -13,8 +13,10 @@ class RptMastController {
     try {
       const page = parseInt(req.query.page) || 1;
       const limit = parseInt(req.query.limit) || 100;
+      const searchField = req.query.searchField;
+      const filterValue = req.query.filterValue;
       
-      const result = await rptMastService.getAgusanMigrationData({ page, limit });
+      const result = await rptMastService.getAgusanMigrationData({ page, limit, searchField, filterValue });
       
       res.status(200).json({
         success: true,

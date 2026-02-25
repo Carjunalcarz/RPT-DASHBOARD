@@ -1,16 +1,15 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, Building2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, TreePine } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
-import StructureTab from './StructureTab';
-import AdjustmentTab from './AdjustmentTab';
 import { RptAssRecord } from '@/services/rptAssService';
-import { getBldgAdjByTdn, BldgAdjRecord } from '@/services/bldgAdjService';
-import { getBldgStrucByTdn, BldgStrucRecord } from '@/services/bldgStrucService';
 
-// Types
-interface BuildingRecord {
+interface LandAssessmentProps {
+  records?: RptAssRecord[];
+  isEnabled?: boolean;
+}
+
+interface LandRecord {
   id: string;
-  uniqueId: string;
   kind: string;
   classification: string;
   actualUse: string;
@@ -26,11 +25,6 @@ interface BuildingRecord {
   idleLand: boolean;
 }
 
-interface BuildingAssessmentProps {
-  records?: RptAssRecord[];
-  isEnabled?: boolean;
-}
-
 interface FormData {
   classification: string;
   actualUse: string;
@@ -43,7 +37,7 @@ interface FormData {
   idleLand: boolean;
 }
 
-// Options for dropdowns
+// Options for dropdowns (Example options, extend as needed)
 const classificationOptions = [
   { value: '', label: 'Select Classification' },
   { value: 'R', label: 'R - Residential' },
@@ -51,27 +45,30 @@ const classificationOptions = [
   { value: 'I', label: 'I - Industrial' },
   { value: 'A', label: 'A - Agricultural' },
   { value: 'M', label: 'M - Mixed Use' },
+  { value: 'T', label: 'T - Timberland' },
+  { value: 'Min', label: 'Min - Mineral' },
 ];
 
 const actualUseOptions = [
   { value: '', label: 'Select Actual Use' },
   { value: 'AR', label: 'AR - Agricultural Residential' },
-  { value: 'RR', label: 'RR - Rural Residential' },
-  { value: 'UR', label: 'UR - Urban Residential' },
-  { value: 'CO', label: 'CO - Commercial Office' },
-  { value: 'CR', label: 'CR - Commercial Retail' },
-  { value: 'IW', label: 'IW - Industrial Warehouse' },
-  { value: 'IM', label: 'IM - Industrial Manufacturing' },
+  { value: 'COCL', label: 'COCL - Coco Land' },
+  { value: 'RICL', label: 'RICL - Rice Land' },
+  { value: 'CORN', label: 'CORN - Corn Land' },
+  { value: 'ORCH', label: 'ORCH - Orchard' },
+  { value: 'FISH', label: 'FISH - Fishpond' },
+  { value: 'PAST', label: 'PAST - Pasture' },
+  { value: 'TIMB', label: 'TIMB - Timberland' },
 ];
 
 const subClassOptions = [
   { value: '', label: 'Select Sub Class' },
   { value: 'NONE', label: 'NONE' },
-  { value: 'I', label: 'I - Type I' },
-  { value: 'II', label: 'II - Type II' },
-  { value: 'III', label: 'III - Type III' },
-  { value: 'IV', label: 'IV - Type IV' },
-  { value: 'V', label: 'V - Type V' },
+  { value: 'COCL1', label: 'COCL1' },
+  { value: 'COCL2', label: 'COCL2' },
+  { value: 'COCL3', label: 'COCL3' },
+  { value: 'RICL1', label: 'RICL1' },
+  { value: 'RICL2', label: 'RICL2' },
 ];
 
 const defaultFormData: FormData = {
@@ -86,15 +83,25 @@ const defaultFormData: FormData = {
   idleLand: false,
 };
 
-const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRecords, isEnabled = true }) => {
-  // State for records table
-  const [records, setRecords] = useState<BuildingRecord[]>([]);
+const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, isEnabled }) => {
+  const { headerColor, headerColorDark } = useThemeColor();
+  const [records, setRecords] = useState<LandRecord[]>([]);
+  const [selectedRecord, setSelectedRecord] = useState<LandRecord | null>(null);
+  const [formData, setFormData] = useState<FormData>(defaultFormData);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
+  
+  // Computed values
+  const [computedValues, setComputedValues] = useState({
+    baseMarketValue: 0,
+    adjustedMarketValue: 0,
+    assessedValue: 0,
+  });
 
   useEffect(() => {
     if (apiRecords) {
       const mapped = apiRecords.map((r, index) => ({
-        id: r.TDN,
-        uniqueId: `${r.TDN}-${r.KIND}-${index}`, // Add a truly unique key for rendering
+        id: r.TDN + '-' + index, // Use TDN + index as ID if multiple records share TDN or just for unique key
         kind: r.KIND,
         classification: r.CLASSIFICATION,
         actualUse: r.ACTUAL_USE || '',
@@ -105,79 +112,13 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
         adjustedMarketValue: r.MARKET_VAL || 0, // Using same value for now as API might not provide split
         assessmentLevel: r.ASS_LEVEL || 0,
         assessedValue: r.ASS_VALUE || 0,
-        taxable: r.TAXABLE_RATE > 0, // Simplified logic
-        beneficialUse: false, // Default
+        taxable: r.TAXABILITY === 'true' || r.TAXABILITY === 'TAXABLE' || r.TAXABLE_RATE > 0, // Handle boolean or string
+        beneficialUse: r.BU === 'true' || r.BU === '1', // Handle boolean or string representation
         idleLand: r.IdleLand || false,
       }));
       setRecords(mapped);
     }
   }, [apiRecords]);
-
-  const { headerColor, headerColorDark } = useThemeColor();
-  const [selectedRecord, setSelectedRecord] = useState<BuildingRecord | null>(null);
-  const [formData, setFormData] = useState<FormData>(defaultFormData);
-  const [isEditing, setIsEditing] = useState(false);
-  const [isAdding, setIsAdding] = useState(false);
-  const [adjustments, setAdjustments] = useState<BldgAdjRecord[]>([]);
-  const [structures, setStructures] = useState<BldgStrucRecord[]>([]);
-
-  // Tab state
-  const [activeTab, setActiveTab] = useState<'structure' | 'adjustment'>('structure');
-
-  // Load adjustments and structures when record is selected
-  useEffect(() => {
-    if (selectedRecord && selectedRecord.id) {
-      console.log('Fetching structure data for TDN:', selectedRecord.id);
-      
-      // Clear existing data before fetching new to show loading state if desired
-      setAdjustments([]);
-      setStructures([]);
-      
-      getBldgStrucByTdn(selectedRecord.id)
-        .then(data => {
-          console.log('Fetched structures (all):', data);
-          
-          // Filter structures to match the selected assessment record's properties
-          // This handles cases where multiple assessments share the same TDN but differ in Classification/Actual Use
-          const filteredStructures = data.filter(s => 
-            s.Classification === selectedRecord.classification && 
-            s.Actual_use === selectedRecord.actualUse
-          );
-          
-          console.log('Filtered structures:', filteredStructures);
-          setStructures(filteredStructures);
-          
-          // Get the valid BldgCodes from the filtered structures to filter adjustments
-          const validBldgCodes = filteredStructures.map(s => s.BldgCode).filter(Boolean);
-          
-          // Now fetch and filter adjustments
-          getBldgAdjByTdn(selectedRecord.id)
-            .then(adjData => {
-              console.log('Fetched adjustments (all):', adjData);
-              
-              // Filter adjustments that belong to the visible structures
-              const filteredAdjustments = adjData.filter(a => 
-                validBldgCodes.includes(a.BldgCode)
-              );
-              
-              console.log('Filtered adjustments:', filteredAdjustments);
-              setAdjustments(filteredAdjustments);
-            })
-            .catch(err => console.error('Error fetching adjustments:', err));
-        })
-        .catch(err => console.error('Error fetching structures:', err));
-    } else {
-      setAdjustments([]);
-      setStructures([]);
-    }
-  }, [selectedRecord?.id, selectedRecord?.classification, selectedRecord?.actualUse]);
-
-  // Computed values
-  const [computedValues, setComputedValues] = useState({
-    baseMarketValue: 0,
-    adjustedMarketValue: 0,
-    assessedValue: 0,
-  });
 
   // Calculate values based on form input
   useEffect(() => {
@@ -188,11 +129,11 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
     // Base Market Value = Area × Unit Value
     const baseMarketValue = area * unitValue;
     
-    // Adjusted Market Value = Base Market Value × (Assessment Level / 100)
-    const adjustedMarketValue = baseMarketValue * (assessmentLevel / 100);
+    // Adjusted Market Value = Base Market Value (simplified, add adjustments logic if needed)
+    const adjustedMarketValue = baseMarketValue; 
     
-    // Assessed Value = Adjusted Market Value (simplified - in reality may have more factors)
-    const assessedValue = adjustedMarketValue;
+    // Assessed Value = Adjusted Market Value × (Assessment Level / 100)
+    const assessedValue = adjustedMarketValue * (assessmentLevel / 100);
 
     setComputedValues({
       baseMarketValue,
@@ -202,14 +143,9 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
   }, [formData.area, formData.unitValue, formData.assessmentLevel]);
 
   // Handle row selection
-  const handleRowSelect = (record: BuildingRecord) => {
+  const handleRowSelect = (record: LandRecord) => {
     if (isEditing || isAdding) return;
     setSelectedRecord(record);
-    
-    // Fetch related data (structures and adjustments)
-    // The useEffect above will handle the actual fetching based on selectedRecord change
-    // But we can also set loading states here if needed in future
-    
     setFormData({
       classification: record.classification,
       actualUse: record.actualUse,
@@ -229,9 +165,6 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
     setIsEditing(false);
     setSelectedRecord(null);
     setFormData(defaultFormData);
-    // Clear sub-lists for new record
-    setAdjustments([]);
-    setStructures([]);
   };
 
   // Handle Edit
@@ -245,20 +178,17 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
   const handleDelete = () => {
     if (!selectedRecord) return;
     if (window.confirm('Are you sure you want to delete this record?')) {
-      // In a real app, this would call an API
-      setRecords(prev => prev.filter(r => r.uniqueId !== selectedRecord.uniqueId));
+      setRecords(prev => prev.filter(r => r.id !== selectedRecord.id));
       setSelectedRecord(null);
       setFormData(defaultFormData);
-      setAdjustments([]);
-      setStructures([]);
     }
   };
 
   // Handle Save
   const handleSave = () => {
-    const newRecord: BuildingRecord = {
+    const newRecord: LandRecord = {
       id: isAdding ? Date.now().toString() : selectedRecord!.id,
-      kind: 'Building',
+      kind: 'Land',
       classification: formData.classification,
       actualUse: formData.actualUse,
       subClass: formData.subClass,
@@ -307,7 +237,6 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
 
   // Handle Refresh
   const handleRefresh = () => {
-    // In real app, would fetch from API
     console.log('Refreshing data...');
   };
 
@@ -329,7 +258,7 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
   const canModify = isEnabled && !isLocalFormEnabled;
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800" data-testid="building-assessment">
+    <div className="bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800" data-testid="land-assessment">
       {/* Header */}
       <div
         className="px-4 py-3 rounded-t-lg"
@@ -346,8 +275,8 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
           }
         `}</style>
         <div className="flex items-center gap-2">
-          <Building2 size={20} className="text-white" />
-          <h2 className="text-base font-semibold text-white">Building Assessment</h2>
+          <TreePine size={20} className="text-white" />
+          <h2 className="text-base font-semibold text-white">Land Assessment</h2>
         </div>
       </div>
 
@@ -358,7 +287,7 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
             onClick={handleAdd}
             disabled={!canModify}
             className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="add-building-btn"
+            data-testid="add-land-btn"
           >
             <Plus size={14} />
             Add
@@ -367,7 +296,7 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
             onClick={handleEdit}
             disabled={!selectedRecord || !canModify}
             className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="edit-building-btn"
+            data-testid="edit-land-btn"
           >
             <Edit2 size={14} />
             Edit
@@ -376,7 +305,7 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
             onClick={handleDelete}
             disabled={!selectedRecord || !canModify}
             className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-red-50 dark:hover:bg-red-900/20 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 text-red-600 dark:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="delete-building-btn"
+            data-testid="delete-land-btn"
           >
             <Trash2 size={14} />
             Delete
@@ -386,7 +315,7 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
             onClick={handleSave}
             disabled={!isLocalFormEnabled}
             className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="save-building-btn"
+            data-testid="save-land-btn"
           >
             <Save size={14} />
             Save
@@ -395,7 +324,7 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
             onClick={handleCancel}
             disabled={!isLocalFormEnabled}
             className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="cancel-building-btn"
+            data-testid="cancel-land-btn"
           >
             <X size={14} />
             Cancel
@@ -404,7 +333,7 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
           <button
             onClick={handleRefresh}
             className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5"
-            data-testid="refresh-building-btn"
+            data-testid="refresh-land-btn"
           >
             <RefreshCw size={14} />
             Refresh
@@ -412,7 +341,7 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
           <button
             onClick={handlePrint}
             className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5"
-            data-testid="print-building-btn"
+            data-testid="print-land-btn"
           >
             <Printer size={14} />
             Print
@@ -422,7 +351,7 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
 
       {/* Main Table */}
       <div className="overflow-x-auto">
-        <table className="w-full text-xs" data-testid="building-records-table">
+        <table className="w-full text-xs" data-testid="land-records-table">
           <thead
             className="text-white"
             style={{
@@ -455,28 +384,28 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
             {records.length === 0 ? (
               <tr>
                 <td colSpan={11} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
-                  No building records. Click "Add" to create one.
+                  No land records. Click "Add" to create one.
                 </td>
               </tr>
             ) : (
               records.map((record, index) => (
                 <tr
-                  key={record.uniqueId || record.id}
+                  key={record.id}
                   onClick={() => handleRowSelect(record)}
                   className={`cursor-pointer transition-colors ${
                     selectedRecord?.id === record.id
-                      ? 'bg-blue-100 dark:bg-blue-900/30'
+                      ? 'bg-green-100 dark:bg-green-900/30'
                       : index % 2 === 0
-                      ? 'bg-blue-50/30 dark:bg-slate-800/50'
+                      ? 'bg-green-50/30 dark:bg-slate-800/50'
                       : 'bg-white dark:bg-slate-900'
-                  } hover:bg-blue-100 dark:hover:bg-blue-900/30`}
-                  data-testid={`building-row-${record.id}`}
+                  } hover:bg-green-100 dark:hover:bg-green-900/30`}
+                  data-testid={`land-row-${record.id}`}
                 >
                   <td className="px-2 py-1.5 border-r border-slate-200 dark:border-slate-700">{record.kind}</td>
                   <td className="px-2 py-1.5 border-r border-slate-200 dark:border-slate-700">{record.classification}</td>
                   <td className="px-2 py-1.5 border-r border-slate-200 dark:border-slate-700">{record.actualUse}</td>
                   <td className="px-2 py-1.5 border-r border-slate-200 dark:border-slate-700">{record.subClass}</td>
-                  <td className="px-2 py-1.5 text-right border-r border-slate-200 dark:border-slate-700">{formatCurrency(record.area)}</td>
+                  <td className="px-2 py-1.5 text-right border-r border-slate-200 dark:border-slate-700">{record.area.toFixed(4)}</td>
                   <td className="px-2 py-1.5 text-right border-r border-slate-200 dark:border-slate-700">{formatCurrency(record.unitValue)}</td>
                   <td className="px-2 py-1.5 text-right border-r border-slate-200 dark:border-slate-700">{formatCurrency(record.baseMarketValue)}</td>
                   <td className="px-2 py-1.5 text-right border-r border-slate-200 dark:border-slate-700">{formatCurrency(record.adjustedMarketValue)}</td>
@@ -557,15 +486,15 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
               <div className="flex-1 flex items-center gap-1">
                 <input
                   type="number"
-                  step="0.01"
+                  step="0.0001"
                   value={formData.area}
                   onChange={(e) => setFormData(prev => ({ ...prev, area: e.target.value }))}
                   disabled={!isFormEnabled}
-                  placeholder="0.00"
+                  placeholder="0.0000"
                   className="flex-1 px-2 py-1.5 text-xs text-right bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
                   data-testid="input-area"
                 />
-                <span className="text-xs text-slate-500 dark:text-slate-400 w-12">sq.m.</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 w-12">ha.</span>
               </div>
             </div>
           </div>
@@ -699,58 +628,8 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
           </div>
         </div>
       </div>
-
-      {/* Sub Tabs - Structure and Adjustment */}
-      <div className="border-t border-slate-200 dark:border-slate-700">
-        {/* Tab Headers */}
-        <div className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-2 pt-2">
-          <div className="flex gap-1">
-            <button
-              onClick={() => setActiveTab('structure')}
-              className={`px-4 py-2 text-xs font-medium rounded-t-lg transition-colors ${
-                activeTab === 'structure'
-                  ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border-t border-l border-r border-slate-200 dark:border-slate-700'
-                  : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-600'
-              }`}
-              data-testid="tab-structure"
-            >
-              Structure
-            </button>
-            <button
-              onClick={() => setActiveTab('adjustment')}
-              className={`px-4 py-2 text-xs font-medium rounded-t-lg transition-colors ${
-                activeTab === 'adjustment'
-                  ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border-t border-l border-r border-slate-200 dark:border-slate-700'
-                  : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-600'
-              }`}
-              data-testid="tab-adjustment"
-            >
-              Adjustment
-            </button>
-          </div>
-        </div>
-
-        {/* Tab Content */}
-        <div className="p-4">
-          {activeTab === 'structure' && (
-            <StructureTab
-              buildingId={selectedRecord?.id || ''}
-              isFormEnabled={isFormEnabled}
-              initialStructures={structures}
-            />
-          )}
-          {activeTab === 'adjustment' && (
-            <AdjustmentTab
-              buildingId={selectedRecord?.id || ''}
-              isFormEnabled={isFormEnabled}
-              initialAdjustments={adjustments}
-              structures={structures}
-            />
-          )}
-        </div>
-      </div>
     </div>
   );
 };
 
-export default BuildingAssessment;
+export default LandAssessment;

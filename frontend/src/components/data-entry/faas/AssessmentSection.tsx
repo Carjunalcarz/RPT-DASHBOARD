@@ -1,15 +1,58 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Building2, TreePine, Cog } from 'lucide-react';
 import { BuildingAssessment } from '../building';
+import { LandAssessment } from '../land';
+import { MachineryAssessment } from '../machinery';
+import { RptAssRecord } from '@/services/rptAssService';
 
 interface AssessmentSectionProps {
   isEnabled?: boolean;
+  assessmentRecords?: RptAssRecord[];
+  isLoading?: boolean;
 }
 
 type AssessmentType = 'land' | 'building' | 'machinery';
 
-const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled }) => {
-  const [activeType, setActiveType] = useState<AssessmentType>('building');
+const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assessmentRecords = [], isLoading = false }) => {
+  const [activeType, setActiveType] = useState<AssessmentType>('land'); // Default to land as it's often the base
+
+  // Filter records by type
+  // KIND: 'L'/'Land' = Land, 'B'/'Building' = Building, 'M'/'Machinery' = Machinery
+  const landRecords = assessmentRecords.filter(r => r.KIND === 'L' || r.KIND === 'Land');
+  const buildingRecords = assessmentRecords.filter(r => r.KIND === 'B' || r.KIND === 'Building');
+  const machineryRecords = assessmentRecords.filter(r => r.KIND === 'M' || r.KIND === 'Machinery');
+
+  // Auto-switch tab based on available data or first record
+  useEffect(() => {
+    if (assessmentRecords.length > 0 && !isLoading) {
+      // Logic: If we have specific records, switch to that tab.
+      // If we have mixed, prioritize: Land -> Building -> Machinery
+      // Or just switch to the type of the first record if we want to show what was clicked/loaded.
+      
+      const firstRecord = assessmentRecords[0];
+      const kind = firstRecord.KIND;
+      
+      if (kind === 'L' || kind === 'Land') {
+        setActiveType('land');
+      } else if (kind === 'B' || kind === 'Building') {
+        setActiveType('building');
+      } else if (kind === 'M' || kind === 'Machinery') {
+        setActiveType('machinery');
+      }
+    } else {
+        // Optional: If no records, maybe default to land or stay?
+        // Let's keep current selection or default to land.
+    }
+  }, [assessmentRecords, isLoading]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-3 text-sm text-slate-500 dark:text-slate-400">Loading assessments...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -56,31 +99,24 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled }) => {
       {/* Assessment Content */}
       <div>
         {activeType === 'land' && (
-          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800 p-8 text-center">
-            <TreePine size={48} className="mx-auto mb-4 text-green-500" />
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
-              Land Assessment
-            </h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Land assessment module will be implemented here.
-            </p>
-          </div>
+          <LandAssessment
+            records={landRecords}
+            isEnabled={isEnabled}
+          />
         )}
 
         {activeType === 'building' && (
-          <BuildingAssessment />
+          <BuildingAssessment 
+            records={buildingRecords}
+            isEnabled={isEnabled}
+          />
         )}
 
         {activeType === 'machinery' && (
-          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800 p-8 text-center">
-            <Cog size={48} className="mx-auto mb-4 text-orange-500" />
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">
-              Machinery Assessment
-            </h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Machinery assessment module will be implemented here.
-            </p>
-          </div>
+          <MachineryAssessment
+            records={machineryRecords}
+            isEnabled={isEnabled}
+          />
         )}
       </div>
     </div>
