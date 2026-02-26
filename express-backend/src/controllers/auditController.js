@@ -75,8 +75,7 @@ exports.getAuditLogs = async (req, res, next) => {
 
     // Parse JSON strings for MSSQL and attach user email
     const formattedLogs = logs.map(log => {
-      // Prefer stored email, fallback to lookup
-      const email = log.userEmail || (log.userId ? userMap[log.userId] : null);
+      const email = log.userId ? userMap[log.userId] : null;
       const enrichedLog = { ...log, userEmail: email };
 
       if (targetSource === 'mssql') {
@@ -98,50 +97,6 @@ exports.getAuditLogs = async (req, res, next) => {
       page: parseInt(page),
       totalPages: Math.ceil(total / limit),
       data: formattedLogs
-    });
-
-  } catch (err) {
-    next(err);
-  }
-};
-
-exports.deleteAuditLogs = async (req, res, next) => {
-  try {
-    const { source } = req.query;
-    const targetSource = source || 'supabase';
-    const client = getClient(targetSource);
-
-    if (!client) {
-      return next(new AppError('Invalid source. Use "mssql" or "supabase".', 400));
-    }
-
-    // Perform deletion and audit logging in a transaction
-    await client.$transaction(async (tx) => {
-      // 1. Delete all existing audit logs
-      const deleteResult = await tx.auditLog.deleteMany({});
-
-      // 2. Create a new audit log entry recording this action
-      // We manually create this because the automatic extension ignores the AuditLog table
-      await tx.auditLog.create({
-        data: {
-          tableName: 'AuditLog',
-          recordId: 'ALL',
-          action: 'DELETE_ALL',
-          userId: req.user.sub || req.user.id || 'system',
-          userEmail: req.user.email || req.user.user_metadata?.email || null,
-          ipAddress: req.ip || req.connection.remoteAddress || null,
-          timestamp: new Date(),
-          details: targetSource === 'supabase' 
-            ? { count: deleteResult.count, message: 'All audit logs cleared by admin' }
-            : JSON.stringify({ count: deleteResult.count, message: 'All audit logs cleared by admin' })
-        }
-      });
-    });
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Audit logs cleared successfully',
-      source: targetSource
     });
 
   } catch (err) {

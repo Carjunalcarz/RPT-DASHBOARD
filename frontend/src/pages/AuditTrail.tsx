@@ -15,8 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   MoreHorizontal,
-  Eye,
-  Trash2
+  Eye
 } from 'lucide-react';
 
 import {
@@ -59,26 +58,11 @@ import {
   PaginationPrevious,
   PaginationEllipsis,
 } from '@/components/ui/pagination';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 
-import { getAuditLogs, clearAuditLogs } from '@/services/auditService';
+import { getAuditLogs } from '@/services/auditService';
 import { AuditLogParams, AuditLog } from '@/types/audit';
-import { useAuth } from '@/context/AuthContext';
-import { toast } from 'sonner';
 
 const AuditTrail: React.FC = () => {
-  const { user } = useAuth();
-  const [isClearing, setIsClearing] = useState(false);
   const [params, setParams] = useState<AuditLogParams>({
     page: 1,
     limit: 10,
@@ -120,20 +104,6 @@ const AuditTrail: React.FC = () => {
       startDate: '',
       endDate: '',
     });
-  };
-
-  const handleClearLogs = async () => {
-    setIsClearing(true);
-    try {
-      await clearAuditLogs(params.source || 'supabase');
-      toast.success('Audit logs cleared successfully');
-      mutate(); // Refresh the list
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.response?.data?.message || 'Failed to clear audit logs');
-    } finally {
-      setIsClearing(false);
-    }
   };
 
   const renderPagination = () => {
@@ -338,33 +308,6 @@ const AuditTrail: React.FC = () => {
                 <RefreshCw className={`mr-2 h-4 w-4 ${isLoading || isValidating ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
-              
-              {(user?.role === 'admin' || user?.role === 'Administrator') && (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm" disabled={isClearing}>
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Clear Logs
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete all audit logs 
-                        from the <strong>{params.source === 'mssql' ? 'MSSQL' : 'Supabase'}</strong> database.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleClearLogs} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                        {isClearing ? 'Clearing...' : 'Continue'}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              )}
-
               {(params.action || params.tableName || params.userId || params.startDate || params.endDate) && (
                 <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 px-2 lg:px-3">
                   Reset Filters

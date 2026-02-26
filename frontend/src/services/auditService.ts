@@ -29,8 +29,4 @@ export const getAuditLogs = async (params: AuditLogParams): Promise<AuditLogResp
   return response.data;
 };
 
-export const clearAuditLogs = async (source: 'mssql' | 'supabase'): Promise<void> => {
-  await api.delete('/audit', {
-    params: { source }
-  });
-};
+// Export hook-compatible function for SWR if needed, but for now we export the service function.

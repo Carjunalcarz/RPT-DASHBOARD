@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, FileText } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 
@@ -50,12 +50,73 @@ const defaultFormData: ReferenceFormData = {
   areaUnit: 'sq. m',
 };
 
-const ReferenceSection: React.FC = () => {
+interface ReferenceSectionProps {
+  selectedRecord?: any;
+  isEnabled?: boolean;
+}
+
+const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: initialRecord, isEnabled = true }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const [records, setRecords] = useState<ReferenceRecord[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<ReferenceRecord | null>(null);
   const [formData, setFormData] = useState<ReferenceFormData>(defaultFormData);
   const [isEditing, setIsEditing] = useState(false);
+
+  // Populate form when selectedRecord prop changes
+  useEffect(() => {
+    if (initialRecord) {
+      // Map API fields to form data
+      setFormData({
+        tdn: initialRecord.pOldTdn || '',
+        extn1: '', // Not in API response example
+        arp: initialRecord.canArp || '',
+        extn2: '', // Not in API response example
+        pin: initialRecord.pPin || '',
+        extn3: '', // Not in API response example
+        effDate: initialRecord.pEffDate ? initialRecord.pEffDate.split('T')[0] : '',
+        ownerCode: initialRecord.pOwnerCode || '',
+        ownerNo: initialRecord.pOwnerNo || '',
+        ownerName: initialRecord.pOwner || '',
+        marketValue: initialRecord.pMarketValue?.toString() || '0.00',
+        assessedValue: initialRecord.pAssessedValue?.toString() || '0.00',
+        improvement: '0.00', // Not explicitly in API response example
+        area: initialRecord.pArea?.toString() || '0.00',
+        areaUnit: initialRecord.pAreaM === true ? 'ha' : 'sq. m',
+      });
+
+      // Populate table with this single reference record
+      const newRecord: ReferenceRecord = {
+        id: initialRecord.id || 'initial-ref',
+        tdn: initialRecord.pOldTdn || '',
+        extn1: '',
+        arp: initialRecord.canArp || '',
+        extn2: '',
+        pin: initialRecord.pPin || '',
+        extn3: '',
+        marketValue: initialRecord.pMarketValue?.toString() || '0.00',
+        assessedValue: initialRecord.pAssessedValue?.toString() || '0.00',
+      };
+      setRecords([newRecord]);
+      setSelectedRecord(newRecord);
+    } else {
+      setRecords([]);
+      setSelectedRecord(null);
+      setFormData(defaultFormData);
+    }
+  }, [initialRecord]);
+
+  const handleRowSelect = (record: ReferenceRecord) => {
+    if (isEditing) return;
+    setSelectedRecord(record);
+    // In a real scenario, we might need to fetch full details if the table record is partial.
+    // For now, since we only have one record populated from the same source, the form data is already set or persisted.
+    // If we support multiple records, we need to find the full data corresponding to this ID.
+    
+    // If we have multiple records, we should update formData here based on the selected record.
+    // However, ReferenceRecord interface is a subset. 
+    // Ideally, `records` should store the full `ReferenceFormData` or `initialRecord` structure.
+    // For this specific task (showing the single P_* record), we assume form matches current view.
+  };
 
   const handleAdd = () => {
     setIsEditing(true);
@@ -73,12 +134,35 @@ const ReferenceSection: React.FC = () => {
     if (window.confirm('Are you sure you want to delete this reference?')) {
       setRecords(prev => prev.filter(r => r.id !== selectedRecord.id));
       setSelectedRecord(null);
+      setFormData(defaultFormData);
     }
   };
 
   const handleSave = () => {
+    // Construct new record from form data
+    const newRecord: ReferenceRecord = {
+      id: selectedRecord?.id || `new-ref-${Date.now()}`,
+      tdn: formData.tdn,
+      extn1: formData.extn1,
+      arp: formData.arp,
+      extn2: formData.extn2,
+      pin: formData.pin,
+      extn3: formData.extn3,
+      marketValue: formData.marketValue,
+      assessedValue: formData.assessedValue,
+    };
+
+    if (selectedRecord) {
+      // Update existing
+      setRecords(prev => prev.map(r => r.id === selectedRecord.id ? newRecord : r));
+    } else {
+      // Add new
+      setRecords(prev => [...prev, newRecord]);
+    }
+    
+    setSelectedRecord(newRecord);
     setIsEditing(false);
-    // Save logic here
+    // Save logic here (e.g. API call if needed)
   };
 
   const handleCancel = () => {
@@ -89,6 +173,9 @@ const ReferenceSection: React.FC = () => {
   const handleRefresh = () => {
     // Refresh logic here
   };
+
+  const isLocalFormEnabled = isEditing;
+  const canModify = isEnabled && !isLocalFormEnabled;
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800">
@@ -109,7 +196,9 @@ const ReferenceSection: React.FC = () => {
         `}</style>
         <div className="flex items-center gap-2">
           <FileText size={20} className="text-white" />
-          <h2 className="text-base font-semibold text-white">Reference Information of TDN 25-07-0001-00006</h2>
+          <h2 className="text-base font-semibold text-white">
+            Reference Information of TDN {initialRecord ? initialRecord.tdn : ''}
+          </h2>
         </div>
       </div>
 
@@ -118,7 +207,7 @@ const ReferenceSection: React.FC = () => {
         <div className="flex flex-wrap gap-1">
           <button
             onClick={handleAdd}
-            disabled={isEditing}
+            disabled={!canModify}
             className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus size={14} />
@@ -126,7 +215,7 @@ const ReferenceSection: React.FC = () => {
           </button>
           <button
             onClick={handleEdit}
-            disabled={!selectedRecord || isEditing}
+            disabled={!selectedRecord || !canModify}
             className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Edit2 size={14} />
@@ -134,7 +223,7 @@ const ReferenceSection: React.FC = () => {
           </button>
           <button
             onClick={handleDelete}
-            disabled={!selectedRecord || isEditing}
+            disabled={!selectedRecord || !canModify}
             className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-red-50 dark:hover:bg-red-900/20 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 text-red-600 dark:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Trash2 size={14} />
@@ -143,7 +232,7 @@ const ReferenceSection: React.FC = () => {
           <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1 self-center" />
           <button
             onClick={handleSave}
-            disabled={!isEditing}
+            disabled={!isLocalFormEnabled}
             className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save size={14} />
@@ -151,7 +240,7 @@ const ReferenceSection: React.FC = () => {
           </button>
           <button
             onClick={handleCancel}
-            disabled={!isEditing}
+            disabled={!isLocalFormEnabled}
             className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <X size={14} />
@@ -211,7 +300,7 @@ const ReferenceSection: React.FC = () => {
               records.map((record, index) => (
                 <tr
                   key={record.id}
-                  onClick={() => setSelectedRecord(record)}
+                  onClick={() => handleRowSelect(record)}
                   className={`cursor-pointer transition-colors ${
                     selectedRecord?.id === record.id
                       ? 'bg-blue-100 dark:bg-blue-900/40'

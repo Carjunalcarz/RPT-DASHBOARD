@@ -46,7 +46,6 @@ const createAuditExtension = (clientName, baseClient) => {
           try {
             const context = getContext();
             const userId = context?.user?.id || 'system';
-            const userEmail = context?.user?.email || null;
             const ipAddress = context?.ip || null;
             const isSupabase = clientName === 'Supabase';
 
@@ -55,7 +54,6 @@ const createAuditExtension = (clientName, baseClient) => {
               recordId: result && result.id ? String(result.id) : (args.where?.id ? String(args.where.id) : 'N/A'),
               action: operation.toUpperCase(),
               userId: String(userId),
-              userEmail: userEmail ? String(userEmail) : null,
               ipAddress: ipAddress ? String(ipAddress) : null,
               details: isSupabase ? { args, duration } : JSON.stringify({ args, duration }),
               timestamp: new Date(),

@@ -258,6 +258,7 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
   const handleSave = () => {
     const newRecord: BuildingRecord = {
       id: isAdding ? Date.now().toString() : selectedRecord!.id,
+      uniqueId: isAdding ? `${Date.now()}-Building-new` : selectedRecord!.uniqueId,
       kind: 'Building',
       classification: formData.classification,
       actualUse: formData.actualUse,

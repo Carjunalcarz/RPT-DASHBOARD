@@ -163,11 +163,75 @@ const defaultFormData: SignatoriesFormData = {
   entryBy: '',
 };
 
-const SignatoriesSection: React.FC = () => {
+interface SignatoriesSectionProps {
+  selectedRecord?: any;
+  isEnabled?: boolean;
+}
+
+const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ selectedRecord: initialRecord, isEnabled = true }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const { user } = useAuth();
   const [activeSubTab, setActiveSubTab] = useState<'signatories' | 'memorandum' | 'sworn' | 'documentation' | 'remarks'>('signatories');
   const [formData, setFormData] = useState<SignatoriesFormData>(defaultFormData);
+  
+  // Populate form when initialRecord changes
+  React.useEffect(() => {
+    if (initialRecord) {
+      setFormData({
+        appraisedBy: initialRecord.appraisedBy || '',
+        appraisedPosition: initialRecord.appraisedPos || '',
+        appraisedDate: initialRecord.appraisedDate ? initialRecord.appraisedDate.split('T')[0] : '',
+        appraisedSGD: initialRecord.sgdAppraised || false,
+        appraisedTPD: initialRecord.tpdAppraised || false,
+        
+        assessedBy: initialRecord.assessor || '',
+        assessedPosition: initialRecord.assessorPos || '',
+        assessedDate: initialRecord.assessorDate ? initialRecord.assessorDate.split('T')[0] : '',
+        assessedSGD: initialRecord.sgdAssessed || false,
+        assessedTPD: initialRecord.tpdAssessed || false,
+        
+        checkedBy: '', // Not in API response
+        checkedPosition: '', // Not in API response
+        checkedDate: '', // Not in API response
+        checkedSGD: false,
+        checkedTPD: false,
+        
+        recommendingBy: initialRecord.recApproval || '',
+        recommendingPosition: initialRecord.recApprovalPos || '',
+        recommendingDate: initialRecord.recAppDate ? initialRecord.recAppDate.split('T')[0] : '',
+        recommendingSGD: initialRecord.sgdRecommend || false,
+        recommendingTPD: initialRecord.tpdRecommend || false,
+        
+        approvedBy: initialRecord.approved || '',
+        approvedPosition: initialRecord.approvedPos || '',
+        approvedDate: initialRecord.approvedDate ? initialRecord.approvedDate.split('T')[0] : '',
+        approvedSGD: initialRecord.sgdApproved || false,
+        approvedTPD: initialRecord.tpdApproved || false,
+        
+        provincialAssessor: initialRecord.provAssessor || '',
+        provincialPosition: initialRecord.provAssessorPos || '',
+        provincialDate: initialRecord.provAssessorDate ? initialRecord.provAssessorDate.split('T')[0] : '',
+        provincialSGD: initialRecord.sgdProv || false,
+        provincialTPD: initialRecord.tpdProv || false,
+        
+        cityAssessor: initialRecord.cityAssessor || '',
+        cityPosition: initialRecord.cityAssessorPos || '',
+        cityDate: initialRecord.cityAssessorDate ? initialRecord.cityAssessorDate.split('T')[0] : '',
+        citySGD: initialRecord.sgdCity || false,
+        cityTPD: initialRecord.tpdCity || false,
+        
+        deputy: initialRecord.deputy || '',
+        deputyPosition: initialRecord.deputyPos || '',
+        deputyDate: initialRecord.deputyDate ? initialRecord.deputyDate.split('T')[0] : '',
+        deputySGD: initialRecord.sgdDeputy || false,
+        deputyTPD: initialRecord.tpdDeputy || false,
+        
+        entryDate: '', // Not explicitly in API for this section
+        entryBy: '', // Not explicitly in API for this section
+      });
+    }
+  }, [initialRecord]);
+
   const [documentationData, setDocumentationData] = useState<DocumentationData>(defaultDocumentationData);
   const [remarksData, setRemarksData] = useState<RemarksData>(defaultRemarksData);
   const [isEditing, setIsEditing] = useState(false);
@@ -178,7 +242,7 @@ const SignatoriesSection: React.FC = () => {
   const [isSavingSworn, setIsSavingSworn] = useState(false);
 
   const currentUser = user?.name || 'System';
-  const canEdit = user?.role === 'Administrator';
+  const canEdit = user?.role === 'Administrator' && isEnabled;
 
   const [signatories, setSignatories] = useState<SignatoryRecord[]>([
     {
@@ -818,7 +882,8 @@ const SignatoriesSection: React.FC = () => {
           disabled={!isEditing}
           className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
         >
-          <option value="">{formData[nameField] || ''}</option>
+          <option value={formData[nameField] as string}>{formData[nameField] as string}</option>
+          {/* Add more options dynamically if needed */}
         </select>
       </div>
       <div className="col-span-4">
@@ -863,42 +928,14 @@ const SignatoriesSection: React.FC = () => {
         `}</style>
         <div className="flex items-center gap-2">
           <Users size={20} className="text-white" />
-          <h2 className="text-base font-semibold text-white">Signatories / Memorandum of TDN 25-07-0001-00005</h2>
+          <h2 className="text-base font-semibold text-white">
+            Signatories / Memorandum of TDN {initialRecord ? initialRecord.tdn : ''}
+          </h2>
         </div>
       </div>
 
       {/* Toolbar */}
-      <div className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-3 py-2">
-        <div className="flex flex-wrap gap-1">
-          <button
-            onClick={handleSave}
-            disabled={!isEditing}
-            className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Save size={14} />
-            Save
-          </button>
-          <button
-            onClick={handleCancel}
-            disabled={!isEditing}
-            className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <X size={14} />
-            Cancel
-          </button>
-          <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1 self-center" />
-          <button
-            onClick={handleRefresh}
-            className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5"
-          >
-            <RefreshCw size={14} />
-            Refresh
-          </button>
-          <button className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5">
-            Close
-          </button>
-        </div>
-      </div>
+      {/* Global Toolbar removed to be specific per tab */}
 
       {/* Sub Tabs */}
       <div className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 px-2 pt-2">
@@ -928,259 +965,74 @@ const SignatoriesSection: React.FC = () => {
         )}
         {activeSubTab === 'signatories' && (
           <div className="space-y-3">
-            <TableToolbar
-              onAdd={handleSignatoryAdd}
-              onEdit={handleSignatoryEdit}
-              onDelete={handleSignatoryDelete}
-              onSave={handleSignatorySave}
-              onCancel={handleSignatoryCancel}
-              onRefresh={handleSignatoryRefresh}
-              onPrint={handleExportSignatories}
-              isEditing={!!editingSignatoryId}
-              hasSelection={!!selectedSignatoryId}
-            />
-            {!canEdit && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-200">
-                You have view-only access to signatories.
+            {/* Signatories Toolbar */}
+            <div className="flex flex-wrap gap-1 mb-2">
+              <button
+                onClick={() => setIsEditing(true)}
+                disabled={!canEdit || isEditing}
+                className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Users size={14} />
+                Edit
+              </button>
+              <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1 self-center" />
+              <button
+                onClick={handleSave}
+                disabled={!isEditing}
+                className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save size={14} />
+                Save
+              </button>
+              <button
+                onClick={handleCancel}
+                disabled={!isEditing}
+                className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <X size={14} />
+                Cancel
+              </button>
+              <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1 self-center" />
+              <button
+                onClick={handleRefresh}
+                className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5"
+              >
+                <RefreshCw size={14} />
+                Refresh
+              </button>
+            </div>
+
+            {renderSignatoryRow('Appraised By', 'appraisedBy', 'appraisedPosition', 'appraisedDate', 'appraisedSGD', 'appraisedTPD')}
+            {renderSignatoryRow('Assessed By', 'assessedBy', 'assessedPosition', 'assessedDate', 'assessedSGD', 'assessedTPD')}
+            {renderSignatoryRow('Checked and Reviewed', 'checkedBy', 'checkedPosition', 'checkedDate', 'checkedSGD', 'checkedTPD')}
+            {renderSignatoryRow('Recommending Approval', 'recommendingBy', 'recommendingPosition', 'recommendingDate', 'recommendingSGD', 'recommendingTPD')}
+            {renderSignatoryRow('Approved By', 'approvedBy', 'approvedPosition', 'approvedDate', 'approvedSGD', 'approvedTPD')}
+            {renderSignatoryRow('Provincial Assessor', 'provincialAssessor', 'provincialPosition', 'provincialDate', 'provincialSGD', 'provincialTPD')}
+            {renderSignatoryRow('City/Municipal Assessor', 'cityAssessor', 'cityPosition', 'cityDate', 'citySGD', 'cityTPD')}
+            {renderSignatoryRow('Deputy', 'deputy', 'deputyPosition', 'deputyDate', 'deputySGD', 'deputyTPD')}
+            
+            {/* Entry Date */}
+            <div className="grid grid-cols-12 gap-2 items-center py-2 border-b border-slate-200 dark:border-slate-700">
+              <div className="col-span-2"></div>
+              <div className="col-span-3">
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Entry Date:</label>
+                <input
+                  type="date"
+                  value={formData.entryDate}
+                  onChange={(e) => setFormData({ ...formData, entryDate: e.target.value })}
+                  disabled={!isEditing}
+                  className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
+                />
               </div>
-            )}
-            {isSavingSignatory && (
-              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700 dark:border-blue-700/40 dark:bg-blue-900/20 dark:text-blue-200">
-                Saving signatory changes...
-              </div>
-            )}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-              <div className="lg:col-span-2 space-y-3">
-                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
-                  <div className="flex flex-wrap gap-2 items-center">
-                    <div className="relative flex-1 min-w-[180px]">
-                      <Search size={14} className="absolute left-2 top-2.5 text-slate-400" />
-                      <input
-                        value={signatoryQuery}
-                        onChange={(e) => setSignatoryQuery(e.target.value)}
-                        placeholder="Search signatories..."
-                        className="w-full pl-7 pr-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                    </div>
-                    <select
-                      value={signatoryStatusFilter}
-                      onChange={(e) => setSignatoryStatusFilter(e.target.value as SignatoryStatus | 'All')}
-                      className="px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg"
-                    >
-                      <option value="All">All Status</option>
-                      <option value="Draft">Draft</option>
-                      <option value="Pending">Pending</option>
-                      <option value="Approved">Approved</option>
-                      <option value="Rejected">Rejected</option>
-                    </select>
-                    <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                      <input
-                        type="checkbox"
-                        checked={signatoryShowDeleted}
-                        onChange={(e) => setSignatoryShowDeleted(e.target.checked)}
-                        className="h-3 w-3 rounded border-slate-300 dark:border-slate-600"
-                      />
-                      Show deleted
-                    </label>
-                    <button
-                      type="button"
-                      onClick={handleExportSignatories}
-                      className="px-3 py-2 text-xs bg-slate-600 hover:bg-slate-700 text-white rounded-lg flex items-center gap-2"
-                    >
-                      <Download size={14} />
-                      Export
-                    </button>
-                    {selectedSignatoryId && (
-                      <button
-                        type="button"
-                        onClick={() => handleNotify('signatory', selectedSignatoryId, 'signatory')}
-                        className="px-3 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2"
-                      >
-                        <Mail size={14} />
-                        Notify
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-                        <tr>
-                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Name</th>
-                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Title</th>
-                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Status</th>
-                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Date Signed</th>
-                          <th className="px-3 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredSignatories.length === 0 ? (
-                          <tr>
-                            <td colSpan={5} className="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
-                              No signatories found.
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredSignatories.map((item) => (
-                            <tr
-                              key={item.id}
-                              onClick={() => setSelectedSignatoryId(item.id)}
-                              className={`border-b border-slate-200 dark:border-slate-700 cursor-pointer ${
-                                selectedSignatoryId === item.id ? 'bg-blue-50 dark:bg-blue-900/20' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
-                              }`}
-                            >
-                              <td className="px-3 py-2 text-slate-700 dark:text-slate-200">
-                                {item.name}
-                                {item.deletedAt && <span className="ml-2 text-[10px] text-red-500">Deleted</span>}
-                              </td>
-                              <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{item.title}</td>
-                              <td className="px-3 py-2">
-                                <span className={`px-2 py-1 rounded-full text-[10px] font-semibold ${statusBadgeClass(item.status)}`}>
-                                  {item.status}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2 text-slate-600 dark:text-slate-300">{item.dateSigned || '--'}</td>
-                              <td className="px-3 py-2">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleViewRecord('signatory', item.id);
-                                  }}
-                                  className="px-2 py-1 text-[11px] bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center gap-1"
-                                >
-                                  <Eye size={12} />
-                                  View
-                                </button>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
-                  <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">
-                    {editingSignatoryId ? 'Edit Signatory' : 'Signatory Details'}
-                  </h4>
-                  <div className="space-y-2">
-                    <div>
-                      <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Name</label>
-                      <input
-                        value={signatoryDraft.name}
-                        onChange={(e) => setSignatoryDraft({ ...signatoryDraft, name: e.target.value })}
-                        disabled={!editingSignatoryId}
-                        className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
-                      />
-                      {signatoryErrors.name && (
-                        <p className="text-[11px] text-red-600 mt-1">{signatoryErrors.name}</p>
-                      )}
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Title</label>
-                      <input
-                        value={signatoryDraft.title}
-                        onChange={(e) => setSignatoryDraft({ ...signatoryDraft, title: e.target.value })}
-                        disabled={!editingSignatoryId}
-                        className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
-                      />
-                      {signatoryErrors.title && (
-                        <p className="text-[11px] text-red-600 mt-1">{signatoryErrors.title}</p>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Status</label>
-                        <select
-                          value={signatoryDraft.status}
-                          onChange={(e) => setSignatoryDraft({ ...signatoryDraft, status: e.target.value as SignatoryStatus })}
-                          disabled={!editingSignatoryId}
-                          className="w-full px-2 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
-                        >
-                          <option value="Draft">Draft</option>
-                          <option value="Pending">Pending</option>
-                          <option value="Approved">Approved</option>
-                          <option value="Rejected">Rejected</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Date Signed</label>
-                        <input
-                          type="date"
-                          value={signatoryDraft.dateSigned}
-                          onChange={(e) => setSignatoryDraft({ ...signatoryDraft, dateSigned: e.target.value })}
-                          disabled={!editingSignatoryId}
-                          className="w-full px-2 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
-                        />
-                        {signatoryErrors.dateSigned && (
-                          <p className="text-[11px] text-red-600 mt-1">{signatoryErrors.dateSigned}</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-300">
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={signatoryDraft.sgd}
-                          onChange={(e) => setSignatoryDraft({ ...signatoryDraft, sgd: e.target.checked })}
-                          disabled={!editingSignatoryId}
-                          className="h-3 w-3 rounded border-slate-300 dark:border-slate-600"
-                        />
-                        SGD
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={signatoryDraft.tpd}
-                          onChange={(e) => setSignatoryDraft({ ...signatoryDraft, tpd: e.target.checked })}
-                          disabled={!editingSignatoryId}
-                          className="h-3 w-3 rounded border-slate-300 dark:border-slate-600"
-                        />
-                        TPD
-                      </label>
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-300 mb-1">Notes</label>
-                      <textarea
-                        value={signatoryDraft.notes}
-                        onChange={(e) => setSignatoryDraft({ ...signatoryDraft, notes: e.target.value })}
-                        disabled={!editingSignatoryId}
-                        rows={3}
-                        className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
-                      />
-                    </div>
-                    <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Updated by {signatoryDraft.updatedBy || '--'} at {signatoryDraft.updatedAt || '--'}
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
-                  <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
-                    <span>Total: {signatorySummary.total}</span>
-                    <span>Approved: {signatorySummary.approved}</span>
-                    <span>Pending: {signatorySummary.pending}</span>
-                    <span>Rejected: {signatorySummary.rejected}</span>
-                  </div>
-                </div>
-                <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
-                  <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2">Audit Trail</h4>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {auditLog.length === 0 ? (
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">No audit entries yet.</p>
-                    ) : (
-                      auditLog.map((entry) => (
-                        <div key={entry.id} className="text-[11px] text-slate-600 dark:text-slate-300">
-                          <div className="font-medium">{entry.details}</div>
-                          <div>{entry.user} • {new Date(entry.timestamp).toLocaleString()}</div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
+              <div className="col-span-4">
+                <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">By:</label>
+                <input
+                  type="text"
+                  value={formData.entryBy}
+                  onChange={(e) => setFormData({ ...formData, entryBy: e.target.value })}
+                  disabled={!isEditing}
+                  className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
+                />
               </div>
             </div>
           </div>
@@ -1188,17 +1040,66 @@ const SignatoriesSection: React.FC = () => {
 
         {activeSubTab === 'memorandum' && (
           <div className="space-y-3">
-            <TableToolbar
-              onAdd={handleMemoAdd}
-              onEdit={handleMemoEdit}
-              onDelete={handleMemoDelete}
-              onSave={handleMemoSave}
-              onCancel={handleMemoCancel}
-              onRefresh={handleMemoRefresh}
-              onPrint={handleExportMemorandums}
-              isEditing={!!editingMemoId}
-              hasSelection={!!selectedMemoId}
-            />
+            {/* Memorandum Toolbar */}
+            <div className="flex flex-wrap gap-1 mb-2">
+              <button
+                onClick={handleMemoAdd}
+                disabled={!canEdit || !!editingMemoId}
+                className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Users size={14} />
+                Add
+              </button>
+              <button
+                onClick={handleMemoEdit}
+                disabled={!canEdit || !selectedMemoId || !!editingMemoId}
+                className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Users size={14} />
+                Edit
+              </button>
+              <button
+                onClick={handleMemoDelete}
+                disabled={!canEdit || !selectedMemoId || !!editingMemoId}
+                className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-red-50 dark:hover:bg-red-900/20 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 text-red-600 dark:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <X size={14} />
+                Delete
+              </button>
+              <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1 self-center" />
+              <button
+                onClick={handleMemoSave}
+                disabled={!editingMemoId}
+                className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save size={14} />
+                Save
+              </button>
+              <button
+                onClick={handleMemoCancel}
+                disabled={!editingMemoId}
+                className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <X size={14} />
+                Cancel
+              </button>
+              <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1 self-center" />
+              <button
+                onClick={handleMemoRefresh}
+                className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5"
+              >
+                <RefreshCw size={14} />
+                Refresh
+              </button>
+              <button
+                onClick={handleExportMemorandums}
+                className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5"
+              >
+                <Download size={14} />
+                Print
+              </button>
+            </div>
+            
             {!canEdit && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-200">
                 You have view-only access to memorandums.
@@ -1447,17 +1348,66 @@ const SignatoriesSection: React.FC = () => {
 
         {activeSubTab === 'sworn' && (
           <div className="space-y-3">
-            <TableToolbar
-              onAdd={handleSwornAdd}
-              onEdit={handleSwornEdit}
-              onDelete={handleSwornDelete}
-              onSave={handleSwornSave}
-              onCancel={handleSwornCancel}
-              onRefresh={handleSwornRefresh}
-              onPrint={handleExportSwornStatements}
-              isEditing={!!editingSwornId}
-              hasSelection={!!selectedSwornId}
-            />
+            {/* Sworn Statement Toolbar */}
+            <div className="flex flex-wrap gap-1 mb-2">
+              <button
+                onClick={handleSwornAdd}
+                disabled={!canEdit || !!editingSwornId}
+                className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Users size={14} />
+                Add
+              </button>
+              <button
+                onClick={handleSwornEdit}
+                disabled={!canEdit || !selectedSwornId || !!editingSwornId}
+                className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Users size={14} />
+                Edit
+              </button>
+              <button
+                onClick={handleSwornDelete}
+                disabled={!canEdit || !selectedSwornId || !!editingSwornId}
+                className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-red-50 dark:hover:bg-red-900/20 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 text-red-600 dark:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <X size={14} />
+                Delete
+              </button>
+              <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1 self-center" />
+              <button
+                onClick={handleSwornSave}
+                disabled={!editingSwornId}
+                className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save size={14} />
+                Save
+              </button>
+              <button
+                onClick={handleSwornCancel}
+                disabled={!editingSwornId}
+                className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <X size={14} />
+                Cancel
+              </button>
+              <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1 self-center" />
+              <button
+                onClick={handleSwornRefresh}
+                className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5"
+              >
+                <RefreshCw size={14} />
+                Refresh
+              </button>
+              <button
+                onClick={handleExportSwornStatements}
+                className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5"
+              >
+                <Download size={14} />
+                Print
+              </button>
+            </div>
+
             {!canEdit && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-700/40 dark:bg-amber-900/20 dark:text-amber-200">
                 You have view-only access to sworn statements.

@@ -119,6 +119,57 @@ export interface RptMastRecord {
   // Enriched Barangay Fields
   'BRGY.CODE'?: string;
   BARANGAY?: string;
+
+  // Reference Fields
+  P_NEW_TDN?: string;
+  P_OLD_TDN?: string;
+  P_PIN?: string;
+  P_MARKET_VALUE?: number;
+  P_ASS_VALUE?: number;
+  P_OWNER_CODE?: string;
+  P_OWNER_NO?: string;
+  CAN_ARP?: string;
+  P_AREA?: number;
+  P_AREA_M?: boolean;
+  P_EFF_DATE?: string;
+  P_OWNER?: string;
+
+  // Signatory Fields
+  Appraiser?: string;
+  AppraiserPos?: string;
+  AppraisedDate?: string;
+  Assessor?: string;
+  AssessorPos?: string;
+  AssessorDate?: string;
+  Rec_Approval?: string;
+  Rec_ApprovalPos?: string;
+  Rec_AppDate?: string;
+  Approved?: string;
+  ApprovedPos?: string;
+  ApprovedDate?: string;
+  ProvAssessor?: string;
+  ProvAssessorPos?: string;
+  ProvAssessorDate?: string;
+  CityAssessor?: string;
+  CityAssessorPos?: string;
+  CityAssessorDate?: string;
+  Deputy?: string;
+  DeputyPos?: string;
+  DeputyDate?: string;
+  SGD_APPRAISED?: boolean;
+  SGD_RECOMMEND?: boolean;
+  SGD_APPROVED?: boolean;
+  SGD_ASSESSED?: boolean;
+  SGD_PROV?: boolean;
+  SGD_CITY?: boolean;
+  SGD_DEPUTY?: boolean;
+  TPD_APPRAISED?: boolean;
+  TPD_RECOMMEND?: boolean;
+  TPD_APPROVED?: boolean;
+  TPD_ASSESSED?: boolean;
+  TPD_PROV?: boolean;
+  TPD_CITY?: boolean;
+  TPD_DEPUTY?: boolean;
 }
 
 export interface RptMastResponse {

@@ -31,6 +31,56 @@ interface PropertyRecord {
   barangay: string;
   barangayCode: string;
   cityCode: string;
+  // Reference Fields
+  pNewTdn?: string;
+  pOldTdn?: string;
+  pPin?: string;
+  pMarketValue?: number;
+  pAssessedValue?: number;
+  pOwnerCode?: string;
+  pOwnerNo?: string;
+  canArp?: string;
+  pArea?: number;
+  pAreaM?: boolean;
+  pEffDate?: string;
+  pOwner?: string;
+
+  // Signatory Fields
+  appraisedBy?: string;
+  appraisedPos?: string;
+  appraisedDate?: string;
+  assessor?: string;
+  assessorPos?: string;
+  assessorDate?: string;
+  recApproval?: string;
+  recApprovalPos?: string;
+  recAppDate?: string;
+  approved?: string;
+  approvedPos?: string;
+  approvedDate?: string;
+  provAssessor?: string;
+  provAssessorPos?: string;
+  provAssessorDate?: string;
+  cityAssessor?: string;
+  cityAssessorPos?: string;
+  cityAssessorDate?: string;
+  deputy?: string;
+  deputyPos?: string;
+  deputyDate?: string;
+  sgdAppraised?: boolean;
+  sgdRecommend?: boolean;
+  sgdApproved?: boolean;
+  sgdAssessed?: boolean;
+  sgdProv?: boolean;
+  sgdCity?: boolean;
+  sgdDeputy?: boolean;
+  tpdAppraised?: boolean;
+  tpdRecommend?: boolean;
+  tpdApproved?: boolean;
+  tpdAssessed?: boolean;
+  tpdProv?: boolean;
+  tpdCity?: boolean;
+  tpdDeputy?: boolean;
 } // Add new field for display
 
 
@@ -172,7 +222,7 @@ const RealPropertyDataEntry: React.FC = () => {
     if (apiData?.success) {
       const mappedRecords: PropertyRecord[] = apiData.data.map((item, index) => ({
         ...item,
-        id: item.TDN || `temp-${index}`,
+        id: `${item.TDN}-${index}`, // Ensure unique ID even with duplicate TDNs
         tdn: item.TDN || '',
         arp: item.ARP || '',
         pin: item.PIN || '',
@@ -180,7 +230,56 @@ const RealPropertyDataEntry: React.FC = () => {
         owner: item.Owner_Name || 'N/A',
         barangay: item.BARANGAY || 'N/A',
         barangayCode: item['BRGY.CODE'] || '',
-        cityCode: item.CITY || ''
+        cityCode: item.CITY || '',
+        // Map Reference Fields
+        pNewTdn: item.P_NEW_TDN,
+        pOldTdn: item.P_OLD_TDN,
+        pPin: item.P_PIN,
+        pMarketValue: item.P_MARKET_VALUE,
+        pAssessedValue: item.P_ASS_VALUE,
+        pOwnerCode: item.P_OWNER_CODE,
+        pOwnerNo: item.P_OWNER_NO,
+        canArp: item.CAN_ARP,
+        pArea: item.P_AREA,
+        pAreaM: item.P_AREA_M,
+        pEffDate: item.P_EFF_DATE,
+        pOwner: item.P_OWNER,
+        // Map Signatory Fields
+        appraisedBy: item.Appraiser,
+        appraisedPos: item.AppraiserPos,
+        appraisedDate: item.AppraisedDate,
+        assessor: item.Assessor,
+        assessorPos: item.AssessorPos,
+        assessorDate: item.AssessorDate,
+        recApproval: item.Rec_Approval,
+        recApprovalPos: item.Rec_ApprovalPos,
+        recAppDate: item.Rec_AppDate,
+        approved: item.Approved,
+        approvedPos: item.ApprovedPos,
+        approvedDate: item.ApprovedDate,
+        provAssessor: item.ProvAssessor,
+        provAssessorPos: item.ProvAssessorPos,
+        provAssessorDate: item.ProvAssessorDate,
+        cityAssessor: item.CityAssessor,
+        cityAssessorPos: item.CityAssessorPos,
+        cityAssessorDate: item.CityAssessorDate,
+        deputy: item.Deputy,
+        deputyPos: item.DeputyPos,
+        deputyDate: item.DeputyDate,
+        sgdAppraised: item.SGD_APPRAISED,
+        sgdRecommend: item.SGD_RECOMMEND,
+        sgdApproved: item.SGD_APPROVED,
+        sgdAssessed: item.SGD_ASSESSED,
+        sgdProv: item.SGD_PROV,
+        sgdCity: item.SGD_CITY,
+        sgdDeputy: item.SGD_DEPUTY,
+        tpdAppraised: item.TPD_APPRAISED,
+        tpdRecommend: item.TPD_RECOMMEND,
+        tpdApproved: item.TPD_APPROVED,
+        tpdAssessed: item.TPD_ASSESSED,
+        tpdProv: item.TPD_PROV,
+        tpdCity: item.TPD_CITY,
+        tpdDeputy: item.TPD_DEPUTY
       }));
 
       setRecords(mappedRecords);
@@ -650,11 +749,14 @@ const RealPropertyDataEntry: React.FC = () => {
             )}
             
             {activeTab === 'reference' && (
-              <ReferenceSection />
+              <ReferenceSection 
+                selectedRecord={selectedRecord} 
+                isEnabled={isFormEnabled} 
+              />
             )}
             
             {activeTab === 'signatories' && (
-              <SignatoriesSection />
+              <SignatoriesSection selectedRecord={selectedRecord} isEnabled={isFormEnabled} />
             )}
             
             {activeTab === 'other-info' && (

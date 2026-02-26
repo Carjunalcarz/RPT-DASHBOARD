@@ -16,7 +16,6 @@ model AuditLog {
   oldValues   String?  @db.NVarChar(Max)
   newValues   String?  @db.NVarChar(Max)
   userId      String?
-  userEmail   String?
   ipAddress   String?  @db.VarChar(45)
   timestamp   DateTime @default(now())
   details     String?  @db.NVarChar(Max)

@@ -162,7 +162,18 @@ const AdjustmentTab: React.FC<AdjustmentTabProps> = ({ buildingId, isFormEnabled
     if (selectedRecord) {
       handleRowSelect(selectedRecord);
     } else {
-      setFormData({ adjustmentType: '', percentage: '', value: '' });
+      setFormData({
+        bldgCode: structures.length > 0 ? structures[0].BldgCode : '',
+        adjustmentType: '',
+        mainComponent: '',
+        subComponent: '',
+        percentage: '',
+        value: '',
+        area: '',
+        unitCost: '',
+        depreciationRate: '',
+        valueAdjustment: '',
+      });
     }
   };
 
