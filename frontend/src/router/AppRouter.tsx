@@ -13,13 +13,32 @@ import DataEntry from '@/pages/DataEntry';
 import AuditTrail from '@/pages/AuditTrail';
 import Items from '@/pages/Items';
 import Tasks from '@/pages/Tasks';
+import RouteRestorer from '@/components/layout/RouteRestorer';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
+const AuthRedirect: React.FC = () => {
+  const lastPath = localStorage.getItem('last_visited_path');
+  // Validate path to prevent loops or invalid redirects
+  const isValidPath = lastPath && lastPath.startsWith('/') && lastPath !== '/login' && lastPath !== '/';
+  return <Navigate to={isValidPath ? lastPath : '/dashboard'} replace />;
+};
+
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-slate-50 dark:bg-slate-900">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Loading application...</p>
+        </div>
+      </div>
+    );
+  }
   
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -28,17 +47,35 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   return <>{children}</>;
 };
 
+const LoginRedirect: React.FC = () => {
+  const lastPath = localStorage.getItem('last_visited_path');
+  const isValidPath = lastPath && lastPath.startsWith('/') && lastPath !== '/login' && lastPath !== '/';
+  return <Navigate to={isValidPath ? lastPath : '/dashboard'} replace />;
+};
+
 const AppRouter: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+     return (
+      <div className="flex h-screen w-screen items-center justify-center bg-slate-50 dark:bg-slate-900">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
+          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Loading application...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <BrowserRouter>
+      <RouteRestorer />
       <Routes>
         {/* Login Route */}
         <Route
           path="/login"
           element={
-            isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />
+            isAuthenticated ? <LoginRedirect /> : <Login />
           }
         />
 
@@ -145,7 +182,7 @@ const AppRouter: React.FC = () => {
         />
 
         {/* Default Route */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<AuthRedirect />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>

@@ -195,6 +195,107 @@ WHERE
       throw new AppError('Database query failed: ' + error.message, 500);
     }
   }
+
+  /**
+   * Update or Insert Signatory record
+   * @param {string} tdn - Tax Declaration Number
+   * @param {Object} data - Signatory data
+   */
+  async updateSignatory(tdn, data) {
+    try {
+      const pool = await poolPromise;
+      if (!pool) {
+        throw new Error('Database connection failed');
+      }
+
+      // Prepare values handling empty strings and booleans
+      const safeString = (val) => val ? `'${val.replace(/'/g, "''")}'` : 'NULL';
+      const safeDate = (val) => val ? `'${val}'` : 'NULL';
+      const safeBool = (val) => val ? 1 : 0;
+
+      const query = `
+        MERGE INTO RPTAS_AGUSAN.dbo.SIGNATORY AS target
+        USING (SELECT '${tdn}' as TDN) AS source
+        ON (target.TDN = source.TDN)
+        WHEN MATCHED THEN
+          UPDATE SET
+            Appraiser = ${safeString(data.appraisedBy)},
+            AppraiserPos = ${safeString(data.appraisedPosition)},
+            AppraisedDate = ${safeDate(data.appraisedDate)},
+            SGD_APPRAISED = ${safeBool(data.appraisedSGD)},
+            TPD_APPRAISED = ${safeBool(data.appraisedTPD)},
+            
+            Assessor = ${safeString(data.assessedBy)},
+            AssessorPos = ${safeString(data.assessedPosition)},
+            AssessorDate = ${safeDate(data.assessedDate)},
+            SGD_ASSESSED = ${safeBool(data.assessedSGD)},
+            TPD_ASSESSED = ${safeBool(data.assessedTPD)},
+            
+            Rec_Approval = ${safeString(data.recommendingBy)},
+            Rec_ApprovalPos = ${safeString(data.recommendingPosition)},
+            Rec_AppDate = ${safeDate(data.recommendingDate)},
+            SGD_RECOMMEND = ${safeBool(data.recommendingSGD)},
+            TPD_RECOMMEND = ${safeBool(data.recommendingTPD)},
+            
+            Approved = ${safeString(data.approvedBy)},
+            ApprovedPos = ${safeString(data.approvedPosition)},
+            ApprovedDate = ${safeDate(data.approvedDate)},
+            SGD_APPROVED = ${safeBool(data.approvedSGD)},
+            TPD_APPROVED = ${safeBool(data.approvedTPD)},
+            
+            ProvAssessor = ${safeString(data.provincialAssessor)},
+            ProvAssessorPos = ${safeString(data.provincialPosition)},
+            ProvAssessorDate = ${safeDate(data.provincialDate)},
+            SGD_PROV = ${safeBool(data.provincialSGD)},
+            TPD_PROV = ${safeBool(data.provincialTPD)},
+            
+            CityAssessor = ${safeString(data.cityAssessor)},
+            CityAssessorPos = ${safeString(data.cityPosition)},
+            CityAssessorDate = ${safeDate(data.cityDate)},
+            SGD_CITY = ${safeBool(data.citySGD)},
+            TPD_CITY = ${safeBool(data.cityTPD)},
+            
+            Deputy = ${safeString(data.deputy)},
+            DeputyPos = ${safeString(data.deputyPosition)},
+            DeputyDate = ${safeDate(data.deputyDate)},
+            SGD_DEPUTY = ${safeBool(data.deputySGD)},
+            TPD_DEPUTY = ${safeBool(data.deputyTPD)},
+
+            PREPAREDBY = ${safeString(data.entryBy)},
+            PreparedDate = ${safeDate(data.entryDate)}
+
+        WHEN NOT MATCHED THEN
+          INSERT (
+            TDN, 
+            Appraiser, AppraiserPos, AppraisedDate, SGD_APPRAISED, TPD_APPRAISED,
+            Assessor, AssessorPos, AssessorDate, SGD_ASSESSED, TPD_ASSESSED,
+            Rec_Approval, Rec_ApprovalPos, Rec_AppDate, SGD_RECOMMEND, TPD_RECOMMEND,
+            Approved, ApprovedPos, ApprovedDate, SGD_APPROVED, TPD_APPROVED,
+            ProvAssessor, ProvAssessorPos, ProvAssessorDate, SGD_PROV, TPD_PROV,
+            CityAssessor, CityAssessorPos, CityAssessorDate, SGD_CITY, TPD_CITY,
+            Deputy, DeputyPos, DeputyDate, SGD_DEPUTY, TPD_DEPUTY,
+            PREPAREDBY, PreparedDate
+          )
+          VALUES (
+            '${tdn}',
+            ${safeString(data.appraisedBy)}, ${safeString(data.appraisedPosition)}, ${safeDate(data.appraisedDate)}, ${safeBool(data.appraisedSGD)}, ${safeBool(data.appraisedTPD)},
+            ${safeString(data.assessedBy)}, ${safeString(data.assessedPosition)}, ${safeDate(data.assessedDate)}, ${safeBool(data.assessedSGD)}, ${safeBool(data.assessedTPD)},
+            ${safeString(data.recommendingBy)}, ${safeString(data.recommendingPosition)}, ${safeDate(data.recommendingDate)}, ${safeBool(data.recommendingSGD)}, ${safeBool(data.recommendingTPD)},
+            ${safeString(data.approvedBy)}, ${safeString(data.approvedPosition)}, ${safeDate(data.approvedDate)}, ${safeBool(data.approvedSGD)}, ${safeBool(data.approvedTPD)},
+            ${safeString(data.provincialAssessor)}, ${safeString(data.provincialPosition)}, ${safeDate(data.provincialDate)}, ${safeBool(data.provincialSGD)}, ${safeBool(data.provincialTPD)},
+            ${safeString(data.cityAssessor)}, ${safeString(data.cityPosition)}, ${safeDate(data.cityDate)}, ${safeBool(data.citySGD)}, ${safeBool(data.cityTPD)},
+            ${safeString(data.deputy)}, ${safeString(data.deputyPosition)}, ${safeDate(data.deputyDate)}, ${safeBool(data.deputySGD)}, ${safeBool(data.deputyTPD)},
+            ${safeString(data.entryBy)}, ${safeDate(data.entryDate)}
+          );
+      `;
+
+      await pool.request().query(query);
+      return { success: true, message: 'Signatories updated successfully' };
+    } catch (error) {
+      logger.error('Error updating Signatories:', error);
+      throw new AppError('Failed to update signatories: ' + error.message, 500);
+    }
+  }
 }
 
 module.exports = new RptMastService();

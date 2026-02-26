@@ -78,4 +78,32 @@ const protect = require('../middleware/auth');
  */
 router.get('/RPTAS_AGUSAN', protect, (req, res, next) => rptMastController.getAgusanMigrationData(req, res, next));
 
+/**
+ * @swagger
+ * /api/rptmast/signatories/{tdn}:
+ *   put:
+ *     summary: Update signatory information
+ *     tags: [RPTMAST]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: tdn
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: Signatory updated successfully
+ *       500:
+ *         description: Server error
+ */
+router.put('/signatories/:tdn', protect, (req, res, next) => rptMastController.updateSignatory(req, res, next));
+
 module.exports = router;

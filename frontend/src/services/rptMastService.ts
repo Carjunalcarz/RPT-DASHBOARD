@@ -235,3 +235,9 @@ export const getRptMastDataDirect = async (params: RptMastParams = { page: 1, li
     throw error;
   }
 };
+
+export const updateSignatory = async (tdn: string, data: any): Promise<any> => {
+  const API_BASE = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/v1', '') : 'http://localhost:3000/api';
+  const response = await api.put(`${API_BASE}/rptmast/signatories/${tdn}`, data);
+  return response.data;
+};

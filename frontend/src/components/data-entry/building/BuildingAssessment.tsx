@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, Building2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, Building2, ArrowDownUp, Hammer } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
-import StructureTab from './StructureTab';
-import AdjustmentTab from './AdjustmentTab';
 import { RptAssRecord } from '@/services/rptAssService';
 import { getBldgAdjByTdn, BldgAdjRecord } from '@/services/bldgAdjService';
 import { getBldgStrucByTdn, BldgStrucRecord } from '@/services/bldgStrucService';
+import BuildingStructureModal from './BuildingStructureModal';
+import BuildingAdjustmentModal from './BuildingAdjustmentModal';
 
 // Types
 interface BuildingRecord {
@@ -120,9 +120,8 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
   const [isAdding, setIsAdding] = useState(false);
   const [adjustments, setAdjustments] = useState<BldgAdjRecord[]>([]);
   const [structures, setStructures] = useState<BldgStrucRecord[]>([]);
-
-  // Tab state
-  const [activeTab, setActiveTab] = useState<'structure' | 'adjustment'>('structure');
+  const [isStructureOpen, setIsStructureOpen] = useState(false);
+  const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
 
   // Load adjustments and structures when record is selected
   useEffect(() => {
@@ -418,6 +417,23 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
             <Printer size={14} />
             Print
           </button>
+          <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1 self-center" />
+          <button
+            onClick={() => setIsStructureOpen(true)}
+            disabled={!selectedRecord || isLocalFormEnabled}
+            className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Hammer size={14} />
+            Structure
+          </button>
+          <button
+            onClick={() => setIsAdjustmentOpen(true)}
+            disabled={!selectedRecord || isLocalFormEnabled}
+            className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 text-orange-600 dark:text-orange-400 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ArrowDownUp size={14} />
+            Adjustment
+          </button>
         </div>
       </div>
 
@@ -491,8 +507,47 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
         </table>
       </div>
 
+      {/* Modals */}
+      <BuildingStructureModal
+        open={isStructureOpen}
+        onOpenChange={setIsStructureOpen}
+        buildingId={selectedRecord?.id || ''}
+        isFormEnabled={isFormEnabled || true} // Always allow editing in modal if parent record is selected? Or strictly follow parent?
+        // Actually, in the Tab version, isFormEnabled was passed.
+        // If we want the modal to be "Manager", we probably want to allow editing inside it
+        // independent of the main form's "Edit" state, OR we follow the main form.
+        // In Land Assessment, Trees/Adjustment buttons are disabled if !selectedRecord.
+        // But once open, can we edit?
+        // In Land Assessment, isLocalFormEnabled was checked in the modal logic?
+        // No, LandAssessment passed `adjustments` and `trees` and handled save locally.
+        // Here, BuildingAssessment passes `buildingId` and the modal handles API calls.
+        // So the Modal should probably manage its own edit state.
+        // Let's pass `isFormEnabled={true}` to allow the modal to handle its own CRUD?
+        // Or should we only allow editing structures if the main record is locked?
+        // Usually sub-records can be edited anytime if the parent exists.
+        // Let's pass `isFormEnabled={true}` effectively letting the modal decide,
+        // BUT the buttons in the toolbar are disabled if !selectedRecord.
+        // Wait, the previous Tab implementation used `isFormEnabled` which came from `isEditing || isAdding`.
+        // This meant you could ONLY edit structures when the MAIN record was in edit mode.
+        // If we want to change that to "Independent Edit", we pass true.
+        // The user asked "use modal instead of tab structure".
+        // In LandAssessment, I implemented independent modals (Trees/Adjustment).
+        // Let's try to make it independent for better UX (so you don't have to put the whole building in edit mode just to add a structure).
+        initialStructures={structures}
+        onUpdate={setStructures}
+      />
+      <BuildingAdjustmentModal
+        open={isAdjustmentOpen}
+        onOpenChange={setIsAdjustmentOpen}
+        buildingId={selectedRecord?.id || ''}
+        isFormEnabled={true} 
+        initialAdjustments={adjustments}
+        structures={structures}
+        onUpdate={setAdjustments}
+      />
+
       {/* Form Section */}
-      <div className="border-t border-slate-200 dark:border-slate-700 p-4 bg-slate-50 dark:bg-slate-800/50">
+      <div className="border-t border-slate-200 dark:border-slate-700 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-b-lg">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column */}
           <div className="space-y-3">
@@ -701,55 +756,7 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
         </div>
       </div>
 
-      {/* Sub Tabs - Structure and Adjustment */}
-      <div className="border-t border-slate-200 dark:border-slate-700">
-        {/* Tab Headers */}
-        <div className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-2 pt-2">
-          <div className="flex gap-1">
-            <button
-              onClick={() => setActiveTab('structure')}
-              className={`px-4 py-2 text-xs font-medium rounded-t-lg transition-colors ${
-                activeTab === 'structure'
-                  ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border-t border-l border-r border-slate-200 dark:border-slate-700'
-                  : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-600'
-              }`}
-              data-testid="tab-structure"
-            >
-              Structure
-            </button>
-            <button
-              onClick={() => setActiveTab('adjustment')}
-              className={`px-4 py-2 text-xs font-medium rounded-t-lg transition-colors ${
-                activeTab === 'adjustment'
-                  ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border-t border-l border-r border-slate-200 dark:border-slate-700'
-                  : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-600'
-              }`}
-              data-testid="tab-adjustment"
-            >
-              Adjustment
-            </button>
-          </div>
-        </div>
 
-        {/* Tab Content */}
-        <div className="p-4">
-          {activeTab === 'structure' && (
-            <StructureTab
-              buildingId={selectedRecord?.id || ''}
-              isFormEnabled={isFormEnabled}
-              initialStructures={structures}
-            />
-          )}
-          {activeTab === 'adjustment' && (
-            <AdjustmentTab
-              buildingId={selectedRecord?.id || ''}
-              isFormEnabled={isFormEnabled}
-              initialAdjustments={adjustments}
-              structures={structures}
-            />
-          )}
-        </div>
-      </div>
     </div>
   );
 };

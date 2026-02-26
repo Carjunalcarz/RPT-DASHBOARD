@@ -19,7 +19,7 @@ import {
   softDeleteSignatory,
   softDeleteSwornStatement,
   updateMemorandum,
-  updateSignatory,
+  updateSignatory as updateSignatoryLocal,
   updateSwornStatement,
   validateMemorandum,
   validateSignatory,
@@ -27,6 +27,7 @@ import {
   Attachment,
   AuditEntry,
 } from './signatoriesCrud';
+import { updateSignatory } from '@/services/rptMastService';
 
 interface DocumentationData {
   preparedBy: string;
@@ -166,13 +167,21 @@ const defaultFormData: SignatoriesFormData = {
 interface SignatoriesSectionProps {
   selectedRecord?: any;
   isEnabled?: boolean;
+  onEditModeChange?: (isEditing: boolean) => void;
 }
 
-const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ selectedRecord: initialRecord, isEnabled = true }) => {
+const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ selectedRecord: initialRecord, isEnabled = true, onEditModeChange }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const { user } = useAuth();
   const [activeSubTab, setActiveSubTab] = useState<'signatories' | 'memorandum' | 'sworn' | 'documentation' | 'remarks'>('signatories');
   const [formData, setFormData] = useState<SignatoriesFormData>(defaultFormData);
+  
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Notify parent when edit mode changes
+  React.useEffect(() => {
+    onEditModeChange?.(isEditing);
+  }, [isEditing, onEditModeChange]);
   
   // Populate form when initialRecord changes
   React.useEffect(() => {
@@ -234,7 +243,6 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ selectedRecord:
 
   const [documentationData, setDocumentationData] = useState<DocumentationData>(defaultDocumentationData);
   const [remarksData, setRemarksData] = useState<RemarksData>(defaultRemarksData);
-  const [isEditing, setIsEditing] = useState(false);
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
   const [isSavingSignatory, setIsSavingSignatory] = useState(false);
@@ -242,7 +250,9 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ selectedRecord:
   const [isSavingSworn, setIsSavingSworn] = useState(false);
 
   const currentUser = user?.name || 'System';
-  const canEdit = user?.role === 'Administrator' && isEnabled;
+  const role = (user?.role || '').toLowerCase();
+  const canEdit = isEnabled || ['administrator', 'admin', 'dataentry', 'assessor'].includes(role);
+  const controlsEnabled = isEditing;
 
   const [signatories, setSignatories] = useState<SignatoryRecord[]>([
     {
@@ -394,8 +404,17 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ selectedRecord:
   const [viewSwornId, setViewSwornId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ type: 'signatory' | 'memorandum' | 'sworn'; id: string } | null>(null);
 
-  const handleSave = () => {
-    setIsEditing(false);
+  const handleSave = async () => {
+    if (!initialRecord?.tdn) return;
+    try {
+      pushNotice('success', 'Saving changes...');
+      await updateSignatory(initialRecord.tdn, formData);
+      pushNotice('success', 'Changes saved successfully.');
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Failed to save signatories:', error);
+      pushNotice('error', 'Failed to save changes.');
+    }
   };
 
   const handleCancel = () => {
@@ -460,7 +479,7 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ selectedRecord:
       setAuditLog((prev) => addAuditEntry(prev, result.audit));
       setSelectedSignatoryId(result.record.id);
     } else {
-      const result = updateSignatory(signatories, editingSignatoryId, signatoryDraft, currentUser);
+      const result = updateSignatoryLocal(signatories, editingSignatoryId, signatoryDraft, currentUser);
       if (result.record && result.audit) {
         const audit = result.audit;
         setSignatories(result.list);
@@ -858,7 +877,7 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ selectedRecord:
             type="checkbox"
             checked={formData[sgdField] as boolean}
             onChange={(e) => setFormData({ ...formData, [sgdField]: e.target.checked })}
-            disabled={!isEditing}
+            disabled={!controlsEnabled}
             className="w-3 h-3 rounded border-slate-300 dark:border-slate-600"
           />
           <span className="text-xs font-medium text-slate-700 dark:text-slate-300">SGD</span>
@@ -868,7 +887,7 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ selectedRecord:
             type="checkbox"
             checked={formData[tpdField] as boolean}
             onChange={(e) => setFormData({ ...formData, [tpdField]: e.target.checked })}
-            disabled={!isEditing}
+            disabled={!controlsEnabled}
             className="w-3 h-3 rounded border-slate-300 dark:border-slate-600"
           />
           <span className="text-xs font-medium text-slate-700 dark:text-slate-300">TPD</span>
@@ -879,7 +898,7 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ selectedRecord:
         <select
           value={formData[nameField] as string}
           onChange={(e) => setFormData({ ...formData, [nameField]: e.target.value })}
-          disabled={!isEditing}
+          disabled={!controlsEnabled}
           className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
         >
           <option value={formData[nameField] as string}>{formData[nameField] as string}</option>
@@ -892,7 +911,7 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ selectedRecord:
           type="text"
           value={formData[positionField] as string}
           onChange={(e) => setFormData({ ...formData, [positionField]: e.target.value })}
-          disabled={!isEditing}
+          disabled={!controlsEnabled}
           className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
         />
       </div>
@@ -902,7 +921,7 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ selectedRecord:
           type="date"
           value={formData[dateField] as string}
           onChange={(e) => setFormData({ ...formData, [dateField]: e.target.value })}
-          disabled={!isEditing}
+          disabled={!controlsEnabled}
           className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
         />
       </div>
@@ -1020,7 +1039,7 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ selectedRecord:
                   type="date"
                   value={formData.entryDate}
                   onChange={(e) => setFormData({ ...formData, entryDate: e.target.value })}
-                  disabled={!isEditing}
+                  disabled={!controlsEnabled}
                   className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
                 />
               </div>
@@ -1030,7 +1049,7 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ selectedRecord:
                   type="text"
                   value={formData.entryBy}
                   onChange={(e) => setFormData({ ...formData, entryBy: e.target.value })}
-                  disabled={!isEditing}
+                  disabled={!controlsEnabled}
                   className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
                 />
               </div>
@@ -1752,7 +1771,7 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ selectedRecord:
                 <select
                   value={documentationData.preparedBy}
                   onChange={(e) => setDocumentationData({ ...documentationData, preparedBy: e.target.value })}
-                  disabled={!isEditing}
+                  disabled={!controlsEnabled}
                   className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
                 >
                   <option value=""></option>
@@ -1770,7 +1789,7 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ selectedRecord:
                   type="date"
                   value={documentationData.datePrepared}
                   onChange={(e) => setDocumentationData({ ...documentationData, datePrepared: e.target.value })}
-                  disabled={!isEditing}
+                  disabled={!controlsEnabled}
                   className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
                 />
               </div>
@@ -1779,7 +1798,7 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ selectedRecord:
             {/* Attachment Document Button */}
             <div className="mt-6">
               <button
-                disabled={!isEditing}
+                disabled={!controlsEnabled}
                 className="px-4 py-2 text-xs bg-slate-600 hover:bg-slate-700 text-white rounded shadow-sm transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Paperclip size={14} />
@@ -1795,7 +1814,7 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ selectedRecord:
               <textarea
                 value={remarksData.remarks}
                 onChange={(e) => setRemarksData({ ...remarksData, remarks: e.target.value })}
-                disabled={!isEditing}
+                disabled={!controlsEnabled}
                 rows={15}
                 placeholder="Enter remarks here..."
                 className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"

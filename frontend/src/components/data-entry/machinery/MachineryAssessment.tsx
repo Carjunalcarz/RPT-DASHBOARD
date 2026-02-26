@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, Cog } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, Settings, ArrowDownUp } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { RptAssRecord } from '@/services/rptAssService';
+import MachineryItemsModal from './MachineryItemsModal';
 
 interface MachineryAssessmentProps {
   records?: RptAssRecord[];
@@ -10,35 +11,34 @@ interface MachineryAssessmentProps {
 
 interface MachineryRecord {
   id: string;
+  tdn?: string;
   kind: string;
   classification: string;
   actualUse: string;
-  brandModel: string; // Mapped from SUB_CLASS or similar if available, or create new field
-  capacity: string;   // Example field
-  acquisitionDate: string;
-  acquisitionCost: number;
-  depreciation: number;
-  marketValue: number;
+  subClass: string;
+  area: number;
+  unitValue: number;
+  baseMarketValue: number;
+  adjustedMarketValue: number;
   assessmentLevel: number;
   assessedValue: number;
   taxable: boolean;
+  beneficialUse: boolean;
   idleLand: boolean;
 }
 
 interface FormData {
   classification: string;
   actualUse: string;
-  brandModel: string;
-  capacity: string;
-  acquisitionDate: string;
-  acquisitionCost: string;
-  depreciation: string;
+  subClass: string;
+  area: string;
+  unitValue: string;
   assessmentLevel: string;
   taxable: boolean;
+  beneficialUse: boolean;
   idleLand: boolean;
 }
 
-// Options
 const classificationOptions = [
   { value: '', label: 'Select Classification' },
   { value: 'C', label: 'C - Commercial' },
@@ -48,22 +48,24 @@ const classificationOptions = [
 
 const actualUseOptions = [
   { value: '', label: 'Select Actual Use' },
-  { value: 'MFG', label: 'MFG - Manufacturing' },
-  { value: 'PROC', label: 'PROC - Processing' },
-  { value: 'PWR', label: 'PWR - Power Generation' },
-  { value: 'TRAN', label: 'TRAN - Transportation' },
+  { value: 'AC', label: 'AC - Actual Use Commercial' },
+  { value: 'AI', label: 'AI - Actual Use Industrial' },
+];
+
+const subClassOptions = [
+  { value: '', label: 'Select Sub Class' },
+  { value: 'NONE', label: 'NONE' },
 ];
 
 const defaultFormData: FormData = {
   classification: '',
   actualUse: '',
-  brandModel: '',
-  capacity: '',
-  acquisitionDate: '',
-  acquisitionCost: '',
-  depreciation: '',
+  subClass: '',
+  area: '',
+  unitValue: '',
   assessmentLevel: '',
   taxable: true,
+  beneficialUse: false,
   idleLand: false,
 };
 
@@ -74,73 +76,77 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
   const [formData, setFormData] = useState<FormData>(defaultFormData);
   const [isEditing, setIsEditing] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
   
   // Computed values
   const [computedValues, setComputedValues] = useState({
-    marketValue: 0,
+    baseMarketValue: 0,
+    adjustedMarketValue: 0,
     assessedValue: 0,
   });
 
   useEffect(() => {
     if (apiRecords) {
-      const mapped = apiRecords.map((r, index) => ({
+      const mapped = apiRecords.filter(r => r.KIND === 'Machinery' || r.KIND === 'MACH').map((r, index) => ({
         id: r.TDN + '-' + index,
-        kind: r.KIND,
+        tdn: r.TDN,
+        kind: 'Machinery',
         classification: r.CLASSIFICATION,
         actualUse: r.ACTUAL_USE || '',
-        brandModel: r.SUB_CLASS || '', // Using SUB_CLASS as Brand/Model placeholder
-        capacity: '', // No direct mapping in API yet
-        acquisitionDate: r.EFF_DATE ? new Date(r.EFF_DATE).toISOString().split('T')[0] : '',
-        acquisitionCost: r.TOTALDIRECTCOST || 0, // Mapping to total cost
-        depreciation: 0, // Need logic or field
-        marketValue: r.MARKET_VAL || 0,
+        subClass: r.SUB_CLASS || '',
+        area: r.AREA || 0,
+        unitValue: r.UNIT_VALUE || 0,
+        baseMarketValue: r.MARKET_VAL || 0,
+        adjustedMarketValue: r.MARKET_VAL || 0, 
         assessmentLevel: r.ASS_LEVEL || 0,
         assessedValue: r.ASS_VALUE || 0,
         taxable: r.TAXABILITY === 'true' || r.TAXABILITY === 'TAXABLE' || r.TAXABLE_RATE > 0,
+        beneficialUse: r.BU === 'true' || r.BU === '1',
         idleLand: r.IdleLand || false,
       }));
       setRecords(mapped);
     }
   }, [apiRecords]);
 
-  // Calculate values
   useEffect(() => {
-    const cost = parseFloat(formData.acquisitionCost) || 0;
-    const depRate = parseFloat(formData.depreciation) || 0;
+    const area = parseFloat(formData.area) || 0;
+    const unitValue = parseFloat(formData.unitValue) || 0;
     const assessmentLevel = parseFloat(formData.assessmentLevel) || 0;
 
-    // Market Value = Acquisition Cost - (Acquisition Cost * Depreciation Rate / 100)
-    // Simplified logic
-    const marketValue = cost - (cost * (depRate / 100));
+    // Base Market Value
+    // For machinery, base market value might come from the sum of items, but here we treat it as input or computed
+    const baseMarketValue = area > 0 ? area * unitValue : (parseFloat(formData.unitValue) || 0); // Fallback if area is 0
     
-    // Assessed Value = Market Value * (Assessment Level / 100)
-    const assessedValue = marketValue * (assessmentLevel / 100);
+    // Simplified adjustment logic without LandAdjustmentModal
+    // If we want to sum up machinery items' adjusted values, we would need to fetch them or pass them up.
+    // For now, let's assume Adjusted Market Value is Base Market Value unless modified by items.
+    
+    const adjustedMarketValue = baseMarketValue; 
+    const assessedValue = adjustedMarketValue * (assessmentLevel / 100);
 
     setComputedValues({
-      marketValue,
+      baseMarketValue,
+      adjustedMarketValue,
       assessedValue,
     });
-  }, [formData.acquisitionCost, formData.depreciation, formData.assessmentLevel]);
+  }, [formData.area, formData.unitValue, formData.assessmentLevel]);
 
-  // Handle row selection
   const handleRowSelect = (record: MachineryRecord) => {
     if (isEditing || isAdding) return;
     setSelectedRecord(record);
     setFormData({
       classification: record.classification,
       actualUse: record.actualUse,
-      brandModel: record.brandModel,
-      capacity: record.capacity,
-      acquisitionDate: record.acquisitionDate,
-      acquisitionCost: record.acquisitionCost.toString(),
-      depreciation: record.depreciation.toString(),
+      subClass: record.subClass,
+      area: record.area.toString(),
+      unitValue: record.unitValue.toString(),
       assessmentLevel: record.assessmentLevel.toString(),
       taxable: record.taxable,
+      beneficialUse: record.beneficialUse,
       idleLand: record.idleLand,
     });
   };
 
-  // CRUD Handlers
   const handleAdd = () => {
     setIsAdding(true);
     setIsEditing(false);
@@ -166,18 +172,19 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
   const handleSave = () => {
     const newRecord: MachineryRecord = {
       id: isAdding ? Date.now().toString() : selectedRecord!.id,
+      tdn: selectedRecord?.tdn, // Preserve TDN
       kind: 'Machinery',
       classification: formData.classification,
       actualUse: formData.actualUse,
-      brandModel: formData.brandModel,
-      capacity: formData.capacity,
-      acquisitionDate: formData.acquisitionDate,
-      acquisitionCost: parseFloat(formData.acquisitionCost) || 0,
-      depreciation: parseFloat(formData.depreciation) || 0,
-      marketValue: computedValues.marketValue,
+      subClass: formData.subClass,
+      area: parseFloat(formData.area) || 0,
+      unitValue: parseFloat(formData.unitValue) || 0,
+      baseMarketValue: computedValues.baseMarketValue,
+      adjustedMarketValue: computedValues.adjustedMarketValue,
       assessmentLevel: parseFloat(formData.assessmentLevel) || 0,
       assessedValue: computedValues.assessedValue,
       taxable: formData.taxable,
+      beneficialUse: formData.beneficialUse,
       idleLand: formData.idleLand,
     };
 
@@ -239,35 +246,38 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
           }
         `}</style>
         <div className="flex items-center gap-2">
-          <Cog size={20} className="text-white" />
-          <h2 className="text-base font-semibold text-white">Machinery Assessment</h2>
+          <Settings size={20} className="text-white" />
+          <h2 className="text-base font-semibold text-white">Real Property Assessment (Machinery)</h2>
         </div>
       </div>
 
       {/* Toolbar */}
       <div className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-3 py-2">
         <div className="flex flex-wrap gap-1">
-          <button onClick={handleAdd} disabled={!canModify} className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={handleAdd} disabled={!canModify} className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 border rounded shadow-sm flex items-center gap-1.5 disabled:opacity-50">
             <Plus size={14} /> Add
           </button>
-          <button onClick={handleEdit} disabled={!selectedRecord || !canModify} className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={handleEdit} disabled={!selectedRecord || !canModify} className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 border rounded shadow-sm flex items-center gap-1.5 disabled:opacity-50">
             <Edit2 size={14} /> Edit
           </button>
-          <button onClick={handleDelete} disabled={!selectedRecord || !canModify} className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-red-50 dark:hover:bg-red-900/20 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 text-red-600 dark:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={handleDelete} disabled={!selectedRecord || !canModify} className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-red-50 border rounded shadow-sm flex items-center gap-1.5 text-red-600 disabled:opacity-50">
             <Trash2 size={14} /> Delete
           </button>
-          <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1 self-center" />
-          <button onClick={handleSave} disabled={!isLocalFormEnabled} className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
+          <div className="w-px h-6 bg-slate-300 mx-1 self-center" />
+          <button onClick={handleSave} disabled={!isLocalFormEnabled} className="px-3 py-1.5 text-xs bg-blue-600 text-white hover:bg-blue-700 rounded shadow-sm flex items-center gap-1.5 disabled:opacity-50">
             <Save size={14} /> Save
           </button>
-          <button onClick={handleCancel} disabled={!isLocalFormEnabled} className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
+          <button onClick={handleCancel} disabled={!isLocalFormEnabled} className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 border rounded shadow-sm flex items-center gap-1.5 disabled:opacity-50">
             <X size={14} /> Cancel
           </button>
-          <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1 self-center" />
-          <button onClick={handleRefresh} className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5">
+          <div className="w-px h-6 bg-slate-300 mx-1 self-center" />
+          <button onClick={handleRefresh} className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 border rounded shadow-sm flex items-center gap-1.5">
             <RefreshCw size={14} /> Refresh
           </button>
-          <button onClick={handlePrint} className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5">
+          <button onClick={() => setIsAdjustmentOpen(true)} disabled={!selectedRecord} className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 border rounded shadow-sm flex items-center gap-1.5 text-orange-600 disabled:opacity-50">
+            <ArrowDownUp size={14} /> Adjustment
+          </button>
+          <button onClick={handlePrint} className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 border rounded shadow-sm flex items-center gap-1.5">
             <Printer size={14} /> Print
           </button>
         </div>
@@ -275,9 +285,9 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
 
       {/* Main Table */}
       <div className="overflow-x-auto">
-        <table className="w-full text-xs" data-testid="machinery-records-table">
+        <table className="w-full text-xs">
           <thead className="text-white" style={{ backgroundColor: 'var(--table-header-bg)', ['--table-header-bg' as any]: headerColor }}>
-            <style>{`
+             <style>{`
               @media (prefers-color-scheme: dark) {
                 .dark thead[style*="--table-header-bg"] {
                   --table-header-bg: ${headerColorDark} !important;
@@ -288,9 +298,11 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
               <th className="px-2 py-2 text-left font-medium border-r border-white/30">Kind</th>
               <th className="px-2 py-2 text-left font-medium border-r border-white/30">Class</th>
               <th className="px-2 py-2 text-left font-medium border-r border-white/30">Actual Use</th>
-              <th className="px-2 py-2 text-left font-medium border-r border-white/30">Brand/Model</th>
-              <th className="px-2 py-2 text-right font-medium border-r border-white/30">Acquisition Cost</th>
-              <th className="px-2 py-2 text-right font-medium border-r border-white/30">Market Value</th>
+              <th className="px-2 py-2 text-left font-medium border-r border-white/30">Sub Class</th>
+              <th className="px-2 py-2 text-right font-medium border-r border-white/30">Area</th>
+              <th className="px-2 py-2 text-right font-medium border-r border-white/30">Unit Value</th>
+              <th className="px-2 py-2 text-right font-medium border-r border-white/30">Base Market Value</th>
+              <th className="px-2 py-2 text-right font-medium border-r border-white/30">Adjusted Market Value</th>
               <th className="px-2 py-2 text-right font-medium border-r border-white/30">Assessment Level</th>
               <th className="px-2 py-2 text-right font-medium border-r border-white/30">Assessed Value</th>
               <th className="px-2 py-2 text-center font-medium">Taxability</th>
@@ -298,30 +310,18 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
           </thead>
           <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
             {records.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
-                  No machinery records. Click "Add" to create one.
-                </td>
-              </tr>
+              <tr><td colSpan={11} className="px-4 py-8 text-center text-slate-500">No machinery records found.</td></tr>
             ) : (
               records.map((record, index) => (
-                <tr
-                  key={record.id}
-                  onClick={() => handleRowSelect(record)}
-                  className={`cursor-pointer transition-colors ${
-                    selectedRecord?.id === record.id
-                      ? 'bg-orange-100 dark:bg-orange-900/30'
-                      : index % 2 === 0
-                      ? 'bg-orange-50/30 dark:bg-slate-800/50'
-                      : 'bg-white dark:bg-slate-900'
-                  } hover:bg-orange-100 dark:hover:bg-orange-900/30`}
-                >
+                <tr key={record.id} onClick={() => handleRowSelect(record)} className={`cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-800 ${selectedRecord?.id === record.id ? 'bg-blue-100 dark:bg-blue-900/30' : index % 2 === 0 ? 'bg-slate-50 dark:bg-slate-800/50' : 'bg-white dark:bg-slate-900'}`}>
                   <td className="px-2 py-1.5 border-r border-slate-200 dark:border-slate-700">{record.kind}</td>
                   <td className="px-2 py-1.5 border-r border-slate-200 dark:border-slate-700">{record.classification}</td>
                   <td className="px-2 py-1.5 border-r border-slate-200 dark:border-slate-700">{record.actualUse}</td>
-                  <td className="px-2 py-1.5 border-r border-slate-200 dark:border-slate-700">{record.brandModel}</td>
-                  <td className="px-2 py-1.5 text-right border-r border-slate-200 dark:border-slate-700">{formatCurrency(record.acquisitionCost)}</td>
-                  <td className="px-2 py-1.5 text-right border-r border-slate-200 dark:border-slate-700">{formatCurrency(record.marketValue)}</td>
+                  <td className="px-2 py-1.5 border-r border-slate-200 dark:border-slate-700">{record.subClass}</td>
+                  <td className="px-2 py-1.5 text-right border-r border-slate-200 dark:border-slate-700">{record.area}</td>
+                  <td className="px-2 py-1.5 text-right border-r border-slate-200 dark:border-slate-700">{formatCurrency(record.unitValue)}</td>
+                  <td className="px-2 py-1.5 text-right border-r border-slate-200 dark:border-slate-700">{formatCurrency(record.baseMarketValue)}</td>
+                  <td className="px-2 py-1.5 text-right border-r border-slate-200 dark:border-slate-700">{formatCurrency(record.adjustedMarketValue)}</td>
                   <td className="px-2 py-1.5 text-right border-r border-slate-200 dark:border-slate-700">{record.assessmentLevel}%</td>
                   <td className="px-2 py-1.5 text-right border-r border-slate-200 dark:border-slate-700">{formatCurrency(record.assessedValue)}</td>
                   <td className="px-2 py-1.5 text-center">{record.taxable ? 'Taxable' : 'Exempt'}</td>
@@ -332,72 +332,90 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
         </table>
       </div>
 
+      {/* Modals */}
+      <MachineryItemsModal
+        open={isAdjustmentOpen}
+        onOpenChange={setIsAdjustmentOpen}
+        tdn={selectedRecord?.tdn || ''}
+      />
+
+
       {/* Form Section */}
       <div className="border-t border-slate-200 dark:border-slate-700 p-4 bg-slate-50 dark:bg-slate-800/50">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <label className="w-32 text-xs font-medium text-slate-700 dark:text-slate-300 text-right">Classification:</label>
-              <select value={formData.classification} onChange={(e) => setFormData(prev => ({ ...prev, classification: e.target.value }))} disabled={!isFormEnabled} className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60">
+              <label className="w-28 text-xs font-medium text-right">Classification:</label>
+              <select value={formData.classification} onChange={(e) => setFormData(prev => ({ ...prev, classification: e.target.value }))} disabled={!isFormEnabled} className="flex-1 px-2 py-1.5 text-xs border rounded">
                 {classificationOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
               </select>
             </div>
             <div className="flex items-center gap-2">
-              <label className="w-32 text-xs font-medium text-slate-700 dark:text-slate-300 text-right">Actual Use:</label>
-              <select value={formData.actualUse} onChange={(e) => setFormData(prev => ({ ...prev, actualUse: e.target.value }))} disabled={!isFormEnabled} className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60">
+              <label className="w-28 text-xs font-medium text-right">Actual Use:</label>
+              <select value={formData.actualUse} onChange={(e) => setFormData(prev => ({ ...prev, actualUse: e.target.value }))} disabled={!isFormEnabled} className="flex-1 px-2 py-1.5 text-xs border rounded">
                 {actualUseOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
               </select>
             </div>
             <div className="flex items-center gap-2">
-              <label className="w-32 text-xs font-medium text-slate-700 dark:text-slate-300 text-right">Brand/Model:</label>
-              <input type="text" value={formData.brandModel} onChange={(e) => setFormData(prev => ({ ...prev, brandModel: e.target.value }))} disabled={!isFormEnabled} className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60" />
+              <label className="w-28 text-xs font-medium text-right">Sub Class:</label>
+              <select value={formData.subClass} onChange={(e) => setFormData(prev => ({ ...prev, subClass: e.target.value }))} disabled={!isFormEnabled} className="flex-1 px-2 py-1.5 text-xs border rounded">
+                {subClassOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+              </select>
             </div>
             <div className="flex items-center gap-2">
-              <label className="w-32 text-xs font-medium text-slate-700 dark:text-slate-300 text-right">Acquisition Date:</label>
-              <input type="date" value={formData.acquisitionDate} onChange={(e) => setFormData(prev => ({ ...prev, acquisitionDate: e.target.value }))} disabled={!isFormEnabled} className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60" />
+              <label className="w-28 text-xs font-medium text-right">Area:</label>
+              <div className="flex-1 flex items-center gap-1">
+                <input type="number" value={formData.area} onChange={(e) => setFormData(prev => ({ ...prev, area: e.target.value }))} disabled={!isFormEnabled} className="flex-1 px-2 py-1.5 text-xs text-right border rounded" />
+                <span className="text-xs w-12">sq. m</span>
+              </div>
             </div>
           </div>
 
           {/* Middle Column */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <label className="w-32 text-xs font-medium text-slate-700 dark:text-slate-300 text-right">Acquisition Cost:</label>
-              <input type="number" step="0.01" value={formData.acquisitionCost} onChange={(e) => setFormData(prev => ({ ...prev, acquisitionCost: e.target.value }))} disabled={!isFormEnabled} className="flex-1 px-2 py-1.5 text-xs text-right bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60" />
+              <label className="w-36 text-xs font-medium text-right">Unit Value:</label>
+              <input type="number" value={formData.unitValue} onChange={(e) => setFormData(prev => ({ ...prev, unitValue: e.target.value }))} disabled={!isFormEnabled} className="flex-1 px-2 py-1.5 text-xs text-right border rounded" />
             </div>
             <div className="flex items-center gap-2">
-              <label className="w-32 text-xs font-medium text-slate-700 dark:text-slate-300 text-right">Depreciation Rate:</label>
+              <label className="w-36 text-xs font-medium text-right">Base Market Value:</label>
+              <input type="text" value={formatCurrency(computedValues.baseMarketValue)} readOnly className="flex-1 px-2 py-1.5 text-xs text-right bg-slate-100 border rounded" />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="w-36 text-xs font-medium text-right">Adjusted Market Value:</label>
+              <input type="text" value={formatCurrency(computedValues.adjustedMarketValue)} readOnly className="flex-1 px-2 py-1.5 text-xs text-right bg-slate-100 border rounded" />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="w-36 text-xs font-medium text-right">Assessment Level:</label>
               <div className="flex-1 flex items-center gap-1">
-                <input type="number" step="0.01" value={formData.depreciation} onChange={(e) => setFormData(prev => ({ ...prev, depreciation: e.target.value }))} disabled={!isFormEnabled} className="flex-1 px-2 py-1.5 text-xs text-right bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60" />
-                <span className="text-xs text-slate-500 dark:text-slate-400 w-4">%</span>
+                <input type="number" value={formData.assessmentLevel} onChange={(e) => setFormData(prev => ({ ...prev, assessmentLevel: e.target.value }))} disabled={!isFormEnabled} className="flex-1 px-2 py-1.5 text-xs text-right border rounded" />
+                <span className="text-xs w-4">%</span>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <label className="w-32 text-xs font-medium text-slate-700 dark:text-slate-300 text-right">Market Value:</label>
-              <input type="text" value={formatCurrency(computedValues.marketValue)} readOnly className="flex-1 px-2 py-1.5 text-xs text-right bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded cursor-not-allowed" />
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="w-32 text-xs font-medium text-slate-700 dark:text-slate-300 text-right">Assessment Level:</label>
-              <div className="flex-1 flex items-center gap-1">
-                <input type="number" step="0.01" value={formData.assessmentLevel} onChange={(e) => setFormData(prev => ({ ...prev, assessmentLevel: e.target.value }))} disabled={!isFormEnabled} className="flex-1 px-2 py-1.5 text-xs text-right bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60" />
-                <span className="text-xs text-slate-500 dark:text-slate-400 w-4">%</span>
-              </div>
+              <label className="w-36 text-xs font-medium text-right">Taxable Rate:</label>
+              <input type="number" defaultValue="100" disabled={!isFormEnabled} className="flex-1 px-2 py-1.5 text-xs text-right border rounded" />
             </div>
           </div>
 
           {/* Right Column */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <label className="w-28 text-xs font-medium text-slate-700 dark:text-slate-300 text-right">Assessed Value:</label>
-              <input type="text" value={formatCurrency(computedValues.assessedValue)} readOnly className="flex-1 px-2 py-1.5 text-xs text-right bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded cursor-not-allowed font-medium" />
+              <label className="w-28 text-xs font-medium text-right">Assessed Value:</label>
+              <input type="text" value={formatCurrency(computedValues.assessedValue)} readOnly className="flex-1 px-2 py-1.5 text-xs text-right bg-slate-100 border rounded font-medium" />
             </div>
             <div className="flex items-center gap-2">
-              <label className="w-28 text-xs font-medium text-slate-700 dark:text-slate-300 text-right">Taxable:</label>
-              <input type="checkbox" checked={formData.taxable} onChange={(e) => setFormData(prev => ({ ...prev, taxable: e.target.checked }))} disabled={!isFormEnabled} className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 disabled:opacity-60" />
+              <label className="w-28 text-xs font-medium text-right">Taxable:</label>
+              <input type="checkbox" checked={formData.taxable} onChange={(e) => setFormData(prev => ({ ...prev, taxable: e.target.checked }))} disabled={!isFormEnabled} className="w-4 h-4" />
             </div>
             <div className="flex items-center gap-2">
-              <label className="w-28 text-xs font-medium text-slate-700 dark:text-slate-300 text-right">Idle Land:</label>
-              <input type="checkbox" checked={formData.idleLand} onChange={(e) => setFormData(prev => ({ ...prev, idleLand: e.target.checked }))} disabled={!isFormEnabled} className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 disabled:opacity-60" />
+              <label className="w-28 text-xs font-medium text-right">Beneficial Use:</label>
+              <input type="checkbox" checked={formData.beneficialUse} onChange={(e) => setFormData(prev => ({ ...prev, beneficialUse: e.target.checked }))} disabled={!isFormEnabled} className="w-4 h-4" />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="w-28 text-xs font-medium text-right">Idle Land:</label>
+              <input type="checkbox" checked={formData.idleLand} onChange={(e) => setFormData(prev => ({ ...prev, idleLand: e.target.checked }))} disabled={!isFormEnabled} className="w-4 h-4" />
             </div>
           </div>
         </div>

@@ -27,6 +27,8 @@ const rptAssRoutes = require('./routes/rptAssRoutes');
 const bldgAdjRoutes = require('./routes/bldgAdjRoutes');
 const bldgStrucRoutes = require('./routes/bldgStrucRoutes');
 const mastExtnRoutes = require('./routes/mastExtnRoutes');
+const rptTreeRoutes = require('./routes/rptTreeRoutes');
+const rptMachRoutes = require('./routes/rptMachRoutes');
 
 const app = express();
 
@@ -136,6 +138,8 @@ app.use('/api/rpt-ass', rptAssRoutes);
 app.use('/api/bldg-adj', bldgAdjRoutes);
 app.use('/api/bldg-struc', bldgStrucRoutes);
 app.use('/api/mastextn', mastExtnRoutes);
+app.use('/api/v1/rpt-tree', rptTreeRoutes);
+app.use('/api/v1/rpt-mach', rptMachRoutes);
 
 // Error Handler
 app.use(errorHandler);

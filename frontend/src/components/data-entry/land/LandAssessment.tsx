@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, TreePine } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, TreePine, ArrowDownUp, Trees } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { RptAssRecord } from '@/services/rptAssService';
+import LandAdjustmentModal, { LandAdjustment } from './LandAdjustmentModal';
+import TreesModal, { TreePlant } from './TreesModal';
 
 interface LandAssessmentProps {
   records?: RptAssRecord[];
@@ -10,6 +12,7 @@ interface LandAssessmentProps {
 
 interface LandRecord {
   id: string;
+  tdn?: string; // Add TDN field
   kind: string;
   classification: string;
   actualUse: string;
@@ -23,6 +26,8 @@ interface LandRecord {
   taxable: boolean;
   beneficialUse: boolean;
   idleLand: boolean;
+  adjustments?: LandAdjustment[];
+  trees?: TreePlant[];
 }
 
 interface FormData {
@@ -87,9 +92,12 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
   const { headerColor, headerColorDark } = useThemeColor();
   const [records, setRecords] = useState<LandRecord[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<LandRecord | null>(null);
+  const [selectedTdn, setSelectedTdn] = useState<string>(''); // Store TDN for trees modal
   const [formData, setFormData] = useState<FormData>(defaultFormData);
   const [isEditing, setIsEditing] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
+  const [isTreesOpen, setIsTreesOpen] = useState(false);
   
   // Computed values
   const [computedValues, setComputedValues] = useState({
@@ -102,6 +110,7 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
     if (apiRecords) {
       const mapped = apiRecords.map((r, index) => ({
         id: r.TDN + '-' + index, // Use TDN + index as ID if multiple records share TDN or just for unique key
+        tdn: r.TDN,
         kind: r.KIND,
         classification: r.CLASSIFICATION,
         actualUse: r.ACTUAL_USE || '',
@@ -129,8 +138,19 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
     // Base Market Value = Area × Unit Value
     const baseMarketValue = area * unitValue;
     
-    // Adjusted Market Value = Base Market Value (simplified, add adjustments logic if needed)
-    const adjustedMarketValue = baseMarketValue; 
+    // Calculate total adjustment from selectedRecord
+    const currentAdjustments = selectedRecord?.adjustments || [];
+    // Recalculate adjustment values based on new Base Market Value if they are percentage based
+    // Ideally we iterate adjustments and use percentage.
+    const totalAdjustment = currentAdjustments.reduce((sum, a) => {
+        // If we want strict percentage adherence:
+        return sum + (baseMarketValue * (a.percentage / 100));
+        // Or if we trust the valueAdjustment in the object:
+        // return sum + a.valueAdjustment;
+    }, 0);
+    
+    // Adjusted Market Value
+    const adjustedMarketValue = baseMarketValue + totalAdjustment;
     
     // Assessed Value = Adjusted Market Value × (Assessment Level / 100)
     const assessedValue = adjustedMarketValue * (assessmentLevel / 100);
@@ -140,12 +160,13 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
       adjustedMarketValue,
       assessedValue,
     });
-  }, [formData.area, formData.unitValue, formData.assessmentLevel]);
+  }, [formData.area, formData.unitValue, formData.assessmentLevel, selectedRecord?.adjustments]);
 
   // Handle row selection
   const handleRowSelect = (record: LandRecord) => {
     if (isEditing || isAdding) return;
     setSelectedRecord(record);
+    setSelectedTdn(record.tdn || '');
     setFormData({
       classification: record.classification,
       actualUse: record.actualUse,
@@ -201,6 +222,8 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
       taxable: formData.taxable,
       beneficialUse: formData.beneficialUse,
       idleLand: formData.idleLand,
+      adjustments: selectedRecord?.adjustments || [],
+      trees: selectedRecord?.trees || [],
     };
 
     if (isAdding) {
@@ -212,6 +235,22 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
     setSelectedRecord(newRecord);
     setIsEditing(false);
     setIsAdding(false);
+  };
+
+  // Handle Save Adjustments
+  const handleSaveAdjustments = (newAdjustments: LandAdjustment[]) => {
+    if (!selectedRecord) return;
+    const updatedRecord = { ...selectedRecord, adjustments: newAdjustments };
+    setSelectedRecord(updatedRecord);
+    setRecords(prev => prev.map(r => r.id === updatedRecord.id ? updatedRecord : r));
+  };
+
+  // Handle Save Trees
+  const handleSaveTrees = (newTrees: TreePlant[]) => {
+    if (!selectedRecord) return;
+    const updatedRecord = { ...selectedRecord, trees: newTrees };
+    setSelectedRecord(updatedRecord);
+    setRecords(prev => prev.map(r => r.id === updatedRecord.id ? updatedRecord : r));
   };
 
   // Handle Cancel
@@ -346,6 +385,23 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
             <Printer size={14} />
             Print
           </button>
+          <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1 self-center" />
+          <button
+            onClick={() => setIsAdjustmentOpen(true)}
+            disabled={!selectedRecord || isLocalFormEnabled}
+            className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 text-orange-600 dark:text-orange-400 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ArrowDownUp size={14} />
+            Adjustment
+          </button>
+          <button
+            onClick={() => setIsTreesOpen(true)}
+            disabled={!selectedRecord || isLocalFormEnabled}
+            className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-green-50 dark:hover:bg-green-900/20 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 text-green-600 dark:text-green-400 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Trees size={14} />
+            Trees
+          </button>
         </div>
       </div>
 
@@ -418,6 +474,22 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
           </tbody>
         </table>
       </div>
+
+      {/* Modals */}
+      <LandAdjustmentModal
+        open={isAdjustmentOpen}
+        onOpenChange={setIsAdjustmentOpen}
+        initialAdjustments={selectedRecord?.adjustments || []}
+        onSave={handleSaveAdjustments}
+        baseMarketValue={computedValues.baseMarketValue}
+      />
+      <TreesModal
+        open={isTreesOpen}
+        onOpenChange={setIsTreesOpen}
+        initialTrees={selectedRecord?.trees || []}
+        onSave={handleSaveTrees}
+        tdn={selectedTdn} // Pass the selected TDN
+      />
 
       {/* Form Section */}
       <div className="border-t border-slate-200 dark:border-slate-700 p-4 bg-slate-50 dark:bg-slate-800/50">

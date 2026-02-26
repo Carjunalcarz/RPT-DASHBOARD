@@ -28,6 +28,23 @@ class RptMastController {
       next(error);
     }
   }
+
+  /**
+   * Update Signatory data
+   * PUT /api/rptmast/signatories/:tdn
+   */
+  async updateSignatory(req, res, next) {
+    try {
+      const { tdn } = req.params;
+      const data = req.body;
+      
+      const result = await rptMastService.updateSignatory(tdn, data);
+      
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new RptMastController();

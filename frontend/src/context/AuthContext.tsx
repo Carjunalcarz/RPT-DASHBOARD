@@ -15,6 +15,7 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   isMockMode: boolean;
+  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,6 +23,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isMockMode, setIsMockMode] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -34,6 +36,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (authMode === 'mock') {
         setIsMockMode(true);
     }
+
+    setIsLoading(false);
 
     // Listen for unauthorized events
     const handleUnauthorized = () => {
@@ -149,7 +153,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, isMockMode }}>
+    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, isMockMode, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -107,6 +107,9 @@ const RealPropertyDataEntry: React.FC = () => {
   const [additionalSearch, setAdditionalSearch] = useState('All Records');
   const [searchText, setSearchText] = useState('');
 
+  // Sub-component editing state
+  const [isSubComponentEditing, setIsSubComponentEditing] = useState(false);
+
   // Active tab state
   const [activeTab, setActiveTab] = useState('property-info');
 
@@ -448,7 +451,7 @@ const RealPropertyDataEntry: React.FC = () => {
           {/* Save/Cancel */}
           <button
             onClick={handleSave}
-            disabled={!isFormEnabled}
+            disabled={!isFormEnabled || isSubComponentEditing}
             className="px-3 py-2 text-xs bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="btn-save"
           >
@@ -457,7 +460,7 @@ const RealPropertyDataEntry: React.FC = () => {
           </button>
           <button
             onClick={handleCancel}
-            disabled={!isFormEnabled}
+            disabled={!isFormEnabled || isSubComponentEditing}
             className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="btn-cancel"
           >
@@ -756,7 +759,11 @@ const RealPropertyDataEntry: React.FC = () => {
             )}
             
             {activeTab === 'signatories' && (
-              <SignatoriesSection selectedRecord={selectedRecord} isEnabled={isFormEnabled} />
+              <SignatoriesSection 
+                selectedRecord={selectedRecord} 
+                isEnabled={isFormEnabled} 
+                onEditModeChange={setIsSubComponentEditing}
+              />
             )}
             
             {activeTab === 'other-info' && (
