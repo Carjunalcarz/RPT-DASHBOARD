@@ -67,34 +67,34 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
     if (initialRecord) {
       // Map API fields to form data
       setFormData({
-        tdn: initialRecord.pOldTdn || '',
+        tdn: initialRecord.P_OLD_TDN || '',
         extn1: '', // Not in API response example
-        arp: initialRecord.canArp || '',
+        arp: initialRecord.CAN_ARP || '', 
         extn2: '', // Not in API response example
-        pin: initialRecord.pPin || '',
+        pin: initialRecord.P_PIN || '',
         extn3: '', // Not in API response example
-        effDate: initialRecord.pEffDate ? initialRecord.pEffDate.split('T')[0] : '',
-        ownerCode: initialRecord.pOwnerCode || '',
-        ownerNo: initialRecord.pOwnerNo || '',
-        ownerName: initialRecord.pOwner || '',
-        marketValue: initialRecord.pMarketValue?.toString() || '0.00',
-        assessedValue: initialRecord.pAssessedValue?.toString() || '0.00',
-        improvement: '0.00', // Not explicitly in API response example
-        area: initialRecord.pArea?.toString() || '0.00',
-        areaUnit: initialRecord.pAreaM === true ? 'ha' : 'sq. m',
+        effDate: initialRecord.P_EFF_DATE ? initialRecord.P_EFF_DATE.split('T')[0] : '', 
+        ownerCode: initialRecord.P_OWNER_CODE || '',
+        ownerNo: initialRecord.P_OWNER_NO || '',
+        ownerName: initialRecord.P_OWNER || '', 
+        marketValue: initialRecord.P_MARKET_VALUE?.toString() || '0.00',
+        assessedValue: initialRecord.P_ASS_VALUE?.toString() || '0.00',
+        improvement: '0.00', 
+        area: initialRecord.P_AREA?.toString() || '0.00',
+        areaUnit: initialRecord.P_AREA_M === true ? 'ha' : 'sq. m',
       });
 
       // Populate table with this single reference record
       const newRecord: ReferenceRecord = {
         id: initialRecord.id || 'initial-ref',
-        tdn: initialRecord.pOldTdn || '',
+        tdn: initialRecord.P_OLD_TDN || '',
         extn1: '',
-        arp: initialRecord.canArp || '',
+        arp: initialRecord.CAN_ARP || '',
         extn2: '',
-        pin: initialRecord.pPin || '',
+        pin: initialRecord.P_PIN || '',
         extn3: '',
-        marketValue: initialRecord.pMarketValue?.toString() || '0.00',
-        assessedValue: initialRecord.pAssessedValue?.toString() || '0.00',
+        marketValue: initialRecord.P_MARKET_VALUE?.toString() || '0.00',
+        assessedValue: initialRecord.P_ASS_VALUE?.toString() || '0.00',
       };
       setRecords([newRecord]);
       setSelectedRecord(newRecord);

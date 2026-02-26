@@ -4,6 +4,7 @@ import { useThemeColor } from '@/context/ThemeColorContext';
 
 interface PropertyBoundariesSectionProps {
   isEnabled: boolean;
+  selectedRecord: any | null;
 }
 
 interface BoundaryData {
@@ -26,9 +27,23 @@ const defaultData: BoundaryData = {
   west: 'BARANGAY STO. ROSARIO / PROVINCIAL ROAD',
 };
 
-const PropertyBoundariesSection: React.FC<PropertyBoundariesSectionProps> = ({ isEnabled }) => {
+const PropertyBoundariesSection: React.FC<PropertyBoundariesSectionProps> = ({ isEnabled, selectedRecord }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const [data, setData] = useState<BoundaryData>(defaultData);
+
+  React.useEffect(() => {
+    if (selectedRecord) {
+      setData({
+        street: selectedRecord.STREET_CD || '', // Map STREET_CD
+        streetName: selectedRecord.STREET || '', // Map STREET
+        location: selectedRecord.LOCATION || '', // Map LOCATION
+        north: selectedRecord.NORTH || '',
+        south: selectedRecord.SOUTH || '',
+        east: selectedRecord.EAST || '',
+        west: selectedRecord.WEST || '',
+      });
+    }
+  }, [selectedRecord]);
 
   const handleChange = (field: keyof BoundaryData, value: string) => {
     setData(prev => ({ ...prev, [field]: value }));

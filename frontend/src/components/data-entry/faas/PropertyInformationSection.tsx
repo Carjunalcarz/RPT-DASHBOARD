@@ -9,6 +9,25 @@ interface PropertyRecord {
   pin: string;
   ownerNo: string;
   owner: string;
+  // Added fields for mapping
+  EFF_DATE?: string;
+  DEC_DATE?: string;
+  EFF_CANC?: string; // Changed from CANC_DATE
+  DIST_NO?: string;
+  BCODE?: string; // Barangay Code
+  BARANGAY?: string;
+  CCN?: string;
+  MTDN?: string; // Mother TDN?
+  IMP_NO?: string;
+  BLDGNAME?: string;
+  BLDGUNIT?: string;
+  TRANS_CD?: string;
+  CER_TIT_NO?: string;
+  TCT_DATE?: string;
+  CAD_LOT_NO?: string;
+  ASS_LOT_NO?: string; // Survey No?
+  BLOCK_NO?: string;
+  LOTE_NO?: string;
 }
 
 interface PropertyInformationSectionProps {
@@ -94,6 +113,43 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
 }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const [data, setData] = useState<PropertyInfoData>(defaultData);
+
+  useEffect(() => {
+    if (selectedRecord) {
+      setData(prev => {
+        const newData = {
+          ...prev,
+          effectivityDate: selectedRecord.EFF_DATE ? selectedRecord.EFF_DATE.split('T')[0] : '',
+          declarationDate: selectedRecord.DEC_DATE ? selectedRecord.DEC_DATE.split('T')[0] : '',
+          cancelledDate: selectedRecord.EFF_CANC ? selectedRecord.EFF_CANC.split('T')[0] : '',
+          district: selectedRecord.DIST_NO || '00',
+          barangay: selectedRecord.BCODE || '001', // Default to 001 if missing, or handle gracefully
+          barangayName: selectedRecord.BARANGAY || '',
+          ccn: selectedRecord.CCN || '',
+          // motherTdn: !!selectedRecord.MTDN, // Logic unclear, leaving as is or default
+          tdNo: selectedRecord.tdn || '',
+          arpNo: selectedRecord.arp || '',
+          propertyIndexNo: selectedRecord.pin || '',
+          improvementNo: selectedRecord.IMP_NO || '',
+          buildingName: selectedRecord.BLDGNAME || '',
+          buildingUnit: selectedRecord.BLDGUNIT || '',
+          updateCode: selectedRecord.TRANS_CD || 'GR',
+          tctOctCct: selectedRecord.CER_TIT_NO || '',
+          tctDate: selectedRecord.TCT_DATE ? selectedRecord.TCT_DATE.split('T')[0] : '',
+          cadLotNo: selectedRecord.CAD_LOT_NO || '',
+          surveyNo: selectedRecord.ASS_LOT_NO || '',
+          blockNo: selectedRecord.BLOCK_NO || '',
+          lotNo: selectedRecord.LOTE_NO || '',
+        };
+
+        // Update description for updateCode
+        const code = updateCodeOptions.find(c => c.value === newData.updateCode);
+        if (code) newData.updateCodeDesc = code.desc;
+
+        return newData;
+      });
+    }
+  }, [selectedRecord]);
 
   const handleChange = (field: keyof PropertyInfoData, value: string | boolean) => {
     setData(prev => {

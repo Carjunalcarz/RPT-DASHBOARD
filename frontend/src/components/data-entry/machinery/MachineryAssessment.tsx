@@ -97,7 +97,7 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
         area: r.AREA || 0,
         unitValue: r.UNIT_VALUE || 0,
         baseMarketValue: r.MARKET_VAL || 0,
-        adjustedMarketValue: r.MARKET_VAL || 0, 
+        adjustedMarketValue: r.ADJ_MARKET_VAL || r.MARKET_VAL || 0, // Use Adjusted Market Value from API if available
         assessmentLevel: r.ASS_LEVEL || 0,
         assessedValue: r.ASS_VALUE || 0,
         taxable: r.TAXABILITY === 'true' || r.TAXABILITY === 'TAXABLE' || r.TAXABLE_RATE > 0,

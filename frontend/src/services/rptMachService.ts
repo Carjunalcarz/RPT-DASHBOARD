@@ -59,7 +59,7 @@ export interface RptMachResponse {
 
 export const getMachineryByTdn = async (tdn: string): Promise<RptMachRecord[]> => {
   try {
-    const response = await api.get<RptMachResponse>(`/v1/rpt-mach/${tdn}`);
+    const response = await api.get<RptMachResponse>(`/rpt-mach/${tdn}`);
     return response.data.data;
   } catch (error) {
     console.error('Error fetching machinery records:', error);

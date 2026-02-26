@@ -2,8 +2,19 @@ import React, { useState } from 'react';
 import { User, Search } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 
+interface PropertyRecord {
+  id: string;
+  ownerNo: string;
+  owner: string;
+  pOwnerNo?: string; // Previous/Other Owner No
+  pOwner?: string; // Previous/Other Owner
+  pOwnerCode?: string; // Previous/Other Owner Code
+  // ... other fields if needed for Administrator
+}
+
 interface PropertyOwnerSectionProps {
   isEnabled: boolean;
+  selectedRecord: any | null; // Use any or specific type if shared
 }
 
 interface OwnerData {
@@ -42,9 +53,29 @@ const codeOptions = [
   { value: 'HRS', label: 'HRS - Heirs' },
 ];
 
-const PropertyOwnerSection: React.FC<PropertyOwnerSectionProps> = ({ isEnabled }) => {
+const PropertyOwnerSection: React.FC<PropertyOwnerSectionProps> = ({ isEnabled, selectedRecord }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const [data, setData] = useState<OwnerAdminData>(defaultData);
+
+  React.useEffect(() => {
+    if (selectedRecord) {
+      setData(prev => ({
+        ...prev,
+        owner: {
+          code: selectedRecord.OWN_CD || 'SING', // Map OWN_CD
+          number: selectedRecord.ownerNo || '',
+          name: selectedRecord.owner || '',
+          address: selectedRecord.Owner_Address || '', // Assuming Owner_Address exists
+        },
+        administrator: {
+          code: selectedRecord.ADM_CD || 'SING', // Map ADM_CD
+          number: selectedRecord.ADMIN_NO || '', // Map ADMIN_NO
+          name: selectedRecord.Administrator_Name || '', // Need to ensure this field exists or map appropriately
+          address: selectedRecord.Administrator_Address || '', // Need to ensure this field exists
+        }
+      }));
+    }
+  }, [selectedRecord]);
 
   const handleOwnerChange = (field: keyof OwnerData, value: string) => {
     setData(prev => ({
