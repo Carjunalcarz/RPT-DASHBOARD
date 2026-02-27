@@ -45,12 +45,14 @@ const router = express.Router();
  *                             type: string
  *                           email:
  *                             type: string
- *                           name:
- *                             type: string
  *                           role:
+ *                             type: string
+ *                           municipalityCode:
  *                             type: string
  *       401:
  *         description: Unauthorized
+ *       403:
+ *         description: Forbidden
  */
 router.get('/', protect, userController.getUsers);
 
@@ -89,5 +91,39 @@ router.get('/', protect, userController.getUsers);
  *         description: Unauthorized
  */
 router.get('/me', protect, userController.getMe);
+
+/**
+ * @swagger
+ * /api/v1/users/{id}:
+ *   put:
+ *     summary: Update user details (Admin only)
+ *     tags: [Users]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               role:
+ *                 type: string
+ *                 enum: [admin, user]
+ *               municipalityCode:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: User updated
+ *       403:
+ *         description: Forbidden
+ */
+router.put('/:id', protect, userController.updateUser);
 
 module.exports = router;

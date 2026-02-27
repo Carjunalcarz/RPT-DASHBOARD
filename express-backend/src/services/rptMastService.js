@@ -15,11 +15,58 @@ class RptMastService {
    * @param {string} params.filterValue - Value to search for
    * @returns {Promise<Object>} Object containing data and pagination info
    */
-  async getAgusanMigrationData({ page = 1, limit = 20000, searchField, filterValue } = {}) {
+  async getAgusanMigrationData({ page = 1, limit = 20000, searchField, filterValue, municipalityCode, user } = {}) {
     try {
       const pool = await poolPromise;
       if (!pool) {
         throw new Error('Database connection failed');
+      }
+
+      // Determine target municipality based on user role
+      let targetMunicipality = null;
+      if (user && user.role === 'admin') {
+        // Admin can view all or filter by specific municipality
+        // If admin provides a specific municipalityCode in query, use it.
+        // If query param is 'ADN' or 'ALL', explicitly show all (targetMunicipality = null)
+        // If not, but admin has a municipalityCode assigned in their profile, default to that.
+        // If neither, they see all (targetMunicipality stays null).
+        
+        if (municipalityCode && municipalityCode !== 'ADN' && municipalityCode !== 'ALL') {
+          targetMunicipality = municipalityCode;
+        } else if (municipalityCode === 'ADN' || municipalityCode === 'ALL') {
+           targetMunicipality = null; // Explicitly show all
+        } else if (user.municipalityCode) {
+           // Fix: If user's assigned municipality is ADN/ALL, treat as null (show all)
+           if (user.municipalityCode === 'ADN' || user.municipalityCode === 'ALL') {
+             targetMunicipality = null;
+           } else {
+             targetMunicipality = user.municipalityCode;
+           }
+        }
+      } else if (user) {
+        // Regular users are restricted to their assigned municipality
+        // If assigned ADN/ALL, they can see all (though usually reserved for admins)
+        if (user.municipalityCode === 'ADN' || user.municipalityCode === 'ALL') {
+          targetMunicipality = null;
+        } else {
+          targetMunicipality = user.municipalityCode;
+        }
+        
+        if (!targetMunicipality && user.municipalityCode !== 'ADN' && user.municipalityCode !== 'ALL') {
+          logger.warn(`User ${user.email} has no municipalityCode assigned. Returning empty result.`);
+          return {
+            data: [],
+            pagination: {
+              page: Number(page),
+              limit: Number(limit),
+              total: 0,
+              totalPages: 0
+            }
+          };
+        }
+      } else {
+         // Fallback for safety
+         throw new AppError('Unauthorized access', 401);
       }
 
       // Base query
@@ -41,18 +88,6 @@ class RptMastService {
     o.Name AS Owner_Name, 
     o.Address AS Owner_Address, 
     o.Tel_no AS Owner_Tel_no,
-    ms.TDN AS P_NEW_TDN,
-    ms.CANCELS AS P_OLD_TDN,
-    ms.Pin AS P_PIN,
-    ms.Pmarket_val AS P_MARKET_VALUE,
-    ms.Pass_value AS P_ASS_VALUE,
-    ms.Pown_cd AS P_OWNER_CODE,
-    ms.Powner_no AS P_OWNER_NO,
-    ms.CANCARP AS CAN_ARP,
-    ms.AREA AS P_AREA,
-    ms.IF_DEFAULT AS P_AREA_M,
-    ms.EFF_DATE AS P_EFF_DATE,
-    p.Name AS P_OWNER,
     s.Appraiser,
     s.AppraiserPos,
     s.AppraisedDate,
@@ -108,27 +143,58 @@ class RptMastService {
     s.ReviewedPos,
     s.ReviewedDate,
     s.SGD_REVIEWED,
-    s.TPD_REVIEWED
+    s.TPD_REVIEWED,
+
+    ms.TDN AS P_NEW_TDN,
+    ms.CANCELS AS P_OLD_TDN,
+    ms.Pin AS P_PIN,
+    ms.Pmarket_val AS P_MARKET_VALUE,
+    ms.Pass_value AS P_ASS_VALUE,
+    ms.Pown_cd AS P_OWNER_CODE,
+    ms.Powner_no AS P_OWNER_NO,
+    ms.CANCARP AS CAN_ARP,
+    ms.AREA AS P_AREA,
+    ms.IF_DEFAULT AS P_AREA_M,
+    ms.EFF_DATE AS P_EFF_DATE,
+    p.Name AS P_OWNER
 
 
 
 FROM RPTAS_AGUSAN.dbo.RPTMAST m
 
-INNER JOIN RPTAS_AGUSAN.dbo.Rptowner o 
-    ON m.OWNER_NO = o.Owner_No
-INNER JOIN RPTAS_AGUSAN.dbo.BARANGAY B 
-    ON m.REGION = B.REGION 
-    AND m.PROV = B.PROV 
-    AND m.CITY = B.CITY 
-    AND m.BCODE = B.CODE
-LEFT JOIN RPTAS_AGUSAN.dbo.Rptowner D   
-    ON m.ADMIN_NO = D.OWNER_NO
-LEFT JOIN RPTAS_AGUSAN.dbo.MASTEXTN ms
-    ON m.TDN = ms.TDN
-LEFT JOIN RPTAS_AGUSAN.dbo.Rptowner p  
-    ON ms.Powner_no = p.OWNER_NO
-LEFT JOIN RPTAS_AGUSAN.dbo.SIGNATORY s
-    ON m.TDN = s.TDN
+OUTER APPLY (
+    SELECT TOP 1 Owner_No, Name, Address, Tel_no 
+    FROM RPTAS_AGUSAN.dbo.Rptowner 
+    WHERE Owner_No = m.OWNER_NO
+) o
+OUTER APPLY (
+    SELECT TOP 1 CODE, DESCRIPTION 
+    FROM RPTAS_AGUSAN.dbo.BARANGAY 
+    WHERE REGION = m.REGION 
+    AND PROV = m.PROV 
+    AND CITY = m.CITY 
+    AND CODE = m.BCODE
+) B
+OUTER APPLY (
+    SELECT TOP 1 Owner_No, Name 
+    FROM RPTAS_AGUSAN.dbo.Rptowner 
+    WHERE Owner_No = m.ADMIN_NO
+) D
+OUTER APPLY (
+    SELECT TOP 1 * 
+    FROM RPTAS_AGUSAN.dbo.SIGNATORY 
+    WHERE TDN = m.TDN
+) s
+OUTER APPLY (
+    SELECT TOP 1 * 
+    FROM RPTAS_AGUSAN.dbo.MASTEXTN 
+    WHERE TDN = m.TDN
+) ms
+OUTER APPLY (
+    SELECT TOP 1 Name 
+    FROM RPTAS_AGUSAN.dbo.Rptowner 
+    WHERE Owner_No = ms.Powner_no
+) p
  
 
 WHERE 
@@ -138,6 +204,14 @@ WHERE
     AND TAX_BEG_YR > 2022
     AND m.OWNER_NO is not null
 `;
+
+      // Apply Municipality Filter
+      if (targetMunicipality) {
+          // Use safe string interpolation or parameter if possible, but existing code uses template literals
+          // Ideally use parameters, but sticking to existing pattern for consistency
+          // Ensuring targetMunicipality is safe (it comes from DB or sanitized param)
+          baseQuery += ` AND m.CITY = '${targetMunicipality.replace(/'/g, "''")}'`;
+      }
 
       // Dynamic Filter Logic
       if (searchField && filterValue) {
@@ -193,6 +267,51 @@ WHERE
     } catch (error) {
       logger.error('Error executing RPTAS_AGUSAN migration query:', error);
       throw new AppError('Database query failed: ' + error.message, 500);
+    }
+  }
+
+  /**
+   * Get MASTEXTN data by TDN
+   * @param {string} tdn - Tax Declaration Number
+   */
+  async getMastExtn(tdn) {
+    try {
+      const pool = await poolPromise;
+      if (!pool) {
+        throw new Error('Database connection failed');
+      }
+
+      const query = `
+        SELECT TOP 1
+          ms.TDN AS P_NEW_TDN,
+          ms.CANCELS AS P_OLD_TDN,
+          ms.Pin AS P_PIN,
+          ms.Pmarket_val AS P_MARKET_VALUE,
+          ms.Pass_value AS P_ASS_VALUE,
+          ms.Pown_cd AS P_OWNER_CODE,
+          ms.Powner_no AS P_OWNER_NO,
+          ms.CANCARP AS CAN_ARP,
+          ms.AREA AS P_AREA,
+          ms.IF_DEFAULT AS P_AREA_M,
+          ms.EFF_DATE AS P_EFF_DATE,
+          p.Name AS P_OWNER
+        FROM RPTAS_AGUSAN.dbo.MASTEXTN ms
+        OUTER APPLY (
+            SELECT TOP 1 Name 
+            FROM RPTAS_AGUSAN.dbo.Rptowner 
+            WHERE OWNER_NO = ms.Powner_no
+        ) p
+        WHERE ms.TDN = @tdn
+      `;
+
+      const result = await pool.request()
+        .input('tdn', tdn)
+        .query(query);
+
+      return result.recordset[0] || null;
+    } catch (error) {
+      logger.error('Error fetching MASTEXTN data:', error);
+      throw new AppError('Failed to fetch MASTEXTN data: ' + error.message, 500);
     }
   }
 

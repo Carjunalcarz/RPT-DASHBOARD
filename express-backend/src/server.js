@@ -133,6 +133,7 @@ app.use('/api/v1/test-tasks', testTaskRoutes);
 app.use('/api/v1/batch', batchRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
+app.use('/api/users', userRoutes); // Alias for consistency if frontend uses /api/users directly
 app.use('/api/rptmast', rptMastRoutes);
 app.use('/api/rpt-ass', rptAssRoutes);
 app.use('/api/bldg-adj', bldgAdjRoutes);

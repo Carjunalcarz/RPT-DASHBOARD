@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/supabase-client"
+  output   = "../src/generated/supabase-client-v5"
 }
 
 datasource db {
@@ -17,6 +17,7 @@ model AuditLog {
   oldValues   Json?
   newValues   Json?
   userId      String?
+  userEmail   String?
   ipAddress   String?
   timestamp   DateTime @default(now())
   details     Json?
@@ -59,11 +60,42 @@ model User {
   avatarUrl   String?  @map("avatar_url")
   bio         String?
   role        String   @default("user") // 'admin', 'user', etc.
+  municipalityCode String? @map("municipality_code") // Code for municipality access control
+  fullName         String? @map("full_name")
+  contactNo        String? @map("contact_no")
   
+  // Relations
+  userRoles   UserRole[]
+
   // Timestamps
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
   lastLoginAt DateTime? @map("last_login_at")
 
   @@map("users") // Maps to public.users table
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique // 'admin', 'user', 'appraiser', etc.
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  userRoles   UserRole[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id") @db.Uuid
+  roleId    String   @map("role_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
 }

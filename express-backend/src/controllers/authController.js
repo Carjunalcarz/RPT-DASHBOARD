@@ -60,7 +60,36 @@ exports.login = async (req, res, next) => {
       });
     }
 
-    logger.info(`User logged in successfully: ${user.id}`);
+    const { supabasePrisma } = require('../database/prisma'); // Import at top or here
+
+    let role = user.role; // Default to Supabase Auth role (usually 'authenticated')
+    
+    // Fetch custom role from public.users table
+    try {
+      const dbUser = await supabasePrisma.user.findUnique({
+        where: { id: user.id },
+        select: { role: true }
+      });
+      if (dbUser && dbUser.role) {
+        role = dbUser.role;
+      } else {
+        // If user not in DB, create them with default role 'user'
+        try {
+          await supabasePrisma.user.create({
+            data: {
+              id: user.id,
+              email: user.email,
+              role: 'user'
+            }
+          });
+          role = 'user';
+        } catch (createErr) {
+          logger.warn('Failed to auto-create user profile on login', createErr);
+        }
+      }
+    } catch (err) {
+      logger.warn('Failed to fetch user role from DB during login', err);
+    }
 
     // Set access token in HttpOnly cookie
     res.cookie('access_token', session.access_token, {
@@ -70,15 +99,16 @@ exports.login = async (req, res, next) => {
       maxAge: session.expires_in * 1000 // Convert to milliseconds
     });
 
-    // Return successful response
+    // Also return token in response body for frontend storage (needed for API calls if cookies fail or for non-browser clients)
     res.status(200).json({
       status: 'success',
       message: 'Logged in successfully',
+      token: session.access_token, // Add this line
       data: {
         user: {
           id: user.id,
           email: user.email,
-          role: user.role,
+          role: role, // Use the fetched role
           created_at: user.created_at,
           last_sign_in_at: user.last_sign_in_at
         }

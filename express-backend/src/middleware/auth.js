@@ -122,7 +122,7 @@ async function processUser(req, next, decoded) {
       if (decoded.sub && supabasePrisma && supabasePrisma.user) {
         dbUser = await supabasePrisma.user.findUnique({
           where: { id: decoded.sub },
-          select: { role: true, email: true }
+          select: { role: true, email: true, municipalityCode: true }
         });
       }
     } catch (err) {
@@ -131,20 +131,22 @@ async function processUser(req, next, decoded) {
     }
 
     // Merge DB user info if available, otherwise rely on token
-    req.user = { ...decoded, ...(dbUser || {}) };
+    // IMPORTANT: Supabase JWT might have a 'role' claim (usually 'authenticated'),
+    // but our app expects 'admin' or 'user'.
+    // If DB fetch failed or user not in DB, dbUser is null.
+    // If dbUser is null, we default to 'user' role unless the token explicitly says otherwise (unlikely for app roles).
     
-    // Pass control to next middleware
-    next();
+    req.user = { 
+      ...decoded, 
+      id: decoded.sub, // Ensure ID is accessible as req.user.id
+      role: dbUser?.role || 'user', // Default to 'user' if DB role is missing
+      municipalityCode: dbUser?.municipalityCode || null
+    };
     
-    // We cannot easily wrap next() in runWithContext because next() is async in Express?
-    // Actually, runWithContext is synchronous usually.
-    // But calling next() inside might be fine.
-    // The original code:
-    /*
+    // Pass control to next middleware with context
     runWithContext({ user: req.user, ip: req.ip || req.connection.remoteAddress }, () => {
       next();
     });
-    */
 }
 
 module.exports = protect;

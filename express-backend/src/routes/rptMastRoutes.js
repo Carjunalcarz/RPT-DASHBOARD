@@ -44,6 +44,32 @@ const protect = require('../middleware/auth');
  *     tags: [RPTMAST]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Items per page
+ *       - in: query
+ *         name: searchField
+ *         schema:
+ *           type: string
+ *         description: Field to search
+ *       - in: query
+ *         name: filterValue
+ *         schema:
+ *           type: string
+ *         description: Value to search
+ *       - in: query
+ *         name: municipalityCode
+ *         schema:
+ *           type: string
+ *         description: (Admin only) Filter by specific municipality code
  *     responses:
  *       200:
  *         description: Successful retrieval
@@ -105,5 +131,27 @@ router.get('/RPTAS_AGUSAN', protect, (req, res, next) => rptMastController.getAg
  *         description: Server error
  */
 router.put('/signatories/:tdn', protect, (req, res, next) => rptMastController.updateSignatory(req, res, next));
+
+/**
+ * @swagger
+ * /api/rptmast/mastextn/{tdn}:
+ *   get:
+ *     summary: Get MASTEXTN data by TDN
+ *     tags: [RPTMAST]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: tdn
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: MASTEXTN data retrieved
+ *       404:
+ *         description: Not found
+ */
+router.get('/mastextn/:tdn', protect, (req, res, next) => rptMastController.getMastExtn(req, res, next));
 
 module.exports = router;

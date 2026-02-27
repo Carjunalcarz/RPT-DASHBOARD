@@ -1,5 +1,5 @@
 const { PrismaClient: MssqlClient } = require('../generated/mssql-client');
-const { PrismaClient: SupabaseClient } = require('../generated/supabase-client');
+const { PrismaClient: SupabaseClient } = require('../generated/supabase-client-v5');
 const { getContext } = require('../utils/context');
 const logger = require('../utils/logger');
 
@@ -24,12 +24,12 @@ const createAuditExtension = (clientName, baseClient) => {
       $allModels: {
         async $allOperations({ model, operation, args, query }) {
           // Skip if operation is on AuditLog table itself or readonly
-          if (model === 'AuditLog' || !['create', 'update', 'delete', 'createMany', 'updateMany', 'deleteMany'].includes(operation)) {
+          if (model === 'AuditLog' || !['create', 'update', 'delete', 'upsert', 'createMany', 'updateMany', 'deleteMany'].includes(operation)) {
             return query(args);
           }
 
           let oldData = null;
-          if (operation === 'update' && args.where && (args.where.id || args.where.recordId)) {
+          if ((operation === 'update' || operation === 'upsert') && args.where && (args.where.id || args.where.recordId)) {
              try {
                const modelName = model.charAt(0).toLowerCase() + model.slice(1);
                if (baseClient[modelName]) {
@@ -61,7 +61,7 @@ const createAuditExtension = (clientName, baseClient) => {
 
             if (operation === 'create') {
               auditData.newValues = isSupabase ? result : JSON.stringify(result);
-            } else if (operation === 'update') {
+            } else if (operation === 'update' || operation === 'upsert') {
               auditData.oldValues = oldData ? (isSupabase ? oldData : JSON.stringify(oldData)) : null;
               auditData.newValues = isSupabase ? result : JSON.stringify(result);
             } else if (operation === 'delete') {
