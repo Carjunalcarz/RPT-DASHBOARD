@@ -61,28 +61,28 @@ interface PropertyInfoData {
 }
 
 const defaultData: PropertyInfoData = {
-  effectivityDate: '2026-01-01',
-  declarationDate: '2025-01-14',
+  effectivityDate: '',
+  declarationDate: '',
   cancelledDate: '',
   district: '00',
   barangay: '001',
   barangayName: 'POBLACION',
   ccn: '',
   motherTdn: false,
-  tdNo: '25-07-0001-00006',
-  arpNo: '25-07-0001-00006',
-  propertyIndexNo: '053-07-0001-002-03',
+  tdNo: '',
+  arpNo: '',
+  propertyIndexNo: '',
   improvementNo: '',
   buildingName: '',
   buildingUnit: '',
   updateCode: 'GR',
   updateCodeDesc: 'GENERAL REVISION',
-  tctOctCct: 'KOT BLG. P-20087 KALOOB NA PATI',
+  tctOctCct: '',
   tctDate: '',
-  cadLotNo: '92-A, CAD 668',
-  surveyNo: 'CSD-13-004840',
+  cadLotNo: '',
+  surveyNo: '',
   blockNo: '',
-  lotNo: 'LOT 3902',
+  lotNo: '',
 };
 
 const districtOptions = [
@@ -107,12 +107,44 @@ const updateCodeOptions = [
   { value: 'CC', label: 'CC', desc: 'CORRECTION OF CLERICAL ERROR' },
 ];
 
+const emptyData: PropertyInfoData = {
+  effectivityDate: '',
+  declarationDate: '',
+  cancelledDate: '',
+  district: '00',
+  barangay: '001',
+  barangayName: 'POBLACION',
+  ccn: '',
+  motherTdn: false,
+  tdNo: '',
+  arpNo: '',
+  propertyIndexNo: '',
+  improvementNo: '',
+  buildingName: '',
+  buildingUnit: '',
+  updateCode: 'GR',
+  updateCodeDesc: 'GENERAL REVISION',
+  tctOctCct: '',
+  tctDate: '',
+  cadLotNo: '',
+  surveyNo: '',
+  blockNo: '',
+  lotNo: '',
+};
+
 const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
   isEnabled,
   selectedRecord,
 }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const [data, setData] = useState<PropertyInfoData>(defaultData);
+
+  useEffect(() => {
+    // Reset to empty data on mount if no record selected
+    if (!selectedRecord) {
+      setData(emptyData);
+    }
+  }, []); // Run once on mount
 
   useEffect(() => {
     if (selectedRecord) {
@@ -148,6 +180,9 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
 
         return newData;
       });
+    } else {
+      // Reset to empty data when no record is selected (Add Mode)
+      setData(emptyData);
     }
   }, [selectedRecord]);
 

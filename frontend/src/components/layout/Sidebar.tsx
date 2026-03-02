@@ -14,13 +14,15 @@ import {
   User,
   FileClock,
   CheckSquare,
-  Package
+  Package,
+  UserCog
 } from 'lucide-react';
 
 interface MenuItem {
   path: string;
   label: string;
   icon: React.ElementType;
+  adminOnly?: boolean;
 }
 
 const menuItems: MenuItem[] = [
@@ -33,6 +35,7 @@ const menuItems: MenuItem[] = [
   { path: '/items', label: 'Items', icon: Package },
   { path: '/tasks', label: 'Tasks', icon: CheckSquare },
   { path: '/audit-trail', label: 'Audit Trail', icon: FileClock },
+  { path: '/admin/users', label: 'User Management', icon: UserCog, adminOnly: false }, // Temporary allow all
   { path: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -56,7 +59,7 @@ const Sidebar: React.FC = () => {
       <div className="flex flex-col h-full">
         {/* Navigation Menu */}
         <nav className="flex-1 px-2 py-4 overflow-y-auto">
-          {menuItems.map((item) => {
+          {menuItems.filter(item => !item.adminOnly || user?.role === 'admin').map((item) => {
             const Icon = item.icon;
             return (
               <NavLink

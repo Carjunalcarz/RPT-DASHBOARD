@@ -13,6 +13,7 @@ import DataEntry from '@/pages/DataEntry';
 import AuditTrail from '@/pages/AuditTrail';
 import Items from '@/pages/Items';
 import Tasks from '@/pages/Tasks';
+import UserManagement from '@/pages/admin/UserManagement';
 import RouteRestorer from '@/components/layout/RouteRestorer';
 
 interface ProtectedRouteProps {
@@ -176,6 +177,16 @@ const AppRouter: React.FC = () => {
             <ProtectedRoute>
               <Layout>
                 <Tasks />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <UserManagement />
               </Layout>
             </ProtectedRoute>
           }

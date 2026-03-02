@@ -23,7 +23,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.0",
+    "@supabase/supabase-js": "^2.98.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.0",
@@ -34,7 +34,7 @@
     "jsonwebtoken": "^9.0.0",
     "jwks-rsa": "^3.2.2",
     "mssql": "^10.0.4",
-    "pg": "^8.18.0",
+    "pg": "^8.19.0",
     "supabase": "^2.76.12",
     "swagger-jsdoc": "^6.2.0",
     "swagger-ui-express": "^5.0.0",

@@ -241,3 +241,17 @@ export const updateSignatory = async (tdn: string, data: any): Promise<any> => {
   const response = await api.put(`${API_BASE}/rptmast/signatories/${tdn}`, data);
   return response.data;
 };
+
+export const getMastExtn = async (tdn: string): Promise<any> => {
+  const API_BASE = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/v1', '') : 'http://localhost:3000/api';
+  try {
+    const response = await api.get(`${API_BASE}/rptmast/mastextn/${tdn}`);
+    if (response.data && response.data.success) {
+        return response.data.data;
+    }
+    return null;
+  } catch (error) {
+    console.warn(`No extension data found for TDN ${tdn}`);
+    return null;
+  }
+};

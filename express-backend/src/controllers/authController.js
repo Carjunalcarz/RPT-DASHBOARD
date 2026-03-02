@@ -1,4 +1,3 @@
-const { supabase } = require('../database/supabase');
 const logger = require('../utils/logger');
 const { validationResult } = require('express-validator');
 
@@ -10,6 +9,8 @@ const { validationResult } = require('express-validator');
  */
 exports.login = async (req, res, next) => {
   try {
+    const supabaseClient = require('../database/supabase'); // Dynamic import to handle mock
+    
     // Check for validation errors first
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -22,17 +23,11 @@ exports.login = async (req, res, next) => {
 
     const { email, password } = req.body;
 
-    if (!supabase) {
-      logger.error('Supabase client is not initialized');
-      return res.status(503).json({
-        status: 'error',
-        message: 'Authentication service unavailable'
-      });
-    }
+    // const { supabase } = require('../database/supabase'); // Duplicate import removed
 
     logger.info(`Attempting login for user: ${email}`);
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
       email,
       password
     });

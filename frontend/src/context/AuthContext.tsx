@@ -92,6 +92,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       if (response.data.status === 'success') {
         const userData = response.data.data.user;
+        const token = response.data.token; // Get token from response
+
         const user: User = {
             id: userData.id,
             email: userData.email,
@@ -101,6 +103,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
         setUser(user);
         localStorage.setItem('user', JSON.stringify(user));
+        if (token) {
+          localStorage.setItem('token', token); // Store token
+        }
         localStorage.removeItem('auth_mode'); // Clear mock mode if successful
         setIsMockMode(false);
         return { success: true };

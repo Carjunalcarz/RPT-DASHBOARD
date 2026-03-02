@@ -31,16 +31,16 @@ interface OwnerAdminData {
 
 const defaultData: OwnerAdminData = {
   owner: {
-    code: 'SING',
-    number: 'MGS07-2011-07-00',
-    name: 'CABINTOY, BERNADITA B. HRS. OF',
-    address: 'P-6, POBLACION, MAGALLANES, AGUSAN DEL NTE.',
+    code: '',
+    number: '',
+    name: '',
+    address: '',
   },
   administrator: {
-    code: 'SING',
-    number: 'MGS07-2011-07-00',
-    name: 'REP. BY: SERGIO B. CABINTOY',
-    address: 'P-6, POBLACION, MAGALLANES, AGUSAN DEL NTE.',
+    code: '',
+    number: '',
+    name: '',
+    address: '',
   },
 };
 
@@ -53,6 +53,21 @@ const codeOptions = [
   { value: 'HRS', label: 'HRS - Heirs' },
 ];
 
+const emptyData: OwnerAdminData = {
+  owner: {
+    code: '',
+    number: '',
+    name: '',
+    address: '',
+  },
+  administrator: {
+    code: '',
+    number: '',
+    name: '',
+    address: '',
+  },
+};
+
 const PropertyOwnerSection: React.FC<PropertyOwnerSectionProps> = ({ isEnabled, selectedRecord }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const [data, setData] = useState<OwnerAdminData>(defaultData);
@@ -62,18 +77,20 @@ const PropertyOwnerSection: React.FC<PropertyOwnerSectionProps> = ({ isEnabled, 
       setData(prev => ({
         ...prev,
         owner: {
-          code: selectedRecord.OWN_CD || 'SING', // Map OWN_CD
+          code: selectedRecord.OWN_CD || 'SING',
           number: selectedRecord.ownerNo || '',
           name: selectedRecord.owner || '',
-          address: selectedRecord.Owner_Address || '', // Assuming Owner_Address exists
+          address: selectedRecord.Owner_Address || '',
         },
         administrator: {
-          code: selectedRecord.ADM_CD || 'SING', // Map ADM_CD
-          number: selectedRecord.ADMIN_NO || '', // Map ADMIN_NO
-          name: selectedRecord.Administrator_Name || '', // Need to ensure this field exists or map appropriately
-          address: selectedRecord.Administrator_Address || '', // Need to ensure this field exists
+          code: selectedRecord.ADM_CD || 'SING',
+          number: selectedRecord.ADMIN_NO || '',
+          name: selectedRecord.Administrator_Name || '',
+          address: selectedRecord.Administrator_Address || '',
         }
       }));
+    } else {
+      setData(emptyData);
     }
   }, [selectedRecord]);
 

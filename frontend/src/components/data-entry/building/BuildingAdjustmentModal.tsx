@@ -37,9 +37,10 @@ const BuildingAdjustmentModal: React.FC<BuildingAdjustmentModalProps> = ({
     setRecords(initialAdjustments);
   }, [initialAdjustments]);
 
-  useEffect(() => {
-    onUpdate?.(records);
-  }, [records, onUpdate]);
+  // Removed automatic onUpdate to prevent infinite loop
+  // useEffect(() => {
+  //   onUpdate?.(records);
+  // }, [records, onUpdate]);
 
   const [selectedRecord, setSelectedRecord] = useState<BldgAdjRecord | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -109,7 +110,9 @@ const BuildingAdjustmentModal: React.FC<BuildingAdjustmentModalProps> = ({
       try {
         const success = await deleteBldgAdj(buildingId, selectedRecord.SeqNo);
         if (success) {
+          const newRecords = records.filter(r => r.SeqNo !== selectedRecord.SeqNo);
           setRecords(prev => prev.filter(r => r.SeqNo !== selectedRecord.SeqNo));
+          onUpdate?.(newRecords);
           setSelectedRecord(null);
           setFormData({ 
             bldgCode: structures.length > 0 ? structures[0].BldgCode : '',
@@ -150,7 +153,9 @@ const BuildingAdjustmentModal: React.FC<BuildingAdjustmentModalProps> = ({
       if (isAdding) {
         const newRecord = await createBldgAdj(recordData);
         if (newRecord) {
+          const newRecords = [...records, newRecord];
           setRecords(prev => [...prev, newRecord]);
+          onUpdate?.(newRecords);
           setSelectedRecord(newRecord);
           setIsEditing(false);
           setIsAdding(false);
@@ -159,7 +164,9 @@ const BuildingAdjustmentModal: React.FC<BuildingAdjustmentModalProps> = ({
         if (!selectedRecord?.SeqNo) return;
         const updatedRecord = await updateBldgAdj(buildingId, selectedRecord.SeqNo, recordData);
         if (updatedRecord) {
+          const newRecords = records.map(r => r.SeqNo === selectedRecord.SeqNo ? updatedRecord : r);
           setRecords(prev => prev.map(r => r.SeqNo === selectedRecord.SeqNo ? updatedRecord : r));
+          onUpdate?.(newRecords);
           setSelectedRecord(updatedRecord);
           setIsEditing(false);
           setIsAdding(false);

@@ -201,7 +201,7 @@ WHERE
     
     
     m.TDN IS NOT NULL
-    AND TAX_BEG_YR > 2022
+  
     AND m.OWNER_NO is not null
 `;
 

@@ -21,15 +21,32 @@ const defaultData: BoundaryData = {
   street: '',
   streetName: '',
   location: '',
-  north: '04 (92-B)-HRS. OF R. B. JUSTAN',
-  south: '02 (97)-Z. MASINDO',
-  east: '14 (92-E)-HRS. OF C. P. BURON',
-  west: 'BARANGAY STO. ROSARIO / PROVINCIAL ROAD',
+  north: '',
+  south: '',
+  east: '',
+  west: '',
+};
+
+const emptyData: BoundaryData = {
+  street: '',
+  streetName: '',
+  location: '',
+  north: '',
+  south: '',
+  east: '',
+  west: '',
 };
 
 const PropertyBoundariesSection: React.FC<PropertyBoundariesSectionProps> = ({ isEnabled, selectedRecord }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const [data, setData] = useState<BoundaryData>(defaultData);
+
+  React.useEffect(() => {
+    // Reset to empty data on mount if no record selected
+    if (!selectedRecord) {
+      setData(emptyData);
+    }
+  }, []); // Run once on mount
 
   React.useEffect(() => {
     if (selectedRecord) {
@@ -42,6 +59,8 @@ const PropertyBoundariesSection: React.FC<PropertyBoundariesSectionProps> = ({ i
         east: selectedRecord.EAST || '',
         west: selectedRecord.WEST || '',
       });
+    } else {
+      setData(emptyData);
     }
   }, [selectedRecord]);
 

@@ -5,7 +5,7 @@ import {
   User, MapPin, Info, DollarSign, GripHorizontal
 } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
-import { getRptMastDataDirect, RptMastRecord } from '@/services/rptMastService';
+import { getRptMastDataDirect, RptMastRecord, getMastExtn } from '@/services/rptMastService';
 import { getRptAssByTdn, RptAssRecord } from '@/services/rptAssService';
 import PropertyInformationSection from './PropertyInformationSection';
 import PropertyOwnerSection from './PropertyOwnerSection';
@@ -293,23 +293,23 @@ const RealPropertyDataEntry: React.FC = () => {
         totalPages: apiData.pagination.totalPages
       }));
 
-      // Select first record if none selected
-      if (mappedRecords.length > 0 && !selectedRecord) {
-        const firstRecord = mappedRecords[0];
-        setSelectedRecord(firstRecord);
+      // Select first record if none selected and not adding
+      // if (mappedRecords.length > 0 && !selectedRecord && !isAdding) {
+      //   const firstRecord = mappedRecords[0];
+      //   setSelectedRecord(firstRecord);
         
-        // Fetch assessments for default selection
-        setIsAssessmentLoading(true);
-        getRptAssByTdn(firstRecord.tdn)
-          .then(setAssessmentRecords)
-          .catch((err) => {
-            console.error(err);
-            setAssessmentRecords([]);
-          })
-          .finally(() => setIsAssessmentLoading(false));
-      }
+      //   // Fetch assessments for default selection
+      //   setIsAssessmentLoading(true);
+      //   getRptAssByTdn(firstRecord.tdn)
+      //     .then(setAssessmentRecords)
+      //     .catch((err) => {
+      //       console.error(err);
+      //       setAssessmentRecords([]);
+      //     })
+      //     .finally(() => setIsAssessmentLoading(false));
+      // }
     }
-  }, [apiData, selectedRecord]);
+  }, [apiData, selectedRecord, isAdding]);
 
   // Error handling
   useEffect(() => {
@@ -345,6 +345,7 @@ const RealPropertyDataEntry: React.FC = () => {
     setIsAdding(true);
     setIsEditing(false);
     setSelectedRecord(null);
+    setAssessmentRecords([]); // Clear assessment records
   };
 
   const handleEdit = () => {

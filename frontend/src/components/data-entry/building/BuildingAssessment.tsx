@@ -123,6 +123,44 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
   const [isStructureOpen, setIsStructureOpen] = useState(false);
   const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
 
+  const handleStructureUpdate = (updatedStructures: BldgStrucRecord[]) => {
+    setStructures(updatedStructures);
+    
+    // Sync structure values to main form if a structure exists
+    // Since we enforce 1:1, we take the first one
+    if (updatedStructures.length > 0) {
+      const structure = updatedStructures[0];
+      const newArea = structure.Floor_area || 0;
+      const newUnitValue = structure.UNIT_VALUE || 0;
+      
+      // Update FormData (for display and computed values)
+      setFormData(prev => ({
+        ...prev,
+        area: newArea.toString(),
+        unitValue: newUnitValue.toString(),
+      }));
+
+      // Update Selected Record and Records Array (to persist changes locally and avoid revert on Cancel)
+      if (selectedRecord) {
+        const baseMarketValue = newArea * newUnitValue;
+        const adjustedMarketValue = baseMarketValue * (selectedRecord.assessmentLevel / 100);
+        const assessedValue = adjustedMarketValue; // Simplified logic matches existing code
+
+        const updatedRecord = {
+          ...selectedRecord,
+          area: newArea,
+          unitValue: newUnitValue,
+          baseMarketValue,
+          adjustedMarketValue,
+          assessedValue,
+        };
+
+        setSelectedRecord(updatedRecord);
+        setRecords(prev => prev.map(r => r.id === selectedRecord.id ? updatedRecord : r));
+      }
+    }
+  };
+
   // Load adjustments and structures when record is selected
   useEffect(() => {
     if (selectedRecord && selectedRecord.id) {
@@ -420,7 +458,7 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
           <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1 self-center" />
           <button
             onClick={() => setIsStructureOpen(true)}
-            disabled={!selectedRecord || isLocalFormEnabled}
+            disabled={!selectedRecord}
             className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 text-indigo-600 dark:text-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Hammer size={14} />
@@ -507,34 +545,38 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
         </table>
       </div>
 
+      {/* Total Assessment Summary */}
+      <div className="bg-slate-100 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 px-4 py-3 rounded-b-lg">
+        <div className="flex justify-end gap-8 text-sm">
+          <div className="flex flex-col items-end">
+            <span className="text-slate-500 dark:text-slate-400 text-xs">Total Base Market Value</span>
+            <span className="font-bold text-slate-800 dark:text-white">
+              {formatCurrency(records.reduce((sum, r) => sum + (r.baseMarketValue || 0), 0))}
+            </span>
+          </div>
+          <div className="flex flex-col items-end">
+            <span className="text-slate-500 dark:text-slate-400 text-xs">Total Adjusted Market Value</span>
+            <span className="font-bold text-slate-800 dark:text-white">
+              {formatCurrency(records.reduce((sum, r) => sum + (r.adjustedMarketValue || 0), 0))}
+            </span>
+          </div>
+          <div className="flex flex-col items-end">
+            <span className="text-slate-500 dark:text-slate-400 text-xs">Total Assessed Value</span>
+            <span className="font-bold text-blue-600 dark:text-blue-400 text-base">
+              {formatCurrency(records.reduce((sum, r) => sum + (r.assessedValue || 0), 0))}
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* Modals */}
       <BuildingStructureModal
         open={isStructureOpen}
         onOpenChange={setIsStructureOpen}
         buildingId={selectedRecord?.id || ''}
-        isFormEnabled={isFormEnabled || true} // Always allow editing in modal if parent record is selected? Or strictly follow parent?
-        // Actually, in the Tab version, isFormEnabled was passed.
-        // If we want the modal to be "Manager", we probably want to allow editing inside it
-        // independent of the main form's "Edit" state, OR we follow the main form.
-        // In Land Assessment, Trees/Adjustment buttons are disabled if !selectedRecord.
-        // But once open, can we edit?
-        // In Land Assessment, isLocalFormEnabled was checked in the modal logic?
-        // No, LandAssessment passed `adjustments` and `trees` and handled save locally.
-        // Here, BuildingAssessment passes `buildingId` and the modal handles API calls.
-        // So the Modal should probably manage its own edit state.
-        // Let's pass `isFormEnabled={true}` to allow the modal to handle its own CRUD?
-        // Or should we only allow editing structures if the main record is locked?
-        // Usually sub-records can be edited anytime if the parent exists.
-        // Let's pass `isFormEnabled={true}` effectively letting the modal decide,
-        // BUT the buttons in the toolbar are disabled if !selectedRecord.
-        // Wait, the previous Tab implementation used `isFormEnabled` which came from `isEditing || isAdding`.
-        // This meant you could ONLY edit structures when the MAIN record was in edit mode.
-        // If we want to change that to "Independent Edit", we pass true.
-        // The user asked "use modal instead of tab structure".
-        // In LandAssessment, I implemented independent modals (Trees/Adjustment).
-        // Let's try to make it independent for better UX (so you don't have to put the whole building in edit mode just to add a structure).
+        isFormEnabled={isFormEnabled}
         initialStructures={structures}
-        onUpdate={setStructures}
+        onUpdate={handleStructureUpdate}
       />
       <BuildingAdjustmentModal
         open={isAdjustmentOpen}
@@ -547,7 +589,7 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
       />
 
       {/* Form Section */}
-      <div className="border-t border-slate-200 dark:border-slate-700 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-b-lg">
+      <div className="border-t border-slate-200 dark:border-slate-700 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-b-lg mt-4">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column */}
           <div className="space-y-3">

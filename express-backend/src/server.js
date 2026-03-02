@@ -29,6 +29,9 @@ const bldgStrucRoutes = require('./routes/bldgStrucRoutes');
 const mastExtnRoutes = require('./routes/mastExtnRoutes');
 const rptTreeRoutes = require('./routes/rptTreeRoutes');
 const rptMachRoutes = require('./routes/rptMachRoutes');
+const bldgUnitCostRoutes = require('./routes/bldgUnitCostRoutes');
+const bldgStrucTypeRoutes = require('./routes/bldgStrucTypeRoutes');
+const ordinanceRoutes = require('./routes/ordinanceRoutes');
 
 const app = express();
 
@@ -141,6 +144,9 @@ app.use('/api/bldg-struc', bldgStrucRoutes);
 app.use('/api/mastextn', mastExtnRoutes);
 app.use('/api/v1/rpt-tree', rptTreeRoutes);
 app.use('/api/v1/rpt-mach', rptMachRoutes);
+app.use('/api/bldg-unit-cost', bldgUnitCostRoutes);
+app.use('/api/bldg-struc-type', bldgStrucTypeRoutes);
+app.use('/api/ordinance', ordinanceRoutes);
 
 // Error Handler
 app.use(errorHandler);

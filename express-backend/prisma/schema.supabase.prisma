@@ -99,3 +99,36 @@ model UserRole {
   @@unique([userId, roleId])
   @@map("user_roles")
 }
+
+// Ordinance Models
+
+model BuildingType {
+  id          String   @id @default(uuid())
+  code        String   @unique // e.g., 'RES', 'COM', 'ACC'
+  name        String   // e.g., 'RESIDENTIAL BUILDING', 'ACCESSORY'
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  marketValues BuildingMarketValue[]
+
+  @@map("building_types")
+}
+
+model BuildingMarketValue {
+  id              String   @id @default(uuid())
+  ordinanceNo     String   @map("ordinance_no")
+  ordinanceDate   DateTime? @map("ordinance_date") @db.Date
+  effectivityDate DateTime @map("effectivity_date") @db.Date
+  
+  buildingTypeId  String   @map("building_type_id")
+  buildingType    BuildingType @relation(fields: [buildingTypeId], references: [id])
+  
+  structureClass  String   @map("structure_class") // e.g., 'I', 'II', 'III', 'IV', 'V'
+  subClass        String?  @map("sub_class") // e.g., 'A', 'B', 'C'
+  unitValue       Decimal  @map("unit_value") @db.Decimal(12, 2)
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("building_market_values")
+}
