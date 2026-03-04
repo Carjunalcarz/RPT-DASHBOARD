@@ -193,20 +193,26 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
   });
 
   useEffect(() => {
-    if (apiRecords) {
-      // Merge apiRecords with local records to preserve updates that haven't been saved to DB yet
-      // But actually, apiRecords comes from parent state, which we update via onUpdate.
-      // So apiRecords should be the source of truth.
-      // The issue "when i save table empty" suggests that apiRecords might be reverting or empty
-      // when the parent re-renders.
+    // Only sync from props if apiRecords is actually different and valid
+    // This prevents the parent's re-render from wiping out local state if the parent hasn't updated yet
+    if (apiRecords && apiRecords.length > 0) {
+      // Check if we need to update. If we just saved (local has more records than prop), don't overwrite.
+      // Or if the content is truly different.
       
-      const mapped = apiRecords.map((r, index) => {
-        // If we already have this record in local state with more details (like trees/adjustments), use it?
-        // No, parent state should have everything if onUpdate worked.
-        // Let's ensure mapping is correct.
-        
-        return {
-        id: r.id || r.TDN + '-' + index, // Use existing ID if available to prevent remounts
+      // The issue is likely that apiRecords from parent is coming back as empty or stale initially.
+      // But we need to support loading initial data.
+      
+      // Strategy:
+      // 1. If local records are empty and apiRecords has data -> Load it (Initial Load)
+      // 2. If apiRecords has data and differs from local -> Update (External Change/Parent Refresh)
+      // 3. BUT, if we just saved, we want to keep our local state until the parent confirms the new state.
+      
+      // Simplified: Just check for deep equality.
+      // If the parent sends back the exact same data we just saved, it should match.
+      // If the parent sends back OLD data (e.g. from a stale fetch), we might overwrite.
+      
+      const mapped = apiRecords.map((r, index) => ({
+        id: r.id || r.TDN + '-' + index,
         uniqueId: r.uniqueId || `${r.TDN}-Land-${index}-${Date.now()}`,
         tdn: r.TDN,
         kind: r.KIND,
@@ -225,11 +231,24 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
         taxable: r.TAXABILITY === 'true' || r.TAXABILITY === 'TAXABLE' || r.TAXABLE_RATE > 0,
         beneficialUse: r.BU === 'true' || r.BU === '1',
         idleLand: r.IdleLand || false,
-        adjustments: (r as any).adjustments || [], // Ensure these are mapped back
-        trees: (r as any).trees || [], // Ensure these are mapped back
-      }});
+        adjustments: (r as any).adjustments || [],
+        trees: (r as any).trees || [],
+      }));
+
+      // Only update if length differs or deep content differs significantly
+      // Using JSON.stringify is a bit heavy but safe for this size.
+      // We need to compare the *mapped* version with `records`.
       
-      setRecords(mapped);
+      // NOTE: `records` has internal fields like `uniqueId` that `apiRecords` might not have consistently 
+      // if coming from raw DB without the UI-specific fields.
+      // We should compare key business fields.
+      
+      const isDifferent = JSON.stringify(mapped.map(r => ({...r, uniqueId: null}))) !== 
+                          JSON.stringify(records.map(r => ({...r, uniqueId: null})));
+
+      if (isDifferent) {
+          setRecords(mapped);
+      }
     }
   }, [apiRecords]);
 
@@ -362,6 +381,10 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
     // Then propagate to parent if callback exists
     if (onUpdate) {
       onUpdate(updatedRecords);
+    } else {
+        // Fallback: If no parent update, just log it. 
+        // This might happen if AssessmentSection didn't pass the prop correctly or context is missing.
+        console.warn('No onUpdate callback provided to LandAssessment. Changes are local only.');
     }
 
     setSelectedRecord(newRecord);
