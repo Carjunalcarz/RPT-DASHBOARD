@@ -5,6 +5,32 @@ const sql = require('mssql');
 
 class RptAssService {
   /**
+   * Helper function to format area with unit based on default flag
+   * @param {number|string} area - The area value
+   * @param {boolean} isDefault - IF_DEFAULT flag (true = hectares, false = sq meters)
+   * @returns {string} Formatted area string (e.g. "3.5037 ha" or "3.5037 m²")
+   */
+  getAreaWithUnit(area, isDefault) {
+    const numericArea = parseFloat(area);
+    if (isNaN(numericArea)) return '0 m²'; // Fallback for invalid input
+    
+    // Format to 4 decimal places to match typical RPT precision
+    // Remove trailing zeros if needed? No, standard is usually fixed.
+    // Let's use simple string conversion or toFixed(4) based on example "3.5037"
+    // Using string conversion to preserve input precision if it's already a number, 
+    // or toFixed(4) if we want standard. 
+    // Example "3.5037" has 4 decimals.
+    
+    const formattedArea = numericArea.toString(); 
+    
+    if (isDefault) {
+      return `${formattedArea} ha`;
+    } else {
+      return `${formattedArea} m²`;
+    }
+  }
+
+  /**
    * Get all RPT_ASS records with filtering, sorting, and pagination
    */
   async getAll({ page = 1, limit = 100, sortBy = 'TDN', sortOrder = 'ASC', filters = {} }) {
@@ -31,22 +57,8 @@ class RptAssService {
         }
       });
       
-      // Fix for "Must declare scalar variable @TDN" error:
-      // When reusing the request object for the count query and then the main query,
-      // we need to make sure parameters are available.
-      // However, the error suggests that the parameter might be missing or scoped incorrectly.
-      // The issue is likely that `request.query()` clears parameters or `request` object is being reused improperly for the second query?
-      // No, mssql request parameters persist until cleared. 
-      // BUT, if we use `pool.request().query()` in the commented out line `const countResult = ...`, it would be a NEW request without params.
-      // The fix I just applied uses `request.query(countQuery)`, which SHOULD have the params.
-      // Let's ensure the main query execution also uses `request`.
-      
       // Count total records for pagination
       const countQuery = `SELECT COUNT(*) as total FROM (${query}) as sub`;
-      // Optimization: For dynamic filters, we need to pass the parameters again or reuse the request object.
-      // The previous request object already has inputs added.
-      // However, we need to be careful not to execute the main query first if we want to reuse the request object easily.
-      // Actually, mssql request object inputs are preserved.
       
       const totalCountResult = await request.query(countQuery);
       const total = totalCountResult.recordset[0].total;
@@ -56,19 +68,17 @@ class RptAssService {
       query += ` ORDER BY ${sortBy} ${sortOrder} OFFSET ${(page - 1) * limit} ROWS FETCH NEXT ${limit} ROWS ONLY`;
 
       logger.info(`Executing RPT_ASS getAll query`);
-      // We must create a new request for the second query because the first one might have consumed the parameters?
-      // No, in tedious/mssql, parameters are attached to the request object.
-      // However, executing a query might clear them or reset state.
-      // To be safe, let's just re-add parameters to a new request if needed, or check if we can reuse.
-      // Actually, standard practice is to use a new request or re-declare params.
-      // The error "Must declare the scalar variable" means the parameter wasn't sent.
-      
-      
       
       const result = await request2.query(query);
 
+      // Enhance result with formatted area
+      const enhancedData = result.recordset.map(record => ({
+        ...record,
+        formattedArea: this.getAreaWithUnit(record.AREA, record.IF_DEFAULT)
+      }));
+
       return {
-        data: result.recordset,
+        data: enhancedData,
         pagination: {
           page: Number(page),
           limit: Number(limit),
@@ -84,11 +94,6 @@ class RptAssService {
 
   /**
    * Get a single record by TDN (assuming TDN is unique/primary key for this context, or pass composite key if needed)
-   * The prompt says "primary key", but usually RPT systems use composite keys (TDN usually unique per property, but check constraints).
-   * For this implementation, we'll assume TDN is the identifier or we need an ID field. 
-   * Checking schema isn't possible directly but standard practice uses ID or TDN.
-   * Let's assume there's an ID column or we use TDN. The prompt says `DELETE /api/rpt-ass/{id}`, implies single ID.
-   * If `TDN` is string, it fits.
    */
   async getById(id) {
     try {
@@ -101,7 +106,11 @@ class RptAssService {
         throw new AppError('Record not found', 404);
       }
 
-      return result.recordset[0];
+      const record = result.recordset[0];
+      return {
+        ...record,
+        formattedArea: this.getAreaWithUnit(record.AREA, record.IF_DEFAULT)
+      };
     } catch (error) {
       if (error instanceof AppError) throw error;
       logger.error('Error in RptAssService.getById:', error);

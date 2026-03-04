@@ -28,6 +28,27 @@ export interface RptTreeResponse {
   };
 }
 
+export interface TreeLibraryRecord {
+  Region: string;
+  Prov: string;
+  City: string;
+  Code: string;
+  Description: string;
+  Eff_Date: string;
+  Rate: number;
+  NFB_Rate: number;
+}
+
+export const getTreeLibrary = async (): Promise<TreeLibraryRecord[]> => {
+  try {
+    const response = await api.get<{ status: string; data: TreeLibraryRecord[] }>('/rpt-tree/library');
+    return response.data.data;
+  } catch (error) {
+    console.error('Error fetching tree library:', error);
+    return [];
+  }
+};
+
 export const getTreesByTdn = async (tdn: string): Promise<RptTreeRecord[]> => {
   try {
     const response = await api.get<RptTreeResponse>(`/rpt-tree/${tdn}`);

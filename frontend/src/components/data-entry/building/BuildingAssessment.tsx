@@ -1,12 +1,14 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, Building2, ArrowDownUp, Hammer } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, Building2, ArrowDownUp, Hammer, ChevronDown, Sparkles } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { RptAssRecord } from '@/services/rptAssService';
 import { getBldgAdjByTdn, BldgAdjRecord } from '@/services/bldgAdjService';
 import { getBldgStrucByTdn, BldgStrucRecord } from '@/services/bldgStrucService';
-import { getClassifications, getActualUses, getSubClasses, Classification, ActualUse, SubClass } from '@/services/classificationService';
+import { getBuildingTypes, getBuildingAppraisals, BuildingType, BuildingAppraisal } from '@/services/buildingService';
 import BuildingStructureModal from './BuildingStructureModal';
 import BuildingAdjustmentModal from './BuildingAdjustmentModal';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { dummyBuildingFormData } from '../faas/dummyData';
 
 // Types
 interface BuildingRecord {
@@ -94,58 +96,63 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
   const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
 
   // Dynamic Options State
-  const [classificationOptions, setClassificationOptions] = useState<Classification[]>([]);
-  const [actualUseOptions, setActualUseOptions] = useState<ActualUse[]>([]);
-  const [subClassOptions, setSubClassOptions] = useState<SubClass[]>([]);
+  const [buildingTypes, setBuildingTypes] = useState<BuildingType[]>([]);
+  const [appraisals, setAppraisals] = useState<BuildingAppraisal[]>([]);
+  const [structureClasses, setStructureClasses] = useState<string[]>([]);
+  const [subClasses, setSubClasses] = useState<string[]>([]);
 
-  // Load Classifications on Mount
+  // Load Building Types on Mount
   useEffect(() => {
-    getClassifications()
-      .then(setClassificationOptions)
-      .catch(err => console.error('Failed to load classifications', err));
+    getBuildingTypes()
+      .then(setBuildingTypes)
+      .catch(err => console.error('Failed to load building types', err));
   }, []);
 
-  // Load Actual Uses when Classification changes
+  // Load Appraisals when Classification (Building Type) changes
   useEffect(() => {
-    // If no classification is selected, don't fetch anything (or clear existing)
     if (formData.classification) {
-      // Clear existing options first to avoid stale data while loading
-      setActualUseOptions([]);
-      setSubClassOptions([]);
-      
-      // Fetch filtered options
-      getActualUses({ mainClass: formData.classification })
+      getBuildingAppraisals({ classificationCode: formData.classification })
         .then(data => {
-            // Double-check client-side filtering if API returns everything
-            const filtered = data.filter(item => item.MainClass === formData.classification);
-            setActualUseOptions(filtered);
+          setAppraisals(data);
+          // Derive structure classes (unique)
+          const uniqueStructures = Array.from(new Set(data.map(a => a.buildingType.trim()))).sort();
+          setStructureClasses(uniqueStructures);
         })
-        .catch(err => console.error('Failed to load actual uses', err));
+        .catch(err => console.error('Failed to load appraisals', err));
     } else {
-      setActualUseOptions([]);
-      setSubClassOptions([]);
+      setAppraisals([]);
+      setStructureClasses([]);
     }
   }, [formData.classification]);
 
-  // Load SubClasses when Actual Use changes
+  // Update SubClasses when Actual Use (Structure Class) changes
   useEffect(() => {
-    if (formData.actualUse && formData.classification) {
-      // Fetch filtered options based on selected Actual Use code (prefix match)
-      getSubClasses({ 
-        mainClass: formData.classification,
-        actualUseCode: formData.actualUse 
-      })
-        .then(data => {
-            // Optional: Client-side filtering if needed
-            // Ensure subclasses belong to the correct main class
-            const filtered = data.filter(item => item.MainClass === formData.classification);
-            setSubClassOptions(filtered);
-        })
-        .catch(err => console.error('Failed to load subclasses', err));
+    if (formData.actualUse && appraisals.length > 0) {
+      const filtered = appraisals.filter(a => a.buildingType.trim() === formData.actualUse.trim());
+      const uniqueSubClasses = Array.from(new Set(filtered.map(a => (a.buildingSubClass || 'NONE').trim()))).sort();
+      setSubClasses(uniqueSubClasses);
     } else {
-      setSubClassOptions([]);
+      setSubClasses([]);
     }
-  }, [formData.actualUse, formData.classification]);
+  }, [formData.actualUse, appraisals]);
+
+  // Update Unit Value when SubClass changes
+  useEffect(() => {
+    if (formData.classification && formData.actualUse && formData.subClass) {
+       // Find matching appraisal
+       const match = appraisals.find(a => 
+         a.buildingType.trim() === formData.actualUse.trim() && 
+         ((a.buildingSubClass || 'NONE').trim() === formData.subClass.trim())
+       );
+       
+       if (match) {
+         setFormData(prev => ({
+           ...prev,
+           unitValue: match.rate.toString()
+         }));
+       }
+    }
+  }, [formData.classification, formData.actualUse, formData.subClass, appraisals]);
 
   const handleStructureUpdate = (updatedStructures: BldgStrucRecord[]) => {
     setStructures(updatedStructures);
@@ -154,12 +161,19 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
     // Since we enforce 1:1, we take the first one
     if (updatedStructures.length > 0) {
       const structure = updatedStructures[0];
-      const newArea = structure.Floor_area || 0;
+      const newArea = structure.Floor_area || structure.Total_Area || 0;
       const newUnitValue = structure.UNIT_VALUE || 0;
       
       // Update FormData (for display and computed values)
+      // Map structure fields to assessment fields:
+      // classification -> Classification
+      // actualUse -> Struc_type (Structural Type)
+      // subClass -> SubClass
       setFormData(prev => ({
         ...prev,
+        classification: structure.Classification || (structure as any).classification || prev.classification,
+        actualUse: structure.Struc_type || prev.actualUse,
+        subClass: structure.SubClass || (structure as any).subClass || prev.subClass,
         area: newArea.toString(),
         unitValue: newUnitValue.toString(),
       }));
@@ -172,6 +186,9 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
 
         const updatedRecord = {
           ...selectedRecord,
+          classification: structure.Classification || (structure as any).classification || selectedRecord.classification,
+          actualUse: structure.Struc_type || selectedRecord.actualUse,
+          subClass: structure.SubClass || (structure as any).subClass || selectedRecord.subClass,
           area: newArea,
           unitValue: newUnitValue,
           baseMarketValue,
@@ -293,6 +310,10 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
     // Clear sub-lists for new record
     setAdjustments([]);
     setStructures([]);
+  };
+
+  const handlePopulateDummy = () => {
+    setFormData(dummyBuildingFormData);
   };
 
   // Handle Edit
@@ -425,6 +446,17 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
             <Plus size={14} />
             Add
           </button>
+          
+          {isAdding && (
+            <button
+              onClick={handlePopulateDummy}
+              className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 text-purple-700 dark:text-purple-400"
+              title="Populate Dummy Data"
+            >
+              <Sparkles size={14} />
+            </button>
+          )}
+
           <button
             onClick={handleEdit}
             disabled={!selectedRecord || !canModify}
@@ -601,6 +633,11 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
         isFormEnabled={isFormEnabled}
         initialStructures={structures}
         onUpdate={handleStructureUpdate}
+        parentClassification={formData.classification}
+        parentStructureType={formData.actualUse}
+        parentSubType={formData.subClass}
+        parentArea={formData.area}
+        parentUnitValue={formData.unitValue}
       />
       <BuildingAdjustmentModal
         open={isAdjustmentOpen}
@@ -618,69 +655,91 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
           {/* Left Column */}
           <div className="space-y-3">
             {/* Classification */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 relative">
               <label className="w-28 text-xs font-medium text-slate-700 dark:text-slate-300 text-right">
                 Classification:
               </label>
-              <select
-                value={formData.classification}
-                onChange={(e) => setFormData(prev => ({ ...prev, classification: e.target.value }))}
-                disabled={!isFormEnabled}
-                className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
-                data-testid="input-classification"
-              >
-                <option value="">Select Classification</option>
-                {classificationOptions.map((opt, index) => (
-                  <option key={`${opt.Code}-${index}`} value={opt.Code}>{opt.Code} - {opt.Description}</option>
-                ))}
-              </select>
+              
+              {/* Custom Dropdown Container */}
+              <div className="flex-1 relative min-w-0">
+                <Select
+                  value={formData.classification}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, classification: value }))}
+                  disabled={!isFormEnabled}
+                >
+                  <SelectTrigger 
+                    className={`w-full h-8 text-xs bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 ${!isFormEnabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    data-testid="input-classification"
+                  >
+                    <span className="truncate">
+                      {formData.classification ? formData.classification : "Select Classification"}
+                    </span>
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    {buildingTypes.map((bt) => (
+                      <SelectItem key={bt.id} value={bt.code} className="text-xs">
+                        {bt.code} - {bt.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            {/* Actual Use */}
+            {/* Actual Use (Renamed to Structural Type) */}
             <div className="flex items-center gap-2">
               <label className="w-28 text-xs font-medium text-slate-700 dark:text-slate-300 text-right">
-                Actual Use:
+                Structural Type:
               </label>
-              <select
-                value={formData.actualUse}
-                onChange={(e) => {
-                  const selected = e.target.value;
-                  const selectedOption = actualUseOptions.find(opt => opt.Code === selected);
-                  setFormData(prev => ({ 
-                    ...prev, 
-                    actualUse: selected,
-                    // Auto-populate unit value if available from Actual Use
-                    unitValue: selectedOption?.MValue ? selectedOption.MValue.toString() : prev.unitValue
-                  }));
-                }}
-                disabled={!isFormEnabled}
-                className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
-                data-testid="input-actual-use"
-              >
-                <option value="">Select Actual Use</option>
-                {actualUseOptions.map((opt, index) => (
-                  <option key={`${opt.Code}-${opt.MainClass}-${index}`} value={opt.Code}>{opt.Code} - {opt.Description}</option>
-                ))}
-              </select>
+              <div className="flex-1 relative min-w-0">
+                <Select
+                  value={formData.actualUse}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, actualUse: value }))}
+                  disabled={!isFormEnabled}
+                >
+                  <SelectTrigger 
+                    className={`w-full h-8 text-xs bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 ${!isFormEnabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    data-testid="input-actual-use"
+                  >
+                    <SelectValue placeholder="Select Structural Type" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    {structureClasses.map((sc, index) => (
+                      <SelectItem key={`${sc}-${index}`} value={sc} className="text-xs">
+                        {sc}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            {/* Sub Class */}
+            {/* Sub Class (Renamed to Sub Type) */}
             <div className="flex items-center gap-2">
               <label className="w-28 text-xs font-medium text-slate-700 dark:text-slate-300 text-right">
-                Sub Class:
+                Sub Type:
               </label>
-              <select
-                value={formData.subClass}
-                onChange={(e) => setFormData(prev => ({ ...prev, subClass: e.target.value }))}
-                disabled={!isFormEnabled}
-                className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
-                data-testid="input-sub-class"
-              >
-                <option value="">Select Sub Class</option>
-                {subClassOptions.map((opt, index) => (
-                  <option key={`${opt.Code}-${opt.MainClass}-${index}`} value={opt.Code}>{opt.Code} - {opt.Description}</option>
-                ))}
-              </select>
+              <div className="flex-1 relative min-w-0">
+                <Select
+                  value={formData.subClass}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, subClass: value }))}
+                  disabled={!isFormEnabled}
+                >
+                  <SelectTrigger 
+                    className={`w-full h-8 text-xs bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 ${!isFormEnabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    data-testid="input-sub-class"
+                  >
+                    <SelectValue placeholder="Select Sub Type" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[300px]">
+                    {subClasses.map((sub, index) => (
+                      <SelectItem key={`${sub}-${index}`} value={sub} className="text-xs">
+                        {sub}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {/* Area */}

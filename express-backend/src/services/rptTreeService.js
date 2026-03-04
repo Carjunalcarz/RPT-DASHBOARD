@@ -19,7 +19,9 @@ class RptTreeService {
       
       let query = `
         SELECT ${columns} FROM RPTAS_AGUSAN.dbo.RPT_TREE
+        
         WHERE 1=1
+
       `;
 
       // Dynamic Filtering
@@ -73,6 +75,37 @@ class RptTreeService {
    */
   async getByTdn(tdn) {
     return this.getAll({ filters: { TDN: tdn } });
+  }
+
+  /**
+   * Get tree reference library (joined with rates)
+   */
+  async getTreeLibrary() {
+    try {
+      const pool = await poolPromise;
+      const request = pool.request();
+      
+      const query = `
+        SELECT 
+             te.Region, 
+             te.Prov, 
+             te.City, 
+             te.Code, 
+             t.Description, 
+             te.Eff_Date, 
+             te.Rate, 
+             te.NFB_Rate 
+         FROM RPTAS_AGUSAN.dbo.TREES_EXTN te 
+         INNER JOIN RPTAS_AGUSAN.dbo.TREES t 
+             ON te.Code = t.Code;
+      `;
+      
+      const result = await request.query(query);
+      return result.recordset;
+    } catch (error) {
+      logger.error('Error in RptTreeService.getTreeLibrary:', error);
+      throw new AppError('Database query failed', 500);
+    }
   }
 }
 

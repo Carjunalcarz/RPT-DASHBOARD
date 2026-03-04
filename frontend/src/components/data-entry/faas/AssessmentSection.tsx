@@ -9,11 +9,12 @@ interface AssessmentSectionProps {
   isEnabled?: boolean;
   assessmentRecords?: RptAssRecord[];
   isLoading?: boolean;
+  onUpdate?: (updatedRecords: RptAssRecord[]) => void;
 }
 
 type AssessmentType = 'land' | 'building' | 'machinery';
 
-const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assessmentRecords = [], isLoading = false }) => {
+const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assessmentRecords = [], isLoading = false, onUpdate }) => {
   const [activeType, setActiveType] = useState<AssessmentType>('land'); // Default to land as it's often the base
 
   // Filter records by type
@@ -21,6 +22,15 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assess
   const landRecords = assessmentRecords.filter(r => r.KIND === 'L' || r.KIND === 'Land');
   const buildingRecords = assessmentRecords.filter(r => r.KIND === 'B' || r.KIND === 'Building');
   const machineryRecords = assessmentRecords.filter(r => r.KIND === 'M' || r.KIND === 'Machinery');
+
+  // Handle updates from child components
+  const handleLandUpdate = (updatedLandRecords: any[]) => {
+    // Merge updated land records back into the main list
+    // We need to replace the old land records with the new ones, while keeping building/machinery records
+    const otherRecords = assessmentRecords.filter(r => r.KIND !== 'L' && r.KIND !== 'Land');
+    const newRecords = [...otherRecords, ...updatedLandRecords];
+    if (onUpdate) onUpdate(newRecords);
+  };
 
   // Auto-switch tab based on available data or first record
   useEffect(() => {
@@ -102,6 +112,7 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assess
           <LandAssessment
             records={landRecords}
             isEnabled={isEnabled}
+            onUpdate={handleLandUpdate}
           />
         )}
 

@@ -124,6 +124,27 @@ router.get('/', rptTreeController.getAll.bind(rptTreeController));
 
 /**
  * @swagger
+ * /api/v1/rpt-tree/library:
+ *   get:
+ *     summary: Get tree reference library with rates
+ *     tags: [RPT Tree]
+ *     responses:
+ *       200:
+ *         description: List of tree references
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                 data:
+ *                   type: array
+ */
+router.get('/library', rptTreeController.getTreeLibrary.bind(rptTreeController));
+
+/**
+ * @swagger
  * /api/v1/rpt-tree/{tdn}:
  *   get:
  *     summary: Get tree records by TDN

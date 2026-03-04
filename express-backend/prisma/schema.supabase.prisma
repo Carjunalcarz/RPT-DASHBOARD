@@ -211,3 +211,40 @@ model Land_Agricultural {
   @@index([landType])
   @@map("land_agricultural")
 }
+
+model BuildingAppraisal {
+  id                 String   @id @default(uuid())
+  classification     String
+  classificationCode String   @map("classification_code")
+  buildingType       String   @map("building_type")
+  buildingSubClass   String?  @map("building_subclass")
+  rate               Decimal  @db.Decimal(12, 2)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @default(now()) @map("updated_at")
+
+  @@map("building_appraisals")
+}
+
+model FaasRecord {
+  id        String   @id @default(uuid())
+  tdn       String?  @unique
+  status    String   @default("draft") // draft, for-review, approved
+  data      Json
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("faas_records")
+}
+
+model MigrationLog {
+  id        Int      @id @default(autoincrement())
+  sourceId  String   @map("source_id") // TDN or ID from MSSQL
+  targetId  String   @map("target_id") // ID in Supabase FaasRecord
+  status    String   @default("synced")
+  timestamp DateTime @default(now())
+  details   Json?
+
+  @@index([sourceId])
+  @@map("migration_logs")
+}

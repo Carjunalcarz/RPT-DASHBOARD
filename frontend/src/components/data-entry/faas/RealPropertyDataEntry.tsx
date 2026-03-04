@@ -2,8 +2,9 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
   Plus, Edit2, Trash2, Save, X, RefreshCw, Printer,
   FileText, CreditCard, Search, ChevronDown, Building2,
-  User, MapPin, Info, DollarSign, GripHorizontal
+  User, MapPin, Info, DollarSign, GripHorizontal, Sparkles, Code
 } from 'lucide-react';
+import { dummyPropertyRecord, dummyAssessmentRecords } from './dummyData';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { getRptMastDataDirect, RptMastRecord, getMastExtn } from '@/services/rptMastService';
 import { getRptAssByTdn, RptAssRecord } from '@/services/rptAssService';
@@ -19,6 +20,13 @@ import OtherPropertyTab from '../OtherPropertyTab';
 import { toast } from 'sonner';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import useSWR from 'swr';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { saveDraft, submitForReview } from '@/services/faasService';
 
 // Types
 interface PropertyRecord {
@@ -81,6 +89,8 @@ interface PropertyRecord {
   tpdProv?: boolean;
   tpdCity?: boolean;
   tpdDeputy?: boolean;
+  trees?: any[];
+  status?: 'draft' | 'for-review' | 'approved';
 } // Add new field for display
 
 
@@ -112,6 +122,7 @@ const RealPropertyDataEntry: React.FC = () => {
 
   // Active tab state
   const [activeTab, setActiveTab] = useState('property-info');
+  const [showJson, setShowJson] = useState(false);
 
   // Filter Validation
   const validateFilter = (field: string, value: string): string | null => {
@@ -348,6 +359,108 @@ const RealPropertyDataEntry: React.FC = () => {
     setAssessmentRecords([]); // Clear assessment records
   };
 
+  const handlePopulateDummy = () => {
+    // Cast to any because the dummy record has extra fields (raw keys) that the interface doesn't strictly define
+    // but are required by the child components (PropertyInformationSection, etc.)
+    setSelectedRecord(dummyPropertyRecord as any);
+    setAssessmentRecords(dummyAssessmentRecords as any); // Populate assessment records
+    toast.success('Form populated with dummy data');
+  };
+
+  // Auto-save mechanism for sub-components
+  // This callback is passed down to children (AssessmentSection -> LandAssessment)
+  // When they save locally, we trigger a save to backend
+  const handleAutoSave = async (updatedAssessmentRecords: any[]) => {
+    // Update local state first
+    setAssessmentRecords(updatedAssessmentRecords);
+    
+    // Construct the full record payload
+    const dataToSave = {
+      ...selectedRecord,
+      assessments: updatedAssessmentRecords,
+      status: 'draft'
+    };
+
+    try {
+      // Sync to Supabase
+      const savedRecord = await saveDraft(dataToSave);
+      toast.success('Changes synced to server');
+      
+      // Update local ID if it was a new record
+      if (selectedRecord && (!selectedRecord.id || selectedRecord.id.includes('DUMMY'))) {
+          setSelectedRecord({
+              ...selectedRecord,
+              id: savedRecord.id,
+              status: 'draft'
+          });
+      }
+    } catch (error) {
+      console.error('Auto-save failed:', error);
+      toast.error('Failed to sync changes');
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    if (!selectedRecord) return;
+    try {
+      const dataToSave = {
+        ...selectedRecord,
+        assessments: assessmentRecords,
+        status: 'draft'
+      };
+      const savedRecord = await saveDraft(dataToSave);
+      toast.success('Draft saved successfully');
+      
+      // Update local state with the saved record (e.g. get the ID)
+      setSelectedRecord({
+        ...selectedRecord,
+        id: savedRecord.id, // Ensure we capture the backend ID
+        status: 'draft'
+      });
+    } catch (error) {
+      toast.error('Failed to save draft');
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedRecord) return;
+    try {
+      // First ensure it's saved
+      const dataToSave = {
+        ...selectedRecord,
+        assessments: assessmentRecords,
+        status: 'for-review' // Optimistically set status
+      };
+      
+      // If it's a new record (no ID), saveDraft will create it. 
+      // If it exists, we can use submitForReview or just saveDraft with status='for-review' 
+      // depending on backend implementation.
+      // My backend implementation of saveDraft handles creation.
+      // submitForReview updates status.
+      
+      let recordId = selectedRecord.id;
+      
+      if (!recordId || recordId.includes('DUMMY') || recordId.length < 10) {
+         // Create first
+         const saved = await saveDraft(dataToSave);
+         recordId = saved.id;
+      }
+      
+      await submitForReview(recordId!);
+      
+      toast.success('Record submitted for review');
+      setSelectedRecord({
+        ...selectedRecord,
+        id: recordId,
+        status: 'for-review'
+      });
+      setIsAdding(false);
+      setIsEditing(false);
+    } catch (error) {
+      toast.error('Failed to submit record');
+    }
+  };
+
   const handleEdit = () => {
     if (!selectedRecord) return;
     setIsEditing(true);
@@ -428,6 +541,48 @@ const RealPropertyDataEntry: React.FC = () => {
             <Plus size={14} />
             Add
           </button>
+          
+          {isAdding && (
+            <button
+              onClick={handlePopulateDummy}
+              className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-purple-700 dark:text-purple-400"
+              title="Populate Dummy Data"
+            >
+              <Sparkles size={14} />
+              Populate
+            </button>
+          )}
+
+          <button
+            onClick={handleSaveDraft}
+            disabled={!selectedRecord || selectedRecord.status === 'for-review' || selectedRecord.status === 'approved'}
+            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-blue-700 dark:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Save as Draft"
+          >
+            <Save size={14} />
+            Save Draft
+          </button>
+
+          <button
+            onClick={handleSubmit}
+            disabled={!selectedRecord || selectedRecord.status === 'for-review' || selectedRecord.status === 'approved'}
+            className="px-3 py-2 text-xs bg-green-600 hover:bg-green-700 text-white border border-transparent rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Submit for Review"
+          >
+            <Save size={14} />
+            Submit
+          </button>
+
+          <button
+            onClick={() => setShowJson(true)}
+            disabled={!selectedRecord}
+            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-orange-700 dark:text-orange-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Show JSON Data"
+          >
+            <Code size={14} />
+            JSON
+          </button>
+
           <button
             onClick={handleEdit}
             disabled={!selectedRecord || isFormEnabled}
@@ -749,6 +904,7 @@ const RealPropertyDataEntry: React.FC = () => {
                 isEnabled={isFormEnabled}
                 assessmentRecords={assessmentRecords}
                 isLoading={isAssessmentLoading}
+                onUpdate={handleAutoSave}
               />
             )}
             
@@ -787,6 +943,33 @@ const RealPropertyDataEntry: React.FC = () => {
           </div>
         </div>
       </div>
+      {/* JSON Viewer Modal */}
+      <Dialog open={showJson} onOpenChange={setShowJson}>
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Form Data (JSON)</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto bg-slate-950 p-4 rounded-lg text-xs font-mono text-green-400">
+            <pre>
+              {JSON.stringify({
+                ...selectedRecord,
+                assessments: assessmentRecords.map(ass => ({
+                  ...ass,
+                  // Include trees if they exist on the record (assuming we store them on the assessment record in frontend state)
+                  // Note: In current implementation, trees might be stored inside the assessment record object in state
+                  // or fetched separately. If they are in `ass.trees`, this will show them.
+                  // If they are separate state, we'd need to merge them.
+                  // Based on LandAssessment.tsx: `trees: selectedRecord?.trees || [],`
+                  // So if we are looking at `assessmentRecords` from `RealPropertyDataEntry`, 
+                  // we need to make sure those records actually contain the `trees` property.
+                  // The `RptAssRecord` interface doesn't strictly have `trees` but `LandRecord` does.
+                  // Let's assume the state in LandAssessment updates the object reference in the array.
+                }))
+              }, null, 2)}
+            </pre>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

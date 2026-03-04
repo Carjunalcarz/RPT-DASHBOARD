@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, Settings, ArrowDownUp } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, Settings, ArrowDownUp, Sparkles } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { RptAssRecord } from '@/services/rptAssService';
 import { getClassifications, getActualUses, getSubClasses, Classification, ActualUse, SubClass } from '@/services/classificationService';
 import MachineryItemsModal from './MachineryItemsModal';
+import { dummyMachineryFormData } from '../faas/dummyData';
 
 interface MachineryAssessmentProps {
   records?: RptAssRecord[];
@@ -136,7 +137,7 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
         area: r.AREA || 0,
         unitValue: r.UNIT_VALUE || 0,
         baseMarketValue: r.MARKET_VAL || 0,
-        adjustedMarketValue: r.ADJ_MARKET_VAL || r.MARKET_VAL || 0, // Use Adjusted Market Value from API if available
+        adjustedMarketValue: (r as any).ADJ_MARKET_VAL || r.MARKET_VAL || 0, // Use Adjusted Market Value from API if available
         assessmentLevel: r.ASS_LEVEL || 0,
         assessedValue: r.ASS_VALUE || 0,
         taxable: r.TAXABILITY === 'true' || r.TAXABILITY === 'TAXABLE' || r.TAXABLE_RATE > 0,
@@ -191,6 +192,10 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
     setIsEditing(false);
     setSelectedRecord(null);
     setFormData(defaultFormData);
+  };
+
+  const handlePopulateDummy = () => {
+    setFormData(dummyMachineryFormData);
   };
 
   const handleEdit = () => {
@@ -296,6 +301,17 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
           <button onClick={handleAdd} disabled={!canModify} className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 border rounded shadow-sm flex items-center gap-1.5 disabled:opacity-50">
             <Plus size={14} /> Add
           </button>
+          
+          {isAdding && (
+            <button
+              onClick={handlePopulateDummy}
+              className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 border rounded shadow-sm flex items-center gap-1.5 text-purple-700 dark:text-purple-400"
+              title="Populate Dummy Data"
+            >
+              <Sparkles size={14} />
+            </button>
+          )}
+
           <button onClick={handleEdit} disabled={!selectedRecord || !canModify} className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 border rounded shadow-sm flex items-center gap-1.5 disabled:opacity-50">
             <Edit2 size={14} /> Edit
           </button>

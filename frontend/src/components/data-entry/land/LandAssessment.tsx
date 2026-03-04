@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, TreePine, ArrowDownUp, Trees, Loader2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, TreePine, ArrowDownUp, Trees, Loader2, Sparkles } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { RptAssRecord } from '@/services/rptAssService';
 import { getLandClassifications, getLandMarketValues, getMunicipalities, getAgriculturalTypes, LandClassification, LandMarketValue, Municipality } from '@/services/landTaxService';
 import LandAdjustmentModal, { LandAdjustment } from './LandAdjustmentModal';
 import TreesModal, { TreePlant } from './TreesModal';
+import { dummyLandFormData } from '../faas/dummyData';
 
 interface LandAssessmentProps {
   records?: RptAssRecord[];
   isEnabled?: boolean;
+  onUpdate?: (updatedRecords: any[]) => void;
 }
 
 interface LandRecord {
@@ -22,6 +24,7 @@ interface LandRecord {
   municipality?: string; // Added
   actualUse: string;
   area: number;
+  ifDefault: boolean; // Added IF_DEFAULT
   unitValue: number;
   baseMarketValue: number;
   adjustedMarketValue: number;
@@ -41,6 +44,7 @@ interface FormData {
   municipality: string; // Added Municipality
   actualUse: string; // Keep for compatibility but might be unused
   area: string;
+  ifDefault: boolean; // Added IF_DEFAULT
   unitValue: string;
   assessmentLevel: string;
   taxable: boolean;
@@ -56,6 +60,7 @@ const defaultFormData: FormData = {
   municipality: 'Buenavista', // Default
   actualUse: '',
   area: '',
+  ifDefault: true, // Default to true (Hectares)
   unitValue: '',
   assessmentLevel: '',
   taxable: true,
@@ -63,7 +68,7 @@ const defaultFormData: FormData = {
   idleLand: false,
 };
 
-const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, isEnabled }) => {
+const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, isEnabled, onUpdate }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const [records, setRecords] = useState<LandRecord[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<LandRecord | null>(null);
@@ -189,26 +194,41 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
 
   useEffect(() => {
     if (apiRecords) {
-      const mapped = apiRecords.map((r, index) => ({
-        id: r.TDN + '-' + index, // Use TDN + index as ID if multiple records share TDN or just for unique key
-        uniqueId: `${r.TDN}-Land-${index}-${Date.now()}`, // Add a truly unique key for rendering
+      // Merge apiRecords with local records to preserve updates that haven't been saved to DB yet
+      // But actually, apiRecords comes from parent state, which we update via onUpdate.
+      // So apiRecords should be the source of truth.
+      // The issue "when i save table empty" suggests that apiRecords might be reverting or empty
+      // when the parent re-renders.
+      
+      const mapped = apiRecords.map((r, index) => {
+        // If we already have this record in local state with more details (like trees/adjustments), use it?
+        // No, parent state should have everything if onUpdate worked.
+        // Let's ensure mapping is correct.
+        
+        return {
+        id: r.id || r.TDN + '-' + index, // Use existing ID if available to prevent remounts
+        uniqueId: r.uniqueId || `${r.TDN}-Land-${index}-${Date.now()}`,
         tdn: r.TDN,
         kind: r.KIND,
         classification: r.CLASSIFICATION,
         subClass: r.SUB_CLASS || '',
-        classLevel: r.CLASS_LEVEL || '1st', // Try to get from API or default
-        municipality: r.MUNICIPALITY || 'Buenavista', // Try to get from API or default
+        classLevel: (r as any).CLASS_LEVEL || '1st',
+        municipality: (r as any).MUNICIPALITY || 'Buenavista',
         actualUse: r.ACTUAL_USE || '', 
         area: r.AREA || 0,
+        ifDefault: r.IF_DEFAULT !== false,
         unitValue: r.UNIT_VALUE || 0,
         baseMarketValue: r.MARKET_VAL || 0,
-        adjustedMarketValue: r.MARKET_VAL || 0, // Using same value for now as API might not provide split
+        adjustedMarketValue: r.MARKET_VAL || 0,
         assessmentLevel: r.ASS_LEVEL || 0,
         assessedValue: r.ASS_VALUE || 0,
-        taxable: r.TAXABILITY === 'true' || r.TAXABILITY === 'TAXABLE' || r.TAXABLE_RATE > 0, // Handle boolean or string
-        beneficialUse: r.BU === 'true' || r.BU === '1', // Handle boolean or string representation
+        taxable: r.TAXABILITY === 'true' || r.TAXABILITY === 'TAXABLE' || r.TAXABLE_RATE > 0,
+        beneficialUse: r.BU === 'true' || r.BU === '1',
         idleLand: r.IdleLand || false,
-      }));
+        adjustments: (r as any).adjustments || [], // Ensure these are mapped back
+        trees: (r as any).trees || [], // Ensure these are mapped back
+      }});
+      
       setRecords(mapped);
     }
   }, [apiRecords]);
@@ -251,13 +271,14 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
     if (isEditing || isAdding) return;
     setSelectedRecord(record);
     setSelectedTdn(record.tdn || '');
-    setFormData({
+      setFormData({
       classification: record.classification,
       actualUse: record.actualUse,
       subClass: record.subClass,
       classLevel: record.classLevel || '1st',
       municipality: record.municipality || 'Buenavista',
       area: record.area.toString(),
+      ifDefault: record.ifDefault,
       unitValue: record.unitValue.toString(),
       assessmentLevel: record.assessmentLevel.toString(),
       taxable: record.taxable,
@@ -272,6 +293,10 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
     setIsEditing(false);
     setSelectedRecord(null);
     setFormData(defaultFormData);
+  };
+
+  const handlePopulateDummy = () => {
+    setFormData(dummyLandFormData);
   };
 
   // Handle Edit
@@ -311,6 +336,7 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
         classLevel: formData.classLevel,
         municipality: formData.municipality,
         area: areaVal,
+        ifDefault: formData.ifDefault,
       unitValue: unitVal,
       baseMarketValue: baseMarketValue,
       adjustedMarketValue: baseMarketValue,
@@ -323,10 +349,19 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
       trees: selectedRecord?.trees || [],
     };
 
+    let updatedRecords;
     if (isAdding) {
-      setRecords(prev => [...prev, newRecord]);
+      updatedRecords = [...records, newRecord];
     } else {
-      setRecords(prev => prev.map(r => r.id === selectedRecord!.id ? newRecord : r));
+      updatedRecords = records.map(r => r.id === selectedRecord!.id ? newRecord : r);
+    }
+    
+    // We must update the state immediately to reflect changes in the UI
+    setRecords(updatedRecords);
+    
+    // Then propagate to parent if callback exists
+    if (onUpdate) {
+      onUpdate(updatedRecords);
     }
 
     setSelectedRecord(newRecord);
@@ -339,7 +374,10 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
     if (!selectedRecord) return;
     const updatedRecord = { ...selectedRecord, adjustments: newAdjustments };
     setSelectedRecord(updatedRecord);
-    setRecords(prev => prev.map(r => r.id === updatedRecord.id ? updatedRecord : r));
+    
+    const updatedRecords = records.map(r => r.id === updatedRecord.id ? updatedRecord : r);
+    setRecords(updatedRecords);
+    if (onUpdate) onUpdate(updatedRecords);
   };
 
   // Handle Save Trees
@@ -347,7 +385,10 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
     if (!selectedRecord) return;
     const updatedRecord = { ...selectedRecord, trees: newTrees };
     setSelectedRecord(updatedRecord);
-    setRecords(prev => prev.map(r => r.id === updatedRecord.id ? updatedRecord : r));
+    // Update the local state
+    const updatedRecords = records.map(r => r.id === updatedRecord.id ? updatedRecord : r);
+    setRecords(updatedRecords);
+    if (onUpdate) onUpdate(updatedRecords);
   };
 
   // Handle Cancel
@@ -359,7 +400,10 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
         classification: selectedRecord.classification,
         actualUse: selectedRecord.actualUse,
         subClass: selectedRecord.subClass,
+        classLevel: selectedRecord.classLevel || '1st',
+        municipality: selectedRecord.municipality || 'Buenavista',
         area: selectedRecord.area.toString(),
+        ifDefault: selectedRecord.ifDefault,
         unitValue: selectedRecord.unitValue.toString(),
         assessmentLevel: selectedRecord.assessmentLevel.toString(),
         taxable: selectedRecord.taxable,
@@ -428,6 +472,17 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
             <Plus size={14} />
             Add
           </button>
+          
+          {isAdding && (
+            <button
+              onClick={handlePopulateDummy}
+              className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 text-purple-700 dark:text-purple-400"
+              title="Populate Dummy Data"
+            >
+              <Sparkles size={14} />
+            </button>
+          )}
+
           <button
             onClick={handleEdit}
             disabled={!selectedRecord || !canModify}
@@ -558,7 +613,9 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
                   <td className="px-2 py-1.5 border-r border-slate-200 dark:border-slate-700">{record.classification}</td>
                   <td className="px-2 py-1.5 border-r border-slate-200 dark:border-slate-700">{record.actualUse}</td>
                   <td className="px-2 py-1.5 border-r border-slate-200 dark:border-slate-700">{record.subClass}</td>
-                  <td className="px-2 py-1.5 text-right border-r border-slate-200 dark:border-slate-700">{record.area.toFixed(4)}</td>
+                  <td className="px-2 py-1.5 text-right border-r border-slate-200 dark:border-slate-700">
+                    {record.area.toFixed(4)} {record.ifDefault ? 'ha.' : 'sq.m.'}
+                  </td>
                   <td className="px-2 py-1.5 text-right border-r border-slate-200 dark:border-slate-700">{formatCurrency(record.unitValue)}</td>
                   <td className="px-2 py-1.5 text-right border-r border-slate-200 dark:border-slate-700">{formatCurrency(record.baseMarketValue)}</td>
                   <td className="px-2 py-1.5 text-right border-r border-slate-200 dark:border-slate-700">{formatCurrency(record.adjustedMarketValue)}</td>
@@ -588,7 +645,7 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
         tdn={selectedTdn} // Pass the selected TDN
       />
 
-      // Add Municipality and Class Level Inputs above Classification
+
       <div className="border-t border-slate-200 dark:border-slate-700 p-4 bg-slate-50 dark:bg-slate-800/50">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column */}
@@ -710,7 +767,17 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
                   className="flex-1 px-2 py-1.5 text-xs text-right bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
                   data-testid="input-area"
                 />
-                <span className="text-xs text-slate-500 dark:text-slate-400 w-12">ha.</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 w-12">
+                  <select
+                    value={formData.ifDefault ? 'true' : 'false'}
+                    onChange={(e) => setFormData(prev => ({ ...prev, ifDefault: e.target.value === 'true' }))}
+                    disabled={!isFormEnabled}
+                    className="w-full bg-transparent border-none focus:ring-0 p-0 text-xs text-slate-500 dark:text-slate-400 cursor-pointer"
+                  >
+                    <option value="true">ha.</option>
+                    <option value="false">sq.m.</option>
+                  </select>
+                </span>
               </div>
             </div>
           </div>

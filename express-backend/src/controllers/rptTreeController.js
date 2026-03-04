@@ -48,6 +48,22 @@ class RptTreeController {
       next(error);
     }
   }
+
+  /**
+   * Get tree reference library (rates)
+   */
+  async getTreeLibrary(req, res, next) {
+    try {
+      const result = await rptTreeService.getTreeLibrary();
+      
+      res.status(200).json({
+        status: 'success',
+        data: result
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new RptTreeController();

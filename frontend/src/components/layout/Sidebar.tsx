@@ -15,7 +15,8 @@ import {
   FileClock,
   CheckSquare,
   Package,
-  UserCog
+  UserCog,
+  Database
 } from 'lucide-react';
 
 interface MenuItem {
@@ -32,6 +33,7 @@ const menuItems: MenuItem[] = [
   { path: '/payments', label: 'Payments', icon: CreditCard },
   { path: '/reports', label: 'Reports', icon: BarChart3 },
   { path: '/data-entry', label: 'Data Entry', icon: ClipboardEdit },
+  { path: '/data-entry-v2', label: 'Data Entry (Mirror)', icon: Database },
   { path: '/items', label: 'Items', icon: Package },
   { path: '/tasks', label: 'Tasks', icon: CheckSquare },
   { path: '/audit-trail', label: 'Audit Trail', icon: FileClock },

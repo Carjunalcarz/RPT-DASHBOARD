@@ -1,4 +1,4 @@
-const { PrismaClient } = require('@prisma/mssql-client');
+const { PrismaClient } = require('../src/generated/mssql-client');
 const prisma = new PrismaClient();
 
 async function main() {

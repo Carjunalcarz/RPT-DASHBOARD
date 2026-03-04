@@ -37,6 +37,9 @@ const actualUseRoutes = require('./routes/actualUseRoutes');
 const subClassRoutes = require('./routes/subClassRoutes');
 const treesRoutes = require('./routes/treesRoutes');
 const landTaxRoutes = require('./routes/landTaxRoutes');
+const buildingRoutes = require('./routes/buildingRoutes');
+const buildingAppraisalRoutes = require('./routes/buildingAppraisalRoutes');
+const faasRoutes = require('./routes/faasRoutes');
 
 const app = express();
 
@@ -156,6 +159,9 @@ app.use('/api/v1/classifications', classificationRoutes);
 app.use('/api/v1/actual-uses', actualUseRoutes);
 app.use('/api/v1/subclasses', subClassRoutes);
 app.use('/api/v1/trees', treesRoutes);
+app.use('/api/v1/buildings', buildingRoutes);
+app.use('/api/v1/building-appraisals', buildingAppraisalRoutes);
+app.use('/api/v1/faas', faasRoutes);
 // Legacy routes support if needed
 app.use('/api/classifications', classificationRoutes);
 app.use('/api/actual-uses', actualUseRoutes);

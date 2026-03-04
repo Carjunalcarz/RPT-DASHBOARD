@@ -10,6 +10,7 @@ import Payments from '@/pages/Payments';
 import Reports from '@/pages/Reports';
 import Settings from '@/pages/Settings';
 import DataEntry from '@/pages/DataEntry';
+import DataEntryV2 from '@/pages/DataEntryV2';
 import AuditTrail from '@/pages/AuditTrail';
 import Items from '@/pages/Items';
 import Tasks from '@/pages/Tasks';
@@ -147,6 +148,16 @@ const AppRouter: React.FC = () => {
             <ProtectedRoute>
               <Layout>
                 <DataEntry />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/data-entry-v2"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <DataEntryV2 />
               </Layout>
             </ProtectedRoute>
           }
