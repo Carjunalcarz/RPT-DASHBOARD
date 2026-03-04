@@ -575,8 +575,8 @@ const BuildingStructureModal: React.FC<BuildingStructureModalProps> = ({
                         
                         return (a.subClass || '').localeCompare(b.subClass || '');
                     })
-                    .map(opt => (
-                      <option key={opt.id} value={opt.id}>
+                    .map((opt, index) => (
+                      <option key={`${opt.id}-${index}`} value={opt.id}>
                         {opt.buildingType.name} - {opt.structureClass}{opt.subClass ? `-${opt.subClass}` : ''} ({opt.unitValue})
                       </option>
                     ))}

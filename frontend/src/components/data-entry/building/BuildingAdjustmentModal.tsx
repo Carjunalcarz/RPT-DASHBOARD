@@ -328,7 +328,7 @@ const BuildingAdjustmentModal: React.FC<BuildingAdjustmentModalProps> = ({
                   >
                     <option value="">Select Structure</option>
                     {structures.map((s, idx) => (
-                      <option key={s.BldgCode || idx} value={s.BldgCode}>{s.BldgCode} - {s.Struc_type}</option>
+                      <option key={`${s.BldgCode}-${idx}`} value={s.BldgCode}>{s.BldgCode} - {s.Struc_type}</option>
                     ))}
                   </select>
                 </div>

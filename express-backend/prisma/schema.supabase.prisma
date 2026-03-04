@@ -10,17 +10,17 @@ datasource db {
 }
 
 model AuditLog {
-  id          Int      @id @default(autoincrement())
-  tableName   String
-  recordId    String
-  action      String
-  oldValues   Json?
-  newValues   Json?
-  userId      String?
-  userEmail   String?
-  ipAddress   String?
-  timestamp   DateTime @default(now())
-  details     Json?
+  id        Int      @id @default(autoincrement())
+  tableName String
+  recordId  String
+  action    String
+  oldValues Json?
+  newValues Json?
+  userId    String?
+  userEmail String?
+  ipAddress String?
+  timestamp DateTime @default(now())
+  details   Json?
 
   @@index([tableName, recordId])
   @@index([timestamp])
@@ -53,35 +53,30 @@ model TestTask {
 /// A comprehensive user profile model that mirrors auth.users
 /// This table is managed via triggers from Supabase Auth
 model User {
-  id          String   @id @db.Uuid // Foreign Key to auth.users.id
-  email       String   @unique
-  username    String?  @unique
-  displayName String?  @map("display_name")
-  avatarUrl   String?  @map("avatar_url")
-  bio         String?
-  role        String   @default("user") // 'admin', 'user', etc.
-  municipalityCode String? @map("municipality_code") // Code for municipality access control
-  fullName         String? @map("full_name")
-  contactNo        String? @map("contact_no")
-  
-  // Relations
-  userRoles   UserRole[]
+  id               String     @id @db.Uuid
+  email            String     @unique
+  username         String?    @unique
+  displayName      String?    @map("display_name")
+  avatarUrl        String?    @map("avatar_url")
+  bio              String?
+  role             String     @default("user")
+  municipalityCode String?    @map("municipality_code")
+  fullName         String?    @map("full_name")
+  contactNo        String?    @map("contact_no")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+  lastLoginAt      DateTime?  @map("last_login_at")
+  userRoles        UserRole[]
 
-  // Timestamps
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  lastLoginAt DateTime? @map("last_login_at")
-
-  @@map("users") // Maps to public.users table
+  @@map("users")
 }
 
 model Role {
-  id          String   @id @default(uuid())
-  name        String   @unique // 'admin', 'user', 'appraiser', etc.
+  id          String     @id @default(uuid())
+  name        String     @unique
   description String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
   userRoles   UserRole[]
 
   @@map("roles")
@@ -92,43 +87,127 @@ model UserRole {
   userId    String   @map("user_id") @db.Uuid
   roleId    String   @map("role_id")
   createdAt DateTime @default(now()) @map("created_at")
-
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, roleId])
   @@map("user_roles")
 }
 
-// Ordinance Models
-
 model BuildingType {
-  id          String   @id @default(uuid())
-  code        String   @unique // e.g., 'RES', 'COM', 'ACC'
-  name        String   // e.g., 'RESIDENTIAL BUILDING', 'ACCESSORY'
-  description String?
-  createdAt   DateTime @default(now()) @map("created_at")
-
+  id           String                @id @default(uuid())
+  code         String                @unique
+  name         String
+  description  String?
+  createdAt    DateTime              @default(now()) @map("created_at")
   marketValues BuildingMarketValue[]
 
   @@map("building_types")
 }
 
 model BuildingMarketValue {
-  id              String   @id @default(uuid())
-  ordinanceNo     String   @map("ordinance_no")
-  ordinanceDate   DateTime? @map("ordinance_date") @db.Date
-  effectivityDate DateTime @map("effectivity_date") @db.Date
-  
-  buildingTypeId  String   @map("building_type_id")
+  id              String       @id @default(uuid())
+  ordinanceNo     String       @map("ordinance_no")
+  ordinanceDate   DateTime?    @map("ordinance_date") @db.Date
+  effectivityDate DateTime     @map("effectivity_date") @db.Date
+  buildingTypeId  String       @map("building_type_id")
+  structureClass  String       @map("structure_class")
+  subClass        String?      @map("sub_class")
+  unitValue       Decimal      @map("unit_value") @db.Decimal(12, 2)
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
   buildingType    BuildingType @relation(fields: [buildingTypeId], references: [id])
-  
-  structureClass  String   @map("structure_class") // e.g., 'I', 'II', 'III', 'IV', 'V'
-  subClass        String?  @map("sub_class") // e.g., 'A', 'B', 'C'
+
+  @@map("building_market_values")
+}
+
+model Municipality {
+  id           Int               @id @default(autoincrement())
+  code         String            @unique @db.VarChar(50)
+  name         String            @db.VarChar(100)
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+  marketValues LandMarketValue[]
+
+  @@map("municipalities")
+}
+
+model LandClassification {
+  id         Int            @id @default(autoincrement())
+  code       String         @unique @db.VarChar(20)
+  name       String         @db.VarChar(100)
+  category   String         @db.VarChar(50)
+  createdAt  DateTime       @default(now()) @map("created_at")
+  updatedAt  DateTime       @updatedAt @map("updated_at")
+  subClasses LandSubClass[]
+
+  @@map("land_classifications")
+}
+
+model LandSubClass {
+  id               Int                @id @default(autoincrement())
+  classificationId Int                @map("classification_id")
+  code             String             @db.VarChar(20)
+  name             String?            @db.VarChar(100)
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  marketValues     LandMarketValue[]
+  classification   LandClassification @relation(fields: [classificationId], references: [id])
+
+  @@unique([classificationId, code])
+  @@map("land_sub_classes")
+}
+
+model LandMarketValue {
+  id              Int          @id @default(autoincrement())
+  municipalityId  Int          @map("municipality_id")
+  subClassId      Int          @map("sub_class_id")
+  classLevel      String       @db.VarChar(20)
+  rate            Decimal      @db.Decimal(12, 2)
+  unit            String       @default("SQM") @db.VarChar(20)
+  ordinanceNo     String       @map("ordinance_no") @db.VarChar(50)
+  effectivityDate DateTime     @map("effectivity_date") @db.Date
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  municipality    Municipality @relation(fields: [municipalityId], references: [id])
+  subClass        LandSubClass @relation(fields: [subClassId], references: [id])
+
+  @@index([municipalityId])
+  @@index([subClassId])
+  @@index([ordinanceNo])
+  @@index([effectivityDate])
+  @@map("land_market_values")
+}
+
+model SimpleLandMarketValue {
+  id              String    @id @default(uuid())
+  municipality    String
+  classification  String
+  subClass        String?   @map("sub_class")
+  firstClass      Decimal?  @map("first_class") @db.Decimal(12, 2)
+  secondClass     Decimal?  @map("second_class") @db.Decimal(12, 2)
+  thirdClass      Decimal?  @map("third_class") @db.Decimal(12, 2)
+  fourthClass     Decimal?  @map("fourth_class") @db.Decimal(12, 2)
+  unit            String    @default("SQM")
+  ordinanceNo     String    @default("716-2024") @map("ordinance_no")
+  ordinanceDate   DateTime? @map("ordinance_date") @db.Date
+  effectivityYear Int       @default(2025) @map("effectivity_year")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@map("simple_land_market_values")
+}
+
+model Land_Agricultural {
+  id              Int      @id @default(autoincrement())
+  landType        String   @map("land_type") @db.VarChar(100)
+  classLevel      String?  @map("class_level") @db.VarChar(20) // Nullable for Unclassified
   unitValue       Decimal  @map("unit_value") @db.Decimal(12, 2)
-  
+  ordinanceNo     String   @map("ordinance_no") @default("716-2024") @db.VarChar(50)
+  effectivityDate DateTime @map("effectivity_date") @db.Date
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
-  @@map("building_market_values")
+  @@index([landType])
+  @@map("land_agricultural")
 }

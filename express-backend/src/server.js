@@ -32,6 +32,11 @@ const rptMachRoutes = require('./routes/rptMachRoutes');
 const bldgUnitCostRoutes = require('./routes/bldgUnitCostRoutes');
 const bldgStrucTypeRoutes = require('./routes/bldgStrucTypeRoutes');
 const ordinanceRoutes = require('./routes/ordinanceRoutes');
+const classificationRoutes = require('./routes/classificationRoutes');
+const actualUseRoutes = require('./routes/actualUseRoutes');
+const subClassRoutes = require('./routes/subClassRoutes');
+const treesRoutes = require('./routes/treesRoutes');
+const landTaxRoutes = require('./routes/landTaxRoutes');
 
 const app = express();
 
@@ -147,6 +152,17 @@ app.use('/api/v1/rpt-mach', rptMachRoutes);
 app.use('/api/bldg-unit-cost', bldgUnitCostRoutes);
 app.use('/api/bldg-struc-type', bldgStrucTypeRoutes);
 app.use('/api/ordinance', ordinanceRoutes);
+app.use('/api/v1/classifications', classificationRoutes);
+app.use('/api/v1/actual-uses', actualUseRoutes);
+app.use('/api/v1/subclasses', subClassRoutes);
+app.use('/api/v1/trees', treesRoutes);
+// Legacy routes support if needed
+app.use('/api/classifications', classificationRoutes);
+app.use('/api/actual-uses', actualUseRoutes);
+app.use('/api/subclasses', subClassRoutes);
+app.use('/api/trees', treesRoutes);
+app.use('/api/land-tax', landTaxRoutes);
+app.use('/api/v1/land-tax', landTaxRoutes);
 
 // Error Handler
 app.use(errorHandler);

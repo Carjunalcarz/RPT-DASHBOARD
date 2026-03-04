@@ -27,6 +27,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
+    const storedToken = localStorage.getItem('token');
     const authMode = localStorage.getItem('auth_mode');
     
     if (storedUser) {
@@ -35,9 +36,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     if (authMode === 'mock') {
         setIsMockMode(true);
+        setIsLoading(false);
+    } else if (storedToken) {
+        // Validate token and refresh user data
+        api.get('/users/me')
+          .then(response => {
+             if (response.data.status === 'success') {
+                const userData = response.data.data.user;
+                const updatedUser: User = {
+                    id: userData.id,
+                    email: userData.email,
+                    role: userData.role || 'user',
+                    name: userData.email.split('@')[0],
+                    avatar: userData.avatarUrl 
+                };
+                setUser(updatedUser);
+                localStorage.setItem('user', JSON.stringify(updatedUser));
+             }
+          })
+          .catch(err => {
+             console.error('Failed to validate session:', err);
+             // If 401, clear session
+             if (err.response && err.response.status === 401) {
+                 logout();
+             }
+          })
+          .finally(() => {
+              setIsLoading(false);
+          });
+    } else {
+        setIsLoading(false);
     }
-
-    setIsLoading(false);
 
     // Listen for unauthorized events
     const handleUnauthorized = () => {

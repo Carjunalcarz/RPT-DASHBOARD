@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, TreePine, ArrowDownUp, Trees } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, TreePine, ArrowDownUp, Trees, Loader2 } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { RptAssRecord } from '@/services/rptAssService';
+import { getLandClassifications, getLandMarketValues, getMunicipalities, getAgriculturalTypes, LandClassification, LandMarketValue, Municipality } from '@/services/landTaxService';
 import LandAdjustmentModal, { LandAdjustment } from './LandAdjustmentModal';
 import TreesModal, { TreePlant } from './TreesModal';
 
@@ -12,11 +13,14 @@ interface LandAssessmentProps {
 
 interface LandRecord {
   id: string;
+  uniqueId?: string;
   tdn?: string; // Add TDN field
   kind: string;
   classification: string;
-  actualUse: string;
   subClass: string;
+  classLevel?: string; // Added
+  municipality?: string; // Added
+  actualUse: string;
   area: number;
   unitValue: number;
   baseMarketValue: number;
@@ -32,8 +36,10 @@ interface LandRecord {
 
 interface FormData {
   classification: string;
-  actualUse: string;
   subClass: string;
+  classLevel: string; // Added Class Level
+  municipality: string; // Added Municipality
+  actualUse: string; // Keep for compatibility but might be unused
   area: string;
   unitValue: string;
   assessmentLevel: string;
@@ -42,44 +48,13 @@ interface FormData {
   idleLand: boolean;
 }
 
-// Options for dropdowns (Example options, extend as needed)
-const classificationOptions = [
-  { value: '', label: 'Select Classification' },
-  { value: 'R', label: 'R - Residential' },
-  { value: 'C', label: 'C - Commercial' },
-  { value: 'I', label: 'I - Industrial' },
-  { value: 'A', label: 'A - Agricultural' },
-  { value: 'M', label: 'M - Mixed Use' },
-  { value: 'T', label: 'T - Timberland' },
-  { value: 'Min', label: 'Min - Mineral' },
-];
-
-const actualUseOptions = [
-  { value: '', label: 'Select Actual Use' },
-  { value: 'AR', label: 'AR - Agricultural Residential' },
-  { value: 'COCL', label: 'COCL - Coco Land' },
-  { value: 'RICL', label: 'RICL - Rice Land' },
-  { value: 'CORN', label: 'CORN - Corn Land' },
-  { value: 'ORCH', label: 'ORCH - Orchard' },
-  { value: 'FISH', label: 'FISH - Fishpond' },
-  { value: 'PAST', label: 'PAST - Pasture' },
-  { value: 'TIMB', label: 'TIMB - Timberland' },
-];
-
-const subClassOptions = [
-  { value: '', label: 'Select Sub Class' },
-  { value: 'NONE', label: 'NONE' },
-  { value: 'COCL1', label: 'COCL1' },
-  { value: 'COCL2', label: 'COCL2' },
-  { value: 'COCL3', label: 'COCL3' },
-  { value: 'RICL1', label: 'RICL1' },
-  { value: 'RICL2', label: 'RICL2' },
-];
 
 const defaultFormData: FormData = {
   classification: '',
-  actualUse: '',
   subClass: '',
+  classLevel: '1st',
+  municipality: 'Buenavista', // Default
+  actualUse: '',
   area: '',
   unitValue: '',
   assessmentLevel: '',
@@ -98,7 +73,113 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
   const [isAdding, setIsAdding] = useState(false);
   const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
   const [isTreesOpen, setIsTreesOpen] = useState(false);
+  const [isLoadingUnitValue, setIsLoadingUnitValue] = useState(false);
   
+  // Dynamic Options State
+  const [classificationOptions, setClassificationOptions] = useState<LandClassification[]>([]);
+  const [municipalityOptions, setMunicipalityOptions] = useState<Municipality[]>([]);
+  const [agriTypeOptions, setAgriTypeOptions] = useState<{ code: string; name: string }[]>([]);
+  const [selectedAgriType, setSelectedAgriType] = useState<string>('');
+  // actualUseOptions removed/deprecated
+
+  // Load Initial Data
+  useEffect(() => {
+    getLandClassifications()
+      .then(setClassificationOptions)
+      .catch(err => console.error('Failed to load classifications', err));
+      
+    getMunicipalities()
+      .then(setMunicipalityOptions)
+      .catch(err => console.error('Failed to load municipalities', err));
+
+    getAgriculturalTypes()
+      .then(setAgriTypeOptions)
+      .catch(err => console.error('Failed to load agricultural types', err));
+  }, []);
+
+  // Load SubClasses removed as it's now an auto-generated input field
+  /*
+  useEffect(() => {
+    if (formData.classification) {
+      getLandSubClasses(formData.classification)
+        .then(setSubClassOptions)
+        .catch(err => console.error('Failed to load subclasses', err));
+    } else {
+      setSubClassOptions([]);
+    }
+  }, [formData.classification]);
+  */
+
+  // Helper function to convert 1st, 2nd, etc. to Roman Numerals I, II, etc.
+  const toRoman = (level: string) => {
+    switch (level) {
+      case '1st': return 'I';
+      case '2nd': return 'II';
+      case '3rd': return 'III';
+      case '4th': return 'IV';
+      default: return '';
+    }
+  };
+
+  // Auto-generate Sub Class based on Classification and Class Level (Client-side logic as requested)
+  useEffect(() => {
+    // Only apply for Residential (RES), Commercial (COM), and Industrial (IND)
+    const allowedClassifications = ['RES', 'COM', 'IND'];
+    
+    if (allowedClassifications.includes(formData.classification) && formData.classLevel) {
+      // Get the first letter of the classification (R, C, I)
+      const prefix = formData.classification.charAt(0);
+      
+      // Convert Class Level to Roman (I, II, III, IV)
+      const roman = toRoman(formData.classLevel);
+      
+      // Construct the code: e.g., R-I, C-II, I-III
+      const autoSubClass = `${prefix}-${roman}`;
+      
+      setFormData(prev => ({ ...prev, subClass: autoSubClass }));
+    } else if (formData.classification === 'AGR' && selectedAgriType && formData.classLevel) {
+      // For Agricultural: Type + Roman Numeral
+      const roman = toRoman(formData.classLevel);
+      const autoSubClass = `${selectedAgriType} - ${roman}`;
+      setFormData(prev => ({ ...prev, subClass: autoSubClass }));
+    }
+  }, [formData.classification, formData.classLevel, selectedAgriType]);
+  
+  // Fetch Unit Value when Municipality, SubClass, or Class Level changes
+  useEffect(() => {
+    // Only fetch if we have a valid subclass (either selected from options or auto-generated)
+    // Note: If auto-generated 'R-I' doesn't exist in DB, it might return empty or error.
+    // We should probably rely on the manual selection if auto-generation isn't strict.
+    // But let's try to fetch.
+    if (formData.municipality && formData.subClass && formData.classLevel && formData.classification) {
+        setIsLoadingUnitValue(true);
+        
+        // For AGR, we need to pass the base type (selectedAgriType) as subClassCode, not the concatenated string
+        const subClassCode = formData.classification === 'AGR' ? selectedAgriType : formData.subClass;
+        
+        getLandMarketValues({
+            municipalityName: formData.municipality,
+            subClassCode: subClassCode,
+            classificationCode: formData.classification
+        }).then(values => {
+            // Find value matching class level
+            const match = values.find(v => v.classLevel === formData.classLevel);
+            if (match) {
+                setFormData(prev => ({
+                    ...prev,
+                    unitValue: match.rate.toString()
+                }));
+            } else {
+                // Optional: clear or leave existing value if not found
+            }
+        }).catch(err => {
+            console.error('Failed to fetch market value', err);
+        }).finally(() => {
+            setIsLoadingUnitValue(false);
+        });
+    }
+  }, [formData.municipality, formData.subClass, formData.classLevel, formData.classification]);
+
   // Computed values
   const [computedValues, setComputedValues] = useState({
     baseMarketValue: 0,
@@ -110,11 +191,14 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
     if (apiRecords) {
       const mapped = apiRecords.map((r, index) => ({
         id: r.TDN + '-' + index, // Use TDN + index as ID if multiple records share TDN or just for unique key
+        uniqueId: `${r.TDN}-Land-${index}-${Date.now()}`, // Add a truly unique key for rendering
         tdn: r.TDN,
         kind: r.KIND,
         classification: r.CLASSIFICATION,
-        actualUse: r.ACTUAL_USE || '',
         subClass: r.SUB_CLASS || '',
+        classLevel: r.CLASS_LEVEL || '1st', // Try to get from API or default
+        municipality: r.MUNICIPALITY || 'Buenavista', // Try to get from API or default
+        actualUse: r.ACTUAL_USE || '', 
         area: r.AREA || 0,
         unitValue: r.UNIT_VALUE || 0,
         baseMarketValue: r.MARKET_VAL || 0,
@@ -171,6 +255,8 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
       classification: record.classification,
       actualUse: record.actualUse,
       subClass: record.subClass,
+      classLevel: record.classLevel || '1st',
+      municipality: record.municipality || 'Buenavista',
       area: record.area.toString(),
       unitValue: record.unitValue.toString(),
       assessmentLevel: record.assessmentLevel.toString(),
@@ -207,18 +293,29 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
 
   // Handle Save
   const handleSave = () => {
+    // Calculate Assessed Value
+    const unitVal = parseFloat(formData.unitValue) || 0;
+    const areaVal = parseFloat(formData.area) || 0;
+    const assLvl = parseFloat(formData.assessmentLevel) || 0;
+    
+    const baseMarketValue = unitVal * areaVal;
+    
     const newRecord: LandRecord = {
-      id: isAdding ? Date.now().toString() : selectedRecord!.id,
+      id: isAdding ? `${selectedTdn}-Land-${Date.now()}` : selectedRecord!.id,
+      uniqueId: selectedRecord?.uniqueId || `${selectedTdn}-Land-${Date.now()}-${Math.random()}`,
+      tdn: selectedTdn,
       kind: 'Land',
-      classification: formData.classification,
-      actualUse: formData.actualUse,
-      subClass: formData.subClass,
-      area: parseFloat(formData.area) || 0,
-      unitValue: parseFloat(formData.unitValue) || 0,
-      baseMarketValue: computedValues.baseMarketValue,
-      adjustedMarketValue: computedValues.adjustedMarketValue,
-      assessmentLevel: parseFloat(formData.assessmentLevel) || 0,
-      assessedValue: computedValues.assessedValue,
+        classification: formData.classification,
+        actualUse: formData.subClass, 
+        subClass: formData.subClass,
+        classLevel: formData.classLevel,
+        municipality: formData.municipality,
+        area: areaVal,
+      unitValue: unitVal,
+      baseMarketValue: baseMarketValue,
+      adjustedMarketValue: baseMarketValue,
+      assessmentLevel: assLvl,
+      assessedValue: baseMarketValue * (assLvl / 100),
       taxable: formData.taxable,
       beneficialUse: formData.beneficialUse,
       idleLand: formData.idleLand,
@@ -446,7 +543,7 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
             ) : (
               records.map((record, index) => (
                 <tr
-                  key={record.id}
+                  key={record.uniqueId || record.id}
                   onClick={() => handleRowSelect(record)}
                   className={`cursor-pointer transition-colors ${
                     selectedRecord?.id === record.id
@@ -491,11 +588,29 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
         tdn={selectedTdn} // Pass the selected TDN
       />
 
-      {/* Form Section */}
+      // Add Municipality and Class Level Inputs above Classification
       <div className="border-t border-slate-200 dark:border-slate-700 p-4 bg-slate-50 dark:bg-slate-800/50">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column */}
           <div className="space-y-3">
+            {/* Municipality */}
+            <div className="flex items-center gap-2">
+              <label className="w-28 text-xs font-medium text-slate-700 dark:text-slate-300 text-right">
+                Municipality:
+              </label>
+              <select
+                value={formData.municipality}
+                onChange={(e) => setFormData(prev => ({ ...prev, municipality: e.target.value }))}
+                disabled={!isFormEnabled}
+                className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <option value="">Select Municipality</option>
+                {municipalityOptions.map((opt, index) => (
+                  <option key={`${opt.code}-${index}`} value={opt.name}>{opt.name}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Classification */}
             <div className="flex items-center gap-2">
               <label className="w-28 text-xs font-medium text-slate-700 dark:text-slate-300 text-right">
@@ -503,50 +618,79 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
               </label>
               <select
                 value={formData.classification}
-                onChange={(e) => setFormData(prev => ({ ...prev, classification: e.target.value }))}
+                onChange={(e) => {
+                  const newVal = e.target.value;
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    classification: newVal,
+                    subClass: newVal === 'AGR' ? '' : prev.subClass // Reset subClass if switching to AGR
+                  }));
+                }}
                 disabled={!isFormEnabled}
                 className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
                 data-testid="input-classification"
               >
-                {classificationOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                <option value="">Select Classification</option>
+                {classificationOptions.map((opt, index) => (
+                  <option key={`${opt.code}-${index}`} value={opt.code}>{opt.code} - {opt.name}</option>
                 ))}
               </select>
             </div>
 
-            {/* Actual Use */}
-            <div className="flex items-center gap-2">
-              <label className="w-28 text-xs font-medium text-slate-700 dark:text-slate-300 text-right">
-                Actual Use:
-              </label>
-              <select
-                value={formData.actualUse}
-                onChange={(e) => setFormData(prev => ({ ...prev, actualUse: e.target.value }))}
-                disabled={!isFormEnabled}
-                className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
-                data-testid="input-actual-use"
-              >
-                {actualUseOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Sub Class */}
+            {/* Sub Class (Replaces Actual Use) */}
             <div className="flex items-center gap-2">
               <label className="w-28 text-xs font-medium text-slate-700 dark:text-slate-300 text-right">
                 Sub Class:
               </label>
+              {formData.classification === 'AGR' ? (
+                <div className="flex-1 flex gap-1">
+                  <select
+                    value={selectedAgriType}
+                    onChange={(e) => setSelectedAgriType(e.target.value)}
+                    disabled={!isFormEnabled}
+                    className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                    data-testid="input-agri-type-select"
+                  >
+                    <option value="">Select Agricultural Type</option>
+                    {agriTypeOptions.map((opt, index) => (
+                      <option key={`${opt.code}-${index}`} value={opt.code}>{opt.name}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    value={formData.subClass}
+                    readOnly
+                    placeholder="Result"
+                    className="flex-1 px-2 py-1.5 text-xs bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded cursor-not-allowed"
+                  />
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  value={formData.subClass}
+                  onChange={(e) => setFormData(prev => ({ ...prev, subClass: e.target.value }))}
+                  disabled={!isFormEnabled}
+                  className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
+                  data-testid="input-sub-class"
+                />
+              )}
+            </div>
+
+            {/* Class Level */}
+            <div className="flex items-center gap-2">
+              <label className="w-28 text-xs font-medium text-slate-700 dark:text-slate-300 text-right">
+                Class Level:
+              </label>
               <select
-                value={formData.subClass}
-                onChange={(e) => setFormData(prev => ({ ...prev, subClass: e.target.value }))}
+                value={formData.classLevel}
+                onChange={(e) => setFormData(prev => ({ ...prev, classLevel: e.target.value }))}
                 disabled={!isFormEnabled}
                 className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
-                data-testid="input-sub-class"
               >
-                {subClassOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
+                <option value="1st">1st</option>
+                <option value="2nd">2nd</option>
+                <option value="3rd">3rd</option>
+                <option value="4th">4th</option>
               </select>
             </div>
 
@@ -578,16 +722,25 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
               <label className="w-36 text-xs font-medium text-slate-700 dark:text-slate-300 text-right">
                 Unit Value:
               </label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.unitValue}
-                onChange={(e) => setFormData(prev => ({ ...prev, unitValue: e.target.value }))}
-                disabled={!isFormEnabled}
-                placeholder="0.00"
-                className="flex-1 px-2 py-1.5 text-xs text-right bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
-                data-testid="input-unit-value"
-              />
+              <div className="relative flex-1">
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.unitValue}
+                  onChange={(e) => setFormData(prev => ({ ...prev, unitValue: e.target.value }))}
+                  disabled={!isFormEnabled || isLoadingUnitValue}
+                  placeholder="0.00"
+                  className={`w-full px-2 py-1.5 text-xs text-right bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed ${isLoadingUnitValue ? 'text-slate-400 dark:text-slate-500 pr-7' : ''}`}
+                  data-testid="input-unit-value"
+                  aria-busy={isLoadingUnitValue}
+                  aria-label="Unit Value"
+                />
+                {isLoadingUnitValue && (
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                    <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin" />
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Base Market Value (readonly) */}

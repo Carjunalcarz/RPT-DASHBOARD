@@ -1,4 +1,4 @@
-const supabase = require('../database/supabase');
+const { supabase } = require('../database/supabase');
 
 async function migrate() {
   try {

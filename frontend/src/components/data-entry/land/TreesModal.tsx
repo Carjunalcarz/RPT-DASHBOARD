@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Plus, Trash2, Save } from 'lucide-react';
 import { getTreesByTdn } from '@/services/rptTreeService';
+import { getTrees, Tree } from '@/services/classificationService';
 
 export interface TreePlant {
   id: string;
@@ -26,19 +27,6 @@ interface TreesModalProps {
   tdn?: string;
 }
 
-const treeOptions = [
-  'Coconut',
-  'Mango',
-  'Banana',
-  'Bamboo',
-  'Cacao',
-  'Coffee',
-  'Rubber',
-  'Mahogany',
-  'Gemilina',
-  'Falcata',
-];
-
 const TreesModal: React.FC<TreesModalProps> = ({
   open,
   onOpenChange,
@@ -47,12 +35,20 @@ const TreesModal: React.FC<TreesModalProps> = ({
   tdn,
 }) => {
   const [trees, setTrees] = useState<TreePlant[]>(initialTrees);
+  const [treeOptions, setTreeOptions] = useState<Tree[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     class: '',
     unitPrice: '',
     quantity: '',
   });
+
+  // Load Tree Options from API
+  useEffect(() => {
+    getTrees()
+      .then(setTreeOptions)
+      .catch(err => console.error('Failed to load tree options', err));
+  }, []);
 
   useEffect(() => {
     // If TDN is provided, fetch trees from API
@@ -132,7 +128,7 @@ const TreesModal: React.FC<TreesModalProps> = ({
               >
                 <option value="">Select Plant/Tree</option>
                 {treeOptions.map((t) => (
-                  <option key={t} value={t}>{t}</option>
+                  <option key={t.Code} value={t.Description || t.Code}>{t.Description || t.Code}</option>
                 ))}
               </select>
             </div>

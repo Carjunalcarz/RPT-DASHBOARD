@@ -9,7 +9,7 @@ const { validationResult } = require('express-validator');
  */
 exports.login = async (req, res, next) => {
   try {
-    const supabaseClient = require('../database/supabase'); // Dynamic import to handle mock
+    const { supabase: supabaseClient } = require('../database/supabase'); // Dynamic import to handle mock
     
     // Check for validation errors first
     const errors = validationResult(req);

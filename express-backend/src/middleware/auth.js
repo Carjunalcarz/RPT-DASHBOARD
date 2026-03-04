@@ -74,33 +74,27 @@ const protect = async (req, res, next) => {
   // Note: jwksUri might be null if not configured, leading to ES256 failure.
   // We should also check if we have a jwksUri before trying ES256.
   if (decodedToken.header.alg === 'ES256') {
-     if (jwksUri) {
-        jwt.verify(token, getKey, { algorithms: ['ES256'] }, verifyCallback);
-     } else {
-        // Fallback for development/misconfiguration:
-        // The error "secretOrPublicKey must be an asymmetric key when using ES256" happens when we try to use verify() with a string secret on an ES256 token.
-        // If we are in this block, we know it's ES256 but we have no JWKS URI.
-        // We can't verify it properly.
-        
-        // HOWEVER, the error in the log "secretOrPublicKey must be an asymmetric key when using ES256" came from the `else` block below
-        // because the original condition `if (decodedToken.header.alg === 'ES256' && jwksUri)` evaluated to FALSE (jwksUri was likely null).
-        // So it fell through to the HS256 block, tried to use process.env.JWT_SECRET with the ES256 token, and failed.
-        
-        // To fix this:
-        // 1. If we have ES256 but no JWKS URI, we should NOT try HS256 verification with the secret. It will fail.
-        // 2. We should error out explicitly saying configuration is missing.
-        
-        return next(new AppError('Server configuration error: ES256 token received but SUPABASE_URL (for JWKS) is not configured.', 500));
-     }
+    // If JWKS URI is available, use it
+    if (jwksUri) {
+      jwt.verify(token, getKey, { algorithms: ['ES256'] }, async (err, decoded) => {
+        if (err) {
+          logger.error(`JWT Verification Failed: ${err.message}`);
+          return next(new AppError('Invalid token. Please log in again.', 401));
+        }
+        await processUser(req, next, decoded);
+      });
+    } else {
+      return next(new AppError('Server configuration error: ES256 token received but SUPABASE_URL (for JWKS) is not configured.', 500));
+    }
   } else {
-     // Fallback to HS256 (Legacy)
-     try {
-       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-       await processUser(req, next, decoded);
-     } catch (err) {
-       logger.error(`JWT Verification (HS256) Failed: ${err.message}`);
-       return next(new AppError('Invalid token. Please log in again.', 401));
-     }
+    // Fallback to HS256 (Legacy)
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      await processUser(req, next, decoded);
+    } catch (err) {
+      logger.error(`JWT Verification (HS256) Failed: ${err.message}`);
+      return next(new AppError('Invalid token. Please log in again.', 401));
+    }
   }
 };
 

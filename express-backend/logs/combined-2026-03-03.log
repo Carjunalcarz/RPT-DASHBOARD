@@ -3884,3 +3884,9 @@
 {"level":"info","message":"Swagger Docs loaded: 35 paths found"}
 {"level":"info","message":"Server running on port 3000"}
 {"level":"info","message":"Connected to MSSQL"}
+{"level":"info","message":"Swagger Docs loaded: 35 paths found"}
+{"level":"info","message":"Server running on port 3000"}
+{"level":"debug","message":"[GET /api/rptmast/RPTAS_AGUSAN?page=1&limit=100&searchField=TDN&filterValue=%25] Cookies: {\"access_token\":\"eyJhbGciOiJFUzI1NiIsImtpZCI6ImNhNmE4YWY0LWU4Y2YtNGEzYS1hMTA5LTc1OGVkMDE5MzQxZSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL3Vxd2J3eWJhZXNvcWdpbHVqbm9iLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiI4ODM4MjdlNi00NGIxLTQ0MWEtYjVmZC03OGJmNDU0MjczZGUiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzcyNTI5MDY1LCJpYXQiOjE3NzI1MjU0NjUsImVtYWlsIjoiYWRtaW5AdGF4LmdvdiIsInBob25lIjoiIiwiYXBwX21ldGFkYXRhIjp7InByb3ZpZGVyIjoiZW1haWwiLCJwcm92aWRlcnMiOlsiZW1haWwiXX0sInVzZXJfbWV0YWRhdGEiOnsiZW1haWxfdmVyaWZpZWQiOnRydWV9LCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImFhbCI6ImFhbDEiLCJhbXIiOlt7Im1ldGhvZCI6InBhc3N3b3JkIiwidGltZXN0YW1wIjoxNzcyNTI1NDY1fV0sInNlc3Npb25faWQiOiIxY2ViNDRjZS05MmZiLTRhZjctYWVhYi0xYWJiY2NhZTM2MTAiLCJpc19hbm9ueW1vdXMiOmZhbHNlfQ.tC0CUxoO_X6ashoVFmhdb5n2rb8hBZUYTfCv1rui5KfiJirxV4f6i_FtWH5pDQfXmZ0oFzed-4ZTyYF_D5jHvA\",\"ph_phc_xAvL2Iq4tFmANRE7kzbKwaSqp1HJjN7x48s3vr0CMjs_posthog\":\"{\\\"$device_id\\\":\\\"019c8daf-80d1-73f1-b5eb-962dce3501a9\\\",\\\"distinct_id\\\":\\\"019c8daf-80d1-73f1-b5eb-962dce3501a9\\\",\\\"$sesid\\\":[1772526046919,\\\"019cb214-2c79-7aa5-8bc5-58eebc0c7b15\\\",1772514192505],\\\"$initial_person_info\\\":{\\\"r\\\":\\\"$direct\\\",\\\"u\\\":\\\"http://localhost:5173/\\\"},\\\"$user_state\\\":\\\"anonymous\\\"}\"} | Auth Header: Present"}
+{"level":"info","message":"Connected to MSSQL"}
+{"level":"info","message":"Executing RPTAS_AGUSAN migration query via MSSQL driver..."}
+{"level":"info","message":"Executing RPTAS_AGUSAN migration query via MSSQL driver..."}

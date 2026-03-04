@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, Settings, ArrowDownUp } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { RptAssRecord } from '@/services/rptAssService';
+import { getClassifications, getActualUses, getSubClasses, Classification, ActualUse, SubClass } from '@/services/classificationService';
 import MachineryItemsModal from './MachineryItemsModal';
 
 interface MachineryAssessmentProps {
@@ -11,6 +12,7 @@ interface MachineryAssessmentProps {
 
 interface MachineryRecord {
   id: string;
+  uniqueId?: string;
   tdn?: string;
   kind: string;
   classification: string;
@@ -39,24 +41,6 @@ interface FormData {
   idleLand: boolean;
 }
 
-const classificationOptions = [
-  { value: '', label: 'Select Classification' },
-  { value: 'C', label: 'C - Commercial' },
-  { value: 'I', label: 'I - Industrial' },
-  { value: 'A', label: 'A - Agricultural' },
-];
-
-const actualUseOptions = [
-  { value: '', label: 'Select Actual Use' },
-  { value: 'AC', label: 'AC - Actual Use Commercial' },
-  { value: 'AI', label: 'AI - Actual Use Industrial' },
-];
-
-const subClassOptions = [
-  { value: '', label: 'Select Sub Class' },
-  { value: 'NONE', label: 'NONE' },
-];
-
 const defaultFormData: FormData = {
   classification: '',
   actualUse: '',
@@ -78,6 +62,60 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
   const [isAdding, setIsAdding] = useState(false);
   const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
   
+  // Dynamic Options State
+  const [classificationOptions, setClassificationOptions] = useState<Classification[]>([]);
+  const [actualUseOptions, setActualUseOptions] = useState<ActualUse[]>([]);
+  const [subClassOptions, setSubClassOptions] = useState<SubClass[]>([]);
+
+  // Load Classifications on Mount
+  useEffect(() => {
+    getClassifications()
+      .then(setClassificationOptions)
+      .catch(err => console.error('Failed to load classifications', err));
+  }, []);
+
+  // Load Actual Uses when Classification changes
+  useEffect(() => {
+    // If no classification is selected, don't fetch anything (or clear existing)
+    if (formData.classification) {
+      // Clear existing options first to avoid stale data while loading
+      setActualUseOptions([]);
+      setSubClassOptions([]);
+      
+      // Fetch filtered options
+      getActualUses({ mainClass: formData.classification })
+        .then(data => {
+            // Double-check client-side filtering if API returns everything
+            const filtered = data.filter(item => item.MainClass === formData.classification);
+            setActualUseOptions(filtered);
+        })
+        .catch(err => console.error('Failed to load actual uses', err));
+    } else {
+      setActualUseOptions([]);
+      setSubClassOptions([]);
+    }
+  }, [formData.classification]);
+
+  // Load SubClasses when Actual Use changes
+  useEffect(() => {
+    if (formData.actualUse && formData.classification) {
+      // Fetch filtered options based on selected Actual Use code (prefix match)
+      getSubClasses({ 
+        mainClass: formData.classification,
+        actualUseCode: formData.actualUse 
+      })
+        .then(data => {
+            // Optional: Client-side filtering if needed
+            // Ensure subclasses belong to the correct main class
+            const filtered = data.filter(item => item.MainClass === formData.classification);
+            setSubClassOptions(filtered);
+        })
+        .catch(err => console.error('Failed to load subclasses', err));
+    } else {
+      setSubClassOptions([]);
+    }
+  }, [formData.actualUse, formData.classification]);
+  
   // Computed values
   const [computedValues, setComputedValues] = useState({
     baseMarketValue: 0,
@@ -89,6 +127,7 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
     if (apiRecords) {
       const mapped = apiRecords.filter(r => r.KIND === 'Machinery' || r.KIND === 'MACH').map((r, index) => ({
         id: r.TDN + '-' + index,
+        uniqueId: `${r.TDN}-Mach-${index}-${Date.now()}`,
         tdn: r.TDN,
         kind: 'Machinery',
         classification: r.CLASSIFICATION,
@@ -313,7 +352,7 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
               <tr><td colSpan={11} className="px-4 py-8 text-center text-slate-500">No machinery records found.</td></tr>
             ) : (
               records.map((record, index) => (
-                <tr key={record.id} onClick={() => handleRowSelect(record)} className={`cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-800 ${selectedRecord?.id === record.id ? 'bg-blue-100 dark:bg-blue-900/30' : index % 2 === 0 ? 'bg-slate-50 dark:bg-slate-800/50' : 'bg-white dark:bg-slate-900'}`}>
+                <tr key={record.uniqueId || record.id} onClick={() => handleRowSelect(record)} className={`cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-800 ${selectedRecord?.id === record.id ? 'bg-blue-100 dark:bg-blue-900/30' : index % 2 === 0 ? 'bg-slate-50 dark:bg-slate-800/50' : 'bg-white dark:bg-slate-900'}`}>
                   <td className="px-2 py-1.5 border-r border-slate-200 dark:border-slate-700">{record.kind}</td>
                   <td className="px-2 py-1.5 border-r border-slate-200 dark:border-slate-700">{record.classification}</td>
                   <td className="px-2 py-1.5 border-r border-slate-200 dark:border-slate-700">{record.actualUse}</td>
@@ -348,19 +387,36 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
             <div className="flex items-center gap-2">
               <label className="w-28 text-xs font-medium text-right">Classification:</label>
               <select value={formData.classification} onChange={(e) => setFormData(prev => ({ ...prev, classification: e.target.value }))} disabled={!isFormEnabled} className="flex-1 px-2 py-1.5 text-xs border rounded">
-                {classificationOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                <option value="">Select Classification</option>
+                {classificationOptions.map((opt, index) => <option key={`${opt.Code}-${index}`} value={opt.Code}>{opt.Code} - {opt.Description}</option>)}
               </select>
             </div>
             <div className="flex items-center gap-2">
               <label className="w-28 text-xs font-medium text-right">Actual Use:</label>
-              <select value={formData.actualUse} onChange={(e) => setFormData(prev => ({ ...prev, actualUse: e.target.value }))} disabled={!isFormEnabled} className="flex-1 px-2 py-1.5 text-xs border rounded">
-                {actualUseOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+              <select 
+                value={formData.actualUse} 
+                onChange={(e) => {
+                  const selected = e.target.value;
+                  const selectedOption = actualUseOptions.find(opt => opt.Code === selected);
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    actualUse: selected,
+                    // Auto-populate unit value if available from Actual Use
+                    unitValue: selectedOption?.MValue ? selectedOption.MValue.toString() : prev.unitValue
+                  }));
+                }}
+                disabled={!isFormEnabled} 
+                className="flex-1 px-2 py-1.5 text-xs border rounded"
+              >
+                <option value="">Select Actual Use</option>
+                {actualUseOptions.map((opt, index) => <option key={`${opt.Code}-${opt.MainClass}-${index}`} value={opt.Code}>{opt.Code} - {opt.Description}</option>)}
               </select>
             </div>
             <div className="flex items-center gap-2">
               <label className="w-28 text-xs font-medium text-right">Sub Class:</label>
               <select value={formData.subClass} onChange={(e) => setFormData(prev => ({ ...prev, subClass: e.target.value }))} disabled={!isFormEnabled} className="flex-1 px-2 py-1.5 text-xs border rounded">
-                {subClassOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                <option value="">Select Sub Class</option>
+                {subClassOptions.map((opt, index) => <option key={`${opt.Code}-${opt.MainClass}-${index}`} value={opt.Code}>{opt.Code} - {opt.Description}</option>)}
               </select>
             </div>
             <div className="flex items-center gap-2">

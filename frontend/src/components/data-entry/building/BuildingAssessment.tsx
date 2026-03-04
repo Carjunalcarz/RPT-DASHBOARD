@@ -4,6 +4,7 @@ import { useThemeColor } from '@/context/ThemeColorContext';
 import { RptAssRecord } from '@/services/rptAssService';
 import { getBldgAdjByTdn, BldgAdjRecord } from '@/services/bldgAdjService';
 import { getBldgStrucByTdn, BldgStrucRecord } from '@/services/bldgStrucService';
+import { getClassifications, getActualUses, getSubClasses, Classification, ActualUse, SubClass } from '@/services/classificationService';
 import BuildingStructureModal from './BuildingStructureModal';
 import BuildingAdjustmentModal from './BuildingAdjustmentModal';
 
@@ -42,37 +43,6 @@ interface FormData {
   beneficialUse: boolean;
   idleLand: boolean;
 }
-
-// Options for dropdowns
-const classificationOptions = [
-  { value: '', label: 'Select Classification' },
-  { value: 'R', label: 'R - Residential' },
-  { value: 'C', label: 'C - Commercial' },
-  { value: 'I', label: 'I - Industrial' },
-  { value: 'A', label: 'A - Agricultural' },
-  { value: 'M', label: 'M - Mixed Use' },
-];
-
-const actualUseOptions = [
-  { value: '', label: 'Select Actual Use' },
-  { value: 'AR', label: 'AR - Agricultural Residential' },
-  { value: 'RR', label: 'RR - Rural Residential' },
-  { value: 'UR', label: 'UR - Urban Residential' },
-  { value: 'CO', label: 'CO - Commercial Office' },
-  { value: 'CR', label: 'CR - Commercial Retail' },
-  { value: 'IW', label: 'IW - Industrial Warehouse' },
-  { value: 'IM', label: 'IM - Industrial Manufacturing' },
-];
-
-const subClassOptions = [
-  { value: '', label: 'Select Sub Class' },
-  { value: 'NONE', label: 'NONE' },
-  { value: 'I', label: 'I - Type I' },
-  { value: 'II', label: 'II - Type II' },
-  { value: 'III', label: 'III - Type III' },
-  { value: 'IV', label: 'IV - Type IV' },
-  { value: 'V', label: 'V - Type V' },
-];
 
 const defaultFormData: FormData = {
   classification: '',
@@ -122,6 +92,60 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
   const [structures, setStructures] = useState<BldgStrucRecord[]>([]);
   const [isStructureOpen, setIsStructureOpen] = useState(false);
   const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
+
+  // Dynamic Options State
+  const [classificationOptions, setClassificationOptions] = useState<Classification[]>([]);
+  const [actualUseOptions, setActualUseOptions] = useState<ActualUse[]>([]);
+  const [subClassOptions, setSubClassOptions] = useState<SubClass[]>([]);
+
+  // Load Classifications on Mount
+  useEffect(() => {
+    getClassifications()
+      .then(setClassificationOptions)
+      .catch(err => console.error('Failed to load classifications', err));
+  }, []);
+
+  // Load Actual Uses when Classification changes
+  useEffect(() => {
+    // If no classification is selected, don't fetch anything (or clear existing)
+    if (formData.classification) {
+      // Clear existing options first to avoid stale data while loading
+      setActualUseOptions([]);
+      setSubClassOptions([]);
+      
+      // Fetch filtered options
+      getActualUses({ mainClass: formData.classification })
+        .then(data => {
+            // Double-check client-side filtering if API returns everything
+            const filtered = data.filter(item => item.MainClass === formData.classification);
+            setActualUseOptions(filtered);
+        })
+        .catch(err => console.error('Failed to load actual uses', err));
+    } else {
+      setActualUseOptions([]);
+      setSubClassOptions([]);
+    }
+  }, [formData.classification]);
+
+  // Load SubClasses when Actual Use changes
+  useEffect(() => {
+    if (formData.actualUse && formData.classification) {
+      // Fetch filtered options based on selected Actual Use code (prefix match)
+      getSubClasses({ 
+        mainClass: formData.classification,
+        actualUseCode: formData.actualUse 
+      })
+        .then(data => {
+            // Optional: Client-side filtering if needed
+            // Ensure subclasses belong to the correct main class
+            const filtered = data.filter(item => item.MainClass === formData.classification);
+            setSubClassOptions(filtered);
+        })
+        .catch(err => console.error('Failed to load subclasses', err));
+    } else {
+      setSubClassOptions([]);
+    }
+  }, [formData.actualUse, formData.classification]);
 
   const handleStructureUpdate = (updatedStructures: BldgStrucRecord[]) => {
     setStructures(updatedStructures);
@@ -605,8 +629,9 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
                 className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
                 data-testid="input-classification"
               >
-                {classificationOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                <option value="">Select Classification</option>
+                {classificationOptions.map((opt, index) => (
+                  <option key={`${opt.Code}-${index}`} value={opt.Code}>{opt.Code} - {opt.Description}</option>
                 ))}
               </select>
             </div>
@@ -618,13 +643,23 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
               </label>
               <select
                 value={formData.actualUse}
-                onChange={(e) => setFormData(prev => ({ ...prev, actualUse: e.target.value }))}
+                onChange={(e) => {
+                  const selected = e.target.value;
+                  const selectedOption = actualUseOptions.find(opt => opt.Code === selected);
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    actualUse: selected,
+                    // Auto-populate unit value if available from Actual Use
+                    unitValue: selectedOption?.MValue ? selectedOption.MValue.toString() : prev.unitValue
+                  }));
+                }}
                 disabled={!isFormEnabled}
                 className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
                 data-testid="input-actual-use"
               >
-                {actualUseOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                <option value="">Select Actual Use</option>
+                {actualUseOptions.map((opt, index) => (
+                  <option key={`${opt.Code}-${opt.MainClass}-${index}`} value={opt.Code}>{opt.Code} - {opt.Description}</option>
                 ))}
               </select>
             </div>
@@ -641,8 +676,9 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
                 className="flex-1 px-2 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
                 data-testid="input-sub-class"
               >
-                {subClassOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                <option value="">Select Sub Class</option>
+                {subClassOptions.map((opt, index) => (
+                  <option key={`${opt.Code}-${opt.MainClass}-${index}`} value={opt.Code}>{opt.Code} - {opt.Description}</option>
                 ))}
               </select>
             </div>

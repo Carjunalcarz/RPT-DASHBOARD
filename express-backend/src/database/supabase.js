@@ -6,6 +6,19 @@ dotenv.config();
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
+// Simple retry helper
+const withRetry = async (fn, retries = 3, delay = 1000) => {
+  try {
+    return await fn();
+  } catch (error) {
+    if (retries <= 0) throw error;
+    await new Promise(resolve => setTimeout(resolve, delay));
+    return withRetry(fn, retries - 1, delay * 2);
+  }
+};
+
+let supabase = null;
+
 if (!supabaseUrl || !supabaseKey) {
   console.warn('Supabase URL or Key not found in environment variables. Supabase features will be disabled.');
   
@@ -37,9 +50,14 @@ if (!supabaseUrl || !supabaseKey) {
     then: (resolve) => resolve({ data: [], error: { message: 'Supabase not configured' }, count: 0 }) // Make it awaitable
   };
 
-  module.exports = {
+  supabase = {
     from: () => mockBuilder,
     auth: {
+      admin: {
+        listUsers: () => Promise.resolve({ data: { users: [] }, error: { message: 'Supabase not configured' } }),
+        getUserById: () => Promise.resolve({ data: { user: null }, error: { message: 'Supabase not configured' } }),
+        deleteUser: () => Promise.resolve({ data: null, error: { message: 'Supabase not configured' } }),
+      },
       signInWithPassword: () => Promise.resolve({ data: { session: null, user: null }, error: { message: 'Supabase not configured. Please add SUPABASE_URL and SUPABASE_KEY to .env' } }),
       signUp: () => Promise.resolve({ data: { session: null, user: null }, error: { message: 'Supabase not configured' } }),
       signOut: () => Promise.resolve({ error: { message: 'Supabase not configured' } }),
@@ -47,6 +65,7 @@ if (!supabaseUrl || !supabaseKey) {
     }
   };
 } else {
-  const supabase = createClient(supabaseUrl, supabaseKey);
-  module.exports = supabase;
+  supabase = createClient(supabaseUrl, supabaseKey);
 }
+
+module.exports = { supabase, withRetry };
