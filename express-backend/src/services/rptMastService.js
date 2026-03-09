@@ -415,6 +415,47 @@ WHERE
       throw new AppError('Failed to update signatories: ' + error.message, 500);
     }
   }
+
+  /**
+   * Check for duplicate TDN or PIN in RPTMAST
+   * @param {string} tdn 
+   * @param {string} pin 
+   */
+  async checkDuplicate(tdn, pin) {
+    try {
+      const pool = await poolPromise;
+      if (!pool) throw new Error('Database connection failed');
+
+      // Check TDN
+      let tdnResult = null;
+      if (tdn) {
+        tdnResult = await pool.request()
+          .input('tdn', tdn)
+          .query('SELECT TOP 1 TDN, PIN FROM RPTAS_AGUSAN.dbo.RPTMAST WHERE TDN = @tdn');
+      }
+
+      // Check PIN
+      let pinResult = null;
+      if (pin) {
+        pinResult = await pool.request()
+          .input('pin', pin)
+          .query('SELECT TOP 1 TDN, PIN FROM RPTAS_AGUSAN.dbo.RPTMAST WHERE PIN = @pin');
+      }
+
+      return {
+        tdnExists: tdnResult && tdnResult.recordset.length > 0,
+        tdnRecord: tdnResult && tdnResult.recordset[0],
+        pinExists: pinResult && pinResult.recordset.length > 0,
+        pinRecord: pinResult && pinResult.recordset[0]
+      };
+
+    } catch (error) {
+      logger.error('Error checking duplicates:', error);
+      // Don't throw, just return nulls or assume no duplicate to avoid blocking if DB is down? 
+      // No, validation is critical. Throw.
+      throw new AppError('Validation check failed: ' + error.message, 500);
+    }
+  }
 }
 
 module.exports = new RptMastService();

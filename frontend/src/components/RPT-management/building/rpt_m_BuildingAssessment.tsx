@@ -5,8 +5,8 @@ import { RptAssRecord } from '@/services/rptAssService';
 import { getBldgAdjByTdn, BldgAdjRecord } from '@/services/bldgAdjService';
 import { getBldgStrucByTdn, BldgStrucRecord } from '@/services/bldgStrucService';
 import { getBuildingTypes, getBuildingAppraisals, BuildingType, BuildingAppraisal } from '@/services/buildingService';
-import BuildingStructureModal from './BuildingStructureModal';
-import BuildingAdjustmentModal from './BuildingAdjustmentModal';
+import BuildingStructureModal from './rpt_m_BuildingStructureModal';
+import BuildingAdjustmentModal from './rpt_m_BuildingAdjustmentModal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Types
@@ -31,6 +31,7 @@ interface BuildingRecord {
 interface BuildingAssessmentProps {
   records?: RptAssRecord[];
   isEnabled?: boolean;
+  onUpdate?: (records: any[]) => void;
 }
 
 interface FormData {
@@ -57,7 +58,7 @@ const defaultFormData: FormData = {
   idleLand: false,
 };
 
-const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRecords, isEnabled = true }) => {
+const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRecords, isEnabled = true, onUpdate }) => {
   // State for records table
   const [records, setRecords] = useState<BuildingRecord[]>([]);
 
@@ -196,7 +197,9 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
         };
 
         setSelectedRecord(updatedRecord);
-        setRecords(prev => prev.map(r => r.id === selectedRecord.id ? updatedRecord : r));
+        const newRecords = records.map(r => r.id === selectedRecord.id ? updatedRecord : r);
+        setRecords(newRecords);
+        if (onUpdate) onUpdate(newRecords);
       }
     }
   };
@@ -323,7 +326,9 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
     if (!selectedRecord) return;
     if (window.confirm('Are you sure you want to delete this record?')) {
       // In a real app, this would call an API
-      setRecords(prev => prev.filter(r => r.uniqueId !== selectedRecord.uniqueId));
+      const newRecords = records.filter(r => r.uniqueId !== selectedRecord.uniqueId);
+      setRecords(newRecords);
+      if (onUpdate) onUpdate(newRecords);
       setSelectedRecord(null);
       setFormData(defaultFormData);
       setAdjustments([]);
@@ -351,11 +356,14 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
       idleLand: formData.idleLand,
     };
 
+    let newRecords: BuildingRecord[] = [];
     if (isAdding) {
-      setRecords(prev => [...prev, newRecord]);
+      newRecords = [...records, newRecord];
     } else {
-      setRecords(prev => prev.map(r => r.id === selectedRecord!.id ? newRecord : r));
+      newRecords = records.map(r => r.id === selectedRecord!.id ? newRecord : r);
     }
+    setRecords(newRecords);
+    if (onUpdate) onUpdate(newRecords);
 
     setSelectedRecord(newRecord);
     setIsEditing(false);

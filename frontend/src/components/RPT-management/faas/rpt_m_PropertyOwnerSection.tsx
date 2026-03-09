@@ -4,7 +4,7 @@ import { useThemeColor } from '@/context/ThemeColorContext';
 
 interface PropertyRecord {
   id: string;
-  ownerNo: string;
+  OWNER_NO: string;
   owner: string;
   pOwnerNo?: string; // Previous/Other Owner No
   pOwner?: string; // Previous/Other Owner
@@ -78,7 +78,7 @@ const PropertyOwnerSection: React.FC<PropertyOwnerSectionProps> = ({ isEnabled, 
         ...prev,
         owner: {
           code: selectedRecord.OWN_CD || 'SING',
-          number: selectedRecord.ownerNo || '',
+          number: selectedRecord.OWNER_NO || '',
           name: selectedRecord.owner || '',
           address: selectedRecord.Owner_Address || '',
         },

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { AssessmentRow, AssessmentSummary } from './types';
-import TableToolbar from './TableToolbar';
-import EditableCell from './EditableCell';
-import PrintDocument from './PrintDocument';
-import SelectionModal from './SelectionModal';
-import { useSelectionModal } from './useSelectionModal';
+import { AssessmentRow, AssessmentSummary } from './rpt_m_types';
+import TableToolbar from './rpt_m_TableToolbar';
+import EditableCell from './rpt_m_EditableCell';
+import PrintDocument from './rpt_m_PrintDocument';
+import SelectionModal from './rpt_m_SelectionModal';
+import { useSelectionModal } from './rpt_m_useSelectionModal';
 import '@/styles/print.css';
 
 const AssessmentTable: React.FC = () => {

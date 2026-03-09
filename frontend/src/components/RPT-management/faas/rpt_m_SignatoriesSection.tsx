@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Save, X, RefreshCw, Users, Paperclip, Search, Eye, Mail, Download } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { useAuth } from '@/context/AuthContext';
-import TableToolbar from '@/components/data-entry/TableToolbar';
+import TableToolbar from '@/components/data-entry/rpt_m_TableToolbar';
 import {
   addAuditEntry,
   createMemorandum,
@@ -26,7 +26,7 @@ import {
   validateSwornStatement,
   Attachment,
   AuditEntry,
-} from './signatoriesCrud';
+} from './rpt_m_signatoriesCrud';
 import { updateSignatory } from '@/services/rptMastService';
 
 interface DocumentationData {

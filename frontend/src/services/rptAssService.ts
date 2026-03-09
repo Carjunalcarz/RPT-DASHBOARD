@@ -48,6 +48,9 @@ export interface RptAssRecord {
   IDLE_USERNAME: string;
   DIRECTLOGCOST: number;
   DOMEPRICELOG: number;
+  // UI-specific fields (optional)
+  id?: string;
+  uniqueId?: string;
 }
 
 export interface RptAssResponse {

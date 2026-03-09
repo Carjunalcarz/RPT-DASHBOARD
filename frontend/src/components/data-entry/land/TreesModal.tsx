@@ -111,8 +111,15 @@ const TreesModal: React.FC<TreesModalProps> = ({
     }
   }, [open, tdn, initialTrees, treeLibrary]); // Re-run when library loads to update descriptions
 
-  const handleTreeSelect = (code: string) => {
-    const selected = treeLibrary.find(t => t.Code === code);
+  const handleTreeSelect = (value: string) => {
+    // Parse composite key if present
+    const [code, effDate] = value.includes('|') ? value.split('|') : [value, ''];
+    
+    // Find exact match including Eff_Date if available
+    const selected = treeLibrary.find(t => 
+      t.Code === code && (!effDate || t.Eff_Date === effDate)
+    );
+
     if (selected) {
       let price = selected.Rate;
       let type: 'FB' | 'NFB' = 'FB';
@@ -126,20 +133,25 @@ const TreesModal: React.FC<TreesModalProps> = ({
 
       setFormData(prev => ({
         ...prev,
-        code: selected.Code,
+        code: value, // Store the full composite value to maintain selection state
         name: selected.Description,
         unitPrice: price.toString(),
         type: type
       }));
     } else {
-        setFormData(prev => ({ ...prev, code, name: code }));
+        setFormData(prev => ({ ...prev, code: value, name: code }));
     }
   };
 
   // When Type changes manually, update the price
   useEffect(() => {
     if (formData.code && formData.type) {
-      const selected = treeLibrary.find(t => t.Code === formData.code);
+      const [code, effDate] = formData.code.includes('|') ? formData.code.split('|') : [formData.code, ''];
+      
+      const selected = treeLibrary.find(t => 
+        t.Code === code && (!effDate || t.Eff_Date === effDate)
+      );
+
       if (selected) {
          // If switching to NFB, use NFB_Rate. If FB, use Rate.
          // Unless Rate is 0, then we might force NFB or 0.
@@ -196,7 +208,7 @@ const TreesModal: React.FC<TreesModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-4xl" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>Trees & Plants Assessment</DialogTitle>
         </DialogHeader>
@@ -213,11 +225,13 @@ const TreesModal: React.FC<TreesModalProps> = ({
                 className="w-full px-2 py-1.5 text-xs border rounded bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
               >
                 <option value="">Select Plant/Tree</option>
-                {treeLibrary.map((t) => {
+                {treeLibrary.map((t, index) => {
                   const date = new Date(t.Eff_Date);
                   const year = date.getFullYear();
+                  // Use composite value to ensure uniqueness in selection
+                  const uniqueValue = `${t.Code}|${t.Eff_Date}`;
                   return (
-                    <option key={t.Code} value={t.Code}>{t.Description} ({year})</option>
+                    <option key={`${t.Code}-${index}`} value={uniqueValue}>{t.Description} ({year})</option>
                   );
                 })}
               </select>

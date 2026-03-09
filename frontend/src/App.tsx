@@ -4,6 +4,7 @@ import { SidebarProvider } from '@/context/SidebarContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { ThemeColorProvider } from '@/context/ThemeColorContext';
 import AppRouter from '@/router/AppRouter';
+import { Toaster } from 'sonner';
 import '@/App.css';
 import '@/styles/print.css';
 
@@ -14,6 +15,7 @@ function App() {
         <AuthProvider>
           <SidebarProvider>
             <AppRouter />
+            <Toaster position="top-right" richColors expand={true} closeButton />
           </SidebarProvider>
         </AuthProvider>
       </ThemeColorProvider>

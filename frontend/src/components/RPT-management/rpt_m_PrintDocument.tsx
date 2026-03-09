@@ -1,5 +1,5 @@
 import React from 'react';
-import { AssessmentRow } from './types';
+import { AssessmentRow } from './rpt_m_types';
 
 interface PropertyInfo {
   ownerName: string;

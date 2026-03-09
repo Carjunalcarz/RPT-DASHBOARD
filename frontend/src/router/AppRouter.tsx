@@ -153,7 +153,7 @@ const AppRouter: React.FC = () => {
           }
         />
         <Route
-          path="/data-entry-v2"
+          path="/rpt-management"
           element={
             <ProtectedRoute>
               <Layout>

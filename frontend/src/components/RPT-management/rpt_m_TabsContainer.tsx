@@ -1,7 +1,7 @@
 import React, { ReactNode } from 'react';
-import TabNavigation from './TabNavigation';
-import TabPanel from './TabPanel';
-import ConfirmLeaveModal from './ConfirmLeaveModal';
+import TabNavigation from './rpt_m_TabNavigation';
+import TabPanel from './rpt_m_TabPanel';
+import ConfirmLeaveModal from './rpt_m_ConfirmLeaveModal';
 
 interface Tab {
   id: string;

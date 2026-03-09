@@ -1,8 +1,8 @@
 import React from 'react';
 import { useForm } from 'react-hook-form';
-import FormInput from './FormInput';
-import FormSelect from './FormSelect';
-import DateInput from './DateInput';
+import FormInput from './rpt_m_FormInput';
+import FormSelect from './rpt_m_FormSelect';
+import DateInput from './rpt_m_DateInput';
 
 interface PropertyFormData {
   effectivityDate: string;

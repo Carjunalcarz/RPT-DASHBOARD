@@ -6,17 +6,18 @@ import {
 } from 'lucide-react';
 import { dummyPropertyRecord, dummyAssessmentRecords } from '@/components/data-entry/faas/dummyData';
 import { useThemeColor } from '@/context/ThemeColorContext';
+import { useAuth } from '@/context/AuthContext';
 import { getRptMastDataDirect, RptMastRecord, getMastExtn } from '@/services/rptMastService';
 import { getRptAssByTdn, RptAssRecord } from '@/services/rptAssService';
-import PropertyInformationSection from './PropertyInformationSection';
-import PropertyOwnerSection from './PropertyOwnerSection';
-import PropertyBoundariesSection from './PropertyBoundariesSection';
-import AssessmentSection from './AssessmentSection';
-import ReferenceSection from './ReferenceSection';
-import SignatoriesSection from './SignatoriesSection';
-import PreviousTDNsSection from './PreviousTDNsSection';
-import TaxDecSheetSection from './TaxDecSheetSection';
-import OtherPropertyTab from '../OtherPropertyTab';
+import PropertyInformationSection from './rpt_m_PropertyInformationSection';
+import PropertyOwnerSection from './rpt_m_PropertyOwnerSection';
+import PropertyBoundariesSection from './rpt_m_PropertyBoundariesSection';
+import AssessmentSection from './rpt_m_AssessmentSection';
+import ReferenceSection from './rpt_m_ReferenceSection';
+import SignatoriesSection from './rpt_m_SignatoriesSection';
+import PreviousTDNsSection from './rpt_m_PreviousTDNsSection';
+import TaxDecSheetSection from './rpt_m_TaxDecSheetSection';
+import OtherPropertyTab from '../rpt_m_OtherPropertyTab';
 import { toast } from 'sonner';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import useSWR from 'swr';
@@ -26,14 +27,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { saveDraft, submitForReview, listFaasRecords, getFaasRecord, deleteFaasRecord, cancelFaasTransaction } from '@/services/faasService';
 
 // Types
 interface PropertyRecord {
   id: string;
-  tdn: string;
-  arp: string;
-  pin: string;
-  ownerNo: string;
+  TDN: string;
+  ARP: string;
+  PIN: string;
+  OWNER_NO: string;
   owner: string;
   barangay: string;
   barangayCode: string;
@@ -88,11 +90,15 @@ interface PropertyRecord {
   tpdProv?: boolean;
   tpdCity?: boolean;
   tpdDeputy?: boolean;
+  status?: string;
+  assessments?: any[];
+  TRANS_CD?: string; // Transaction Code
 } // Add new field for display
 
 
 const RealPropertyDataEntry: React.FC = () => {
   const { headerColor, headerColorDark } = useThemeColor();
+  const { user } = useAuth();
   
   // Records state
   const [records, setRecords] = useState<PropertyRecord[]>([]);
@@ -106,6 +112,7 @@ const RealPropertyDataEntry: React.FC = () => {
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Search/Filter state
   const [searchField, setSearchField] = useState('TDN');
@@ -120,6 +127,48 @@ const RealPropertyDataEntry: React.FC = () => {
   // Active tab state
   const [activeTab, setActiveTab] = useState('property-info');
   const [showJson, setShowJson] = useState(false);
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
+
+  const handleTransactionClick = () => {
+    setShowTransactionModal(true);
+  };
+
+  const handleTransactionSelect = (type: string) => {
+    if (!selectedRecord) {
+      toast.error('Please select a property first.');
+      return;
+    }
+
+    const newRecord: PropertyRecord = {
+      ...selectedRecord,
+      id: `TRANS-${type}-${Date.now()}`,
+      TDN: '', 
+      ARP: '',
+      pOldTdn: selectedRecord.TDN,
+      pPin: selectedRecord.PIN,
+      pOwner: selectedRecord.owner,
+      pOwnerNo: selectedRecord.OWNER_NO,
+      pEffDate: selectedRecord.pEffDate,
+      pAssessedValue: selectedRecord.pAssessedValue,
+      TRANS_CD: type,
+      status: 'draft',
+      appraisedDate: new Date().toISOString().split('T')[0],
+      // Reset approvals
+      sgdAppraised: false,
+      sgdRecommend: false,
+      sgdApproved: false,
+      sgdAssessed: false,
+      sgdProv: false,
+      sgdCity: false,
+      sgdDeputy: false,
+    };
+
+    setSelectedRecord(newRecord);
+    setIsAdding(true); 
+    setIsEditing(true); 
+    setShowTransactionModal(false);
+    toast.success(`Transaction '${type}' initiated.`);
+  };
 
   // Filter Validation
   const validateFilter = (field: string, value: string): string | null => {
@@ -218,9 +267,9 @@ const RealPropertyDataEntry: React.FC = () => {
   }, [isResizing, resize, stopResizing]);
 
   // SWR Data Fetching
-  const { data: apiData, error, isLoading: isSwrLoading, mutate } = useSWR(
-    ['rpt-mast', pagination.page, pagination.limit, appliedFilter.field, appliedFilter.value],
-    ([_, page, limit, searchField, filterValue]) => getRptMastDataDirect({ page, limit, searchField, filterValue }),
+  const { data: apiData, error, isLoading: isSwrLoading, isValidating, mutate } = useSWR(
+    ['faas-records', pagination.page, pagination.limit, appliedFilter.field, appliedFilter.value],
+    ([_, page, limit, searchField, filterValue]) => listFaasRecords({ page, limit, searchField, filterValue }),
     {
       keepPreviousData: true,
       revalidateOnFocus: false,
@@ -230,68 +279,22 @@ const RealPropertyDataEntry: React.FC = () => {
 
   // Sync data to state
   useEffect(() => {
-    if (apiData?.success) {
-      const mappedRecords: PropertyRecord[] = apiData.data.map((item, index) => ({
-        ...item,
-        id: `${item.TDN}-${index}`, // Ensure unique ID even with duplicate TDNs
-        tdn: item.TDN || '',
-        arp: item.ARP || '',
-        pin: item.PIN || '',
-        ownerNo: item.OWNER_NO || '',
-        owner: item.Owner_Name || 'N/A',
-        barangay: item.BARANGAY || 'N/A',
-        barangayCode: item['BRGY.CODE'] || '',
-        cityCode: item.CITY || '',
-        // Map Reference Fields
-        pNewTdn: item.P_NEW_TDN,
-        pOldTdn: item.P_OLD_TDN,
-        pPin: item.P_PIN,
-        pMarketValue: item.P_MARKET_VALUE,
-        pAssessedValue: item.P_ASS_VALUE,
-        pOwnerCode: item.P_OWNER_CODE,
-        pOwnerNo: item.P_OWNER_NO,
-        canArp: item.CAN_ARP,
-        pArea: item.P_AREA,
-        pAreaM: item.P_AREA_M,
-        pEffDate: item.P_EFF_DATE,
-        pOwner: item.P_OWNER,
-        // Map Signatory Fields
-        appraisedBy: item.Appraiser,
-        appraisedPos: item.AppraiserPos,
-        appraisedDate: item.AppraisedDate,
-        assessor: item.Assessor,
-        assessorPos: item.AssessorPos,
-        assessorDate: item.AssessorDate,
-        recApproval: item.Rec_Approval,
-        recApprovalPos: item.Rec_ApprovalPos,
-        recAppDate: item.Rec_AppDate,
-        approved: item.Approved,
-        approvedPos: item.ApprovedPos,
-        approvedDate: item.ApprovedDate,
-        provAssessor: item.ProvAssessor,
-        provAssessorPos: item.ProvAssessorPos,
-        provAssessorDate: item.ProvAssessorDate,
-        cityAssessor: item.CityAssessor,
-        cityAssessorPos: item.CityAssessorPos,
-        cityAssessorDate: item.CityAssessorDate,
-        deputy: item.Deputy,
-        deputyPos: item.DeputyPos,
-        deputyDate: item.DeputyDate,
-        sgdAppraised: item.SGD_APPRAISED,
-        sgdRecommend: item.SGD_RECOMMEND,
-        sgdApproved: item.SGD_APPROVED,
-        sgdAssessed: item.SGD_ASSESSED,
-        sgdProv: item.SGD_PROV,
-        sgdCity: item.SGD_CITY,
-        sgdDeputy: item.SGD_DEPUTY,
-        tpdAppraised: item.TPD_APPRAISED,
-        tpdRecommend: item.TPD_RECOMMEND,
-        tpdApproved: item.TPD_APPROVED,
-        tpdAssessed: item.TPD_ASSESSED,
-        tpdProv: item.TPD_PROV,
-        tpdCity: item.TPD_CITY,
-        tpdDeputy: item.TPD_DEPUTY
-      }));
+    if (apiData?.data) {
+      const mappedRecords: PropertyRecord[] = apiData.data.map((item: any) => {
+        const innerData = item.data || {};
+        return {
+          ...innerData,
+          id: item.id,
+          TDN: item.tdn || innerData.tdn || innerData.TDN || '',
+          status: item.status,
+          // Ensure essential fields have defaults if missing in JSON
+          owner: innerData.owner || innerData.owner_name || 'N/A',
+          barangay: innerData.barangay || 'N/A',
+          ARP: innerData.ARP || '',
+          PIN: innerData.PIN || '',
+          OWNER_NO: innerData.OWNER_NO || '',
+        };
+      });
 
       setRecords(mappedRecords);
       setTotalRecords(apiData.pagination.total);
@@ -300,24 +303,8 @@ const RealPropertyDataEntry: React.FC = () => {
         ...prev,
         totalPages: apiData.pagination.totalPages
       }));
-
-      // Select first record if none selected and not adding
-      // if (mappedRecords.length > 0 && !selectedRecord && !isAdding) {
-      //   const firstRecord = mappedRecords[0];
-      //   setSelectedRecord(firstRecord);
-        
-      //   // Fetch assessments for default selection
-      //   setIsAssessmentLoading(true);
-      //   getRptAssByTdn(firstRecord.tdn)
-      //     .then(setAssessmentRecords)
-      //     .catch((err) => {
-      //       console.error(err);
-      //       setAssessmentRecords([]);
-      //     })
-      //     .finally(() => setIsAssessmentLoading(false));
-      // }
     }
-  }, [apiData, selectedRecord, isAdding]);
+  }, [apiData, isAdding]);
 
   // Error handling
   useEffect(() => {
@@ -332,21 +319,69 @@ const RealPropertyDataEntry: React.FC = () => {
     setIsLoading(isSwrLoading);
   }, [isSwrLoading]);
 
+  // Restore draft on mount
+  useEffect(() => {
+    const savedDraftId = localStorage.getItem('currentDraftId');
+    if (savedDraftId) {
+      // Don't set global loading here to avoid flashing if SWR is also loading list
+      // But maybe good to indicate restoration
+      const restore = async () => {
+          try {
+              const record = await getFaasRecord(savedDraftId);
+              if (record) {
+                  const innerData = record.data || {};
+                  const mappedRecord: PropertyRecord = {
+                      ...innerData,
+                      id: record.id,
+                      TDN: record.tdn || innerData.tdn || innerData.TDN || '',
+                      status: record.status,
+                      owner: innerData.owner || innerData.owner_name || 'N/A',
+                      barangay: innerData.barangay || 'N/A',
+                      ARP: innerData.ARP || '',
+                      PIN: innerData.PIN || '',
+                      OWNER_NO: innerData.OWNER_NO || '',
+                  };
+                  
+                  setSelectedRecord(mappedRecord);
+                  if (mappedRecord.assessments) {
+                      setAssessmentRecords(mappedRecord.assessments);
+                  }
+                  setIsEditing(true);
+                  toast.success('Restored unsubmitted draft');
+              }
+          } catch (err) {
+              console.error('Failed to restore draft', err);
+              localStorage.removeItem('currentDraftId');
+          }
+      };
+      restore();
+    }
+  }, []);
+
+  // Prevent accidental navigation/refresh when editing
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isEditing || isAdding) {
+        e.preventDefault();
+        e.returnValue = ''; // Standard for Chrome/Firefox
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isEditing, isAdding]);
+
   // Handlers
   const handleRowSelect = (record: PropertyRecord) => {
     if (isEditing || isAdding) return;
     setSelectedRecord(record);
 
-    // Fetch assessments
-    setIsAssessmentLoading(true);
-    getRptAssByTdn(record.tdn)
-      .then(setAssessmentRecords)
-      .catch((err) => {
-        console.error(err);
-        toast.error('Failed to load assessment records');
+    // Use embedded assessments if available, otherwise clear or fetch
+    if (record.assessments) {
+        setAssessmentRecords(record.assessments);
+    } else {
         setAssessmentRecords([]);
-      })
-      .finally(() => setIsAssessmentLoading(false));
+    }
   };
 
   const handleAdd = () => {
@@ -366,20 +401,87 @@ const RealPropertyDataEntry: React.FC = () => {
 
   const handleEdit = () => {
     if (!selectedRecord) return;
+    if (user?.role !== 'admin' && user?.role !== 'Administrator') {
+      toast.error('Only administrators can edit records.');
+      return;
+    }
     setIsEditing(true);
     setIsAdding(false);
   };
 
-  const handleDelete = () => {
+  const handleTransactionCancel = async () => {
     if (!selectedRecord) return;
+    
+    if (window.confirm('Are you sure you want to cancel this transaction? This action cannot be undone.')) {
+        try {
+            // Check if it's actually a transaction
+            const isTransaction = selectedRecord.id && selectedRecord.id.startsWith('TRANS');
+            
+            if (isTransaction) {
+                // If it's a drafted transaction that hasn't been submitted/approved, we can just delete it
+                // But if we want to log it as "Cancelled", we might want a specific endpoint
+                await cancelFaasTransaction(selectedRecord.id);
+                toast.success('Transaction cancelled successfully');
+            } else {
+                toast.error('This is not an active transaction.');
+                return;
+            }
+
+            if (selectedRecord.id === localStorage.getItem('currentDraftId')) {
+                localStorage.removeItem('currentDraftId');
+            }
+            
+            setRecords(prev => prev.filter(r => r.id !== selectedRecord.id));
+            setSelectedRecord(null);
+            setIsEditing(false);
+            setIsAdding(false);
+            mutate();
+        } catch (error) {
+            console.error('Failed to cancel transaction:', error);
+            toast.error('Failed to cancel transaction');
+        }
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedRecord) return;
+    if (user?.role !== 'admin' && user?.role !== 'Administrator') {
+      toast.error('Only administrators can delete records.');
+      return;
+    }
+
     if (window.confirm('Are you sure you want to delete this record?')) {
-      setRecords(prev => prev.filter(r => r.id !== selectedRecord.id));
-      setSelectedRecord(null);
+      try {
+        // Only attempt to delete from backend if it's a real record (not dummy/temp)
+        const isRealRecord = selectedRecord.id && 
+                           !selectedRecord.id.includes('DUMMY') && 
+                           !selectedRecord.id.startsWith('TRANS');
+                           
+        if (isRealRecord) {
+            await deleteFaasRecord(selectedRecord.id);
+            toast.success('Record deleted successfully');
+        } else {
+            toast.success('Local record removed');
+        }
+
+        if (selectedRecord.id === localStorage.getItem('currentDraftId')) {
+            localStorage.removeItem('currentDraftId');
+        }
+        
+        setRecords(prev => prev.filter(r => r.id !== selectedRecord.id));
+        setSelectedRecord(null);
+        mutate(); // Refresh the list
+      } catch (error) {
+        console.error('Failed to delete record:', error);
+        toast.error('Failed to delete record');
+      }
     }
   };
 
   // Auto-save mechanism for sub-components
   const handleAutoSave = async (updatedAssessmentRecords: any[]) => {
+    if (!selectedRecord) return; // Guard clause
+
     // Update local state first
     setAssessmentRecords(updatedAssessmentRecords);
     
@@ -392,14 +494,24 @@ const RealPropertyDataEntry: React.FC = () => {
 
     try {
       // Sync to Supabase
-      const savedRecord = await saveDraft(dataToSave);
+      // Pass ID if it's an update to existing record (not a new temp one)
+      const isUpdate = selectedRecord.id && 
+                       !selectedRecord.id.includes('DUMMY') && 
+                       !selectedRecord.id.startsWith('TRANS');
+                       
+      const savedRecord = await saveDraft(dataToSave, isUpdate ? selectedRecord.id : undefined);
       toast.success('Changes synced to server');
+      
+      const savedId = savedRecord.id || selectedRecord?.id;
+      if (savedId) {
+          localStorage.setItem('currentDraftId', savedId);
+      }
       
       // Update local ID if it was a new record
       if (selectedRecord && (!selectedRecord.id || selectedRecord.id.includes('DUMMY'))) {
           setSelectedRecord({
               ...selectedRecord,
-              id: savedRecord.id,
+              id: savedId || '', // Fallback to empty string if undefined, though it should exist
               status: 'draft'
           });
       }
@@ -409,20 +521,202 @@ const RealPropertyDataEntry: React.FC = () => {
     }
   };
 
-  const handleSave = () => {
-    // Save logic here
-    setIsEditing(false);
-    setIsAdding(false);
-    toast.success('Record saved successfully');
+  const checkDuplicatePinTdn = async (pin: string, tdn: string): Promise<string | null> => {
+    // Skip check if values are empty
+    if (!pin && !tdn) return null;
+
+    try {
+      // Check PIN uniqueness
+      if (pin) {
+        const pinResult = await getRptMastDataDirect({
+          page: 1,
+          limit: 5,
+          searchField: 'PIN',
+          filterValue: pin
+        });
+        
+        const duplicatePin = pinResult.data.find(r => r.PIN === pin);
+        
+        if (duplicatePin) {
+            // Allow if the found record is the predecessor (parent)
+            if (duplicatePin.TDN !== selectedRecord?.TDN && duplicatePin.TDN !== selectedRecord?.pOldTdn) {
+              return `PIN ${pin} already exists (Used by TDN: ${duplicatePin.TDN})`;
+            }
+         }
+      }
+
+      // Check TDN uniqueness
+      if (tdn) {
+        const tdnResult = await getRptMastDataDirect({
+          page: 1,
+          limit: 5,
+          searchField: 'TDN',
+          filterValue: tdn
+        });
+
+        const duplicateTdn = tdnResult.data.find(r => r.TDN === tdn);
+        if (duplicateTdn) {
+           const isNewRecord = isAdding || (selectedRecord?.id && selectedRecord.id.startsWith('TRANS'));
+           
+           if (isNewRecord) {
+               return `TDN ${tdn} already exists.`;
+           } else {
+               const originalTdn = selectedRecord?.id?.split('-')[0];
+               if (duplicateTdn.TDN !== originalTdn) {
+                   return `TDN ${tdn} already exists.`;
+               }
+           }
+        }
+      }
+
+    } catch (error: any) {
+      console.error('Validation check failed:', error);
+      return `Validation check failed: ${error.message || 'Network Error'}`;
+    }
+    return null;
+  };
+
+  const handleSave = async () => {
+    if (!selectedRecord) return;
+
+    // Check duplicates
+    const errorMsg = await checkDuplicatePinTdn(selectedRecord.PIN, selectedRecord.TDN);
+    if (errorMsg) {
+      toast.error('Validation Error', {
+        description: errorMsg,
+        duration: Infinity,
+        action: {
+          label: 'Dismiss',
+          onClick: () => console.log('Dismissed')
+        }
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    const toastId = toast.loading('Saving draft...');
+
+    try {
+      // Prepare data for saving
+      const isTempId = selectedRecord.id && (selectedRecord.id.startsWith('TRANS') || selectedRecord.id.startsWith('DUMMY') || selectedRecord.id.includes('DUMMY'));
+      
+      const { id, ...recordData } = selectedRecord;
+      const dataToSave = {
+        ...recordData,
+        ...(isTempId ? {} : { id: selectedRecord.id }),
+        assessments: assessmentRecords,
+        status: 'draft'
+      };
+
+      // Pass ID if it's an update to existing record (not a new temp one)
+      const savedRecord = await saveDraft(dataToSave, isTempId ? undefined : selectedRecord.id);
+      
+      toast.dismiss(toastId);
+      toast.success('Draft saved successfully');
+      
+      const savedId = savedRecord.id || selectedRecord.id;
+      localStorage.setItem('currentDraftId', savedId);
+
+      setSelectedRecord({
+        ...selectedRecord,
+        id: savedId,
+        status: 'draft'
+      });
+    } catch (error: any) {
+      toast.dismiss(toastId);
+      // Prioritize the error message from the backend response (AppError)
+      const backendMessage = error.response?.data?.message;
+      const errorMessage = backendMessage || error.message || 'Failed to save draft';
+      
+      toast.error(errorMessage, {
+        duration: 5000,
+        description: backendMessage ? 'Please check your input.' : 'Server Error'
+      });
+      console.error('Save Draft Error:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedRecord) return;
+
+    // Check duplicates
+    const errorMsg = await checkDuplicatePinTdn(selectedRecord.PIN, selectedRecord.TDN);
+    if (errorMsg) {
+      toast.error('Validation Error', {
+        description: errorMsg,
+        duration: Infinity,
+        action: {
+          label: 'Dismiss',
+          onClick: () => console.log('Dismissed')
+        }
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    const toastId = toast.loading('Submitting record...');
+
+    try {
+      // First ensure it's saved
+      const isTempId = selectedRecord.id && (selectedRecord.id.startsWith('TRANS') || selectedRecord.id.startsWith('DUMMY') || selectedRecord.id.includes('DUMMY'));
+      
+      const { id, ...recordData } = selectedRecord;
+      const dataToSave = {
+        ...recordData,
+        ...(isTempId ? {} : { id: selectedRecord.id }),
+        assessments: assessmentRecords,
+        status: 'for-review'
+      };
+      
+      let recordId = selectedRecord.id;
+      
+      if (isTempId) {
+         const saved = await saveDraft(dataToSave);
+         recordId = saved.id || ''; 
+      } else {
+         const saved = await saveDraft(dataToSave, recordId);
+         recordId = saved.id || recordId;
+      }
+      
+      if (!recordId) throw new Error("Failed to obtain Record ID");
+      
+      await submitForReview(recordId);
+      
+      toast.dismiss(toastId);
+      toast.success('Record submitted for review');
+      setSelectedRecord({
+        ...selectedRecord,
+        id: recordId,
+        status: 'for-review'
+      });
+      setIsAdding(false);
+      setIsEditing(false);
+    } catch (error: any) {
+      toast.dismiss(toastId);
+      // Prioritize the error message from the backend response (AppError)
+      const backendMessage = error.response?.data?.message;
+      const errorMessage = backendMessage || error.message || 'Failed to submit record';
+      
+      toast.error(errorMessage, {
+        duration: 5000,
+        description: backendMessage ? 'Please check your input.' : 'Server Error'
+      });
+      console.error('Submit Error:', error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCancel = () => {
     setIsEditing(false);
     setIsAdding(false);
+    localStorage.removeItem('currentDraftId');
   };
 
-  const handleRefresh = () => {
-    mutate();
+  const handleRefresh = async () => {
+    await mutate();
     toast.success('Data refreshed');
   };
 
@@ -521,33 +815,47 @@ const RealPropertyDataEntry: React.FC = () => {
           {/* Save/Cancel */}
           <button
             onClick={handleSave}
-            disabled={!isFormEnabled || isSubComponentEditing}
+            disabled={!isFormEnabled || isSubComponentEditing || isSaving}
             className="px-3 py-2 text-xs bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="btn-save"
           >
-            <Save size={14} />
-            Save
+            {isSaving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+            {isSaving ? 'Saving...' : 'Save'}
           </button>
-          <button
-            onClick={handleCancel}
-            disabled={!isFormEnabled || isSubComponentEditing}
-            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="btn-cancel"
-          >
-            <X size={14} />
-            Cancel
-          </button>
+          
+          {selectedRecord && selectedRecord.id && selectedRecord.id.startsWith('TRANS') ? (
+            <button
+                onClick={handleTransactionCancel}
+                disabled={!selectedRecord || isSaving}
+                className="px-3 py-2 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="btn-cancel-transaction"
+            >
+                <X size={14} />
+                Cancel Transaction
+            </button>
+          ) : (
+            <button
+                onClick={handleCancel}
+                disabled={!isFormEnabled || isSubComponentEditing || isSaving}
+                className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="btn-cancel"
+            >
+                <X size={14} />
+                Cancel
+            </button>
+          )}
           
           <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1" />
           
           {/* Utility Buttons */}
           <button
             onClick={handleRefresh}
-            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
+            disabled={isValidating}
+            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-70"
             data-testid="btn-refresh"
           >
-            <RefreshCw size={14} />
-            Refresh
+            <RefreshCw size={14} className={isValidating ? "animate-spin" : ""} />
+            {isValidating ? 'Refreshing...' : 'Refresh'}
           </button>
           <button
             onClick={handlePrint}
@@ -565,9 +873,13 @@ const RealPropertyDataEntry: React.FC = () => {
             <Info size={14} />
             Other Info
           </button>
-          <button className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5">
-            <FileText size={14} />
-            Transaction
+          <button 
+            onClick={handleTransactionClick}
+            disabled={!selectedRecord}
+            className="px-4 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all transform active:scale-95 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none ring-2 ring-blue-500/20"
+          >
+            <FileText size={16} strokeWidth={2.5} />
+            TRANSACTION
           </button>
           <button className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-purple-700 dark:text-purple-400">
             <DollarSign size={14} />
@@ -639,10 +951,10 @@ const RealPropertyDataEntry: React.FC = () => {
                     }`}
                     data-testid={`record-row-${record.id}`}
                   >
-                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.tdn}</td>
-                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.arp}</td>
-                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.pin}</td>
-                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.ownerNo}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.TDN}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.ARP}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.PIN}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.OWNER_NO}</td>
                     <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap truncate max-w-xs">{record.owner}</td>
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap text-center">{record.cityCode}</td>
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap text-center">{record.barangayCode}</td>
@@ -857,9 +1169,111 @@ const RealPropertyDataEntry: React.FC = () => {
           </div>
         </div>
       </div>
+      {/* Transaction Modal */}
+      <Dialog open={showTransactionModal} onOpenChange={setShowTransactionModal}>
+        <DialogContent className="max-w-md" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>Select Transaction Type</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 py-4">
+            <button
+              onClick={() => handleTransactionSelect('GR')}
+              className="p-4 text-left border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 group"
+            >
+              <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:bg-blue-200 dark:group-hover:bg-blue-900/50 transition-colors">
+                <FileText size={20} />
+              </div>
+              <div>
+                <div className="font-semibold text-slate-900 dark:text-slate-100">General Revision (GR)</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Mass update of property assessments</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handleTransactionSelect('REV')}
+              className="p-4 text-left border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 group"
+            >
+              <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-600 dark:text-orange-400 group-hover:bg-orange-200 dark:group-hover:bg-orange-900/50 transition-colors">
+                <RefreshCw size={20} />
+              </div>
+              <div>
+                <div className="font-semibold text-slate-900 dark:text-slate-100">Revision (REV)</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Specific updates or corrections</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handleTransactionSelect('MIGRATE')}
+              className="p-4 text-left border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 group"
+            >
+              <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 group-hover:bg-purple-200 dark:group-hover:bg-purple-900/50 transition-colors">
+                <Sparkles size={20} />
+              </div>
+              <div>
+                <div className="font-semibold text-slate-900 dark:text-slate-100">Migrate (MIGRATE)</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Import or transfer legacy data</div>
+              </div>
+            </button>
+
+            <div className="border-t border-slate-200 dark:border-slate-700 my-2"></div>
+
+            <button
+              onClick={() => handleTransactionSelect('CN')}
+              className="p-4 text-left border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 group"
+            >
+              <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-600 dark:text-red-400 group-hover:bg-red-200 dark:group-hover:bg-red-900/50 transition-colors">
+                <X size={20} />
+              </div>
+              <div>
+                <div className="font-semibold text-slate-900 dark:text-slate-100">Cancellation (CN)</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Cancel existing assessment</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handleTransactionSelect('CS')}
+              className="p-4 text-left border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 group"
+            >
+              <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400 group-hover:bg-green-200 dark:group-hover:bg-green-900/50 transition-colors">
+                <Building2 size={20} />
+              </div>
+              <div>
+                <div className="font-semibold text-slate-900 dark:text-slate-100">Consolidation (CS)</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Combine multiple properties</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handleTransactionSelect('SD')}
+              className="p-4 text-left border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 group"
+            >
+              <div className="w-10 h-10 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center text-yellow-600 dark:text-yellow-400 group-hover:bg-yellow-200 dark:group-hover:bg-yellow-900/50 transition-colors">
+                <GripHorizontal size={20} />
+              </div>
+              <div>
+                <div className="font-semibold text-slate-900 dark:text-slate-100">Subdivision (SD)</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Split property into multiple lots</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handleTransactionSelect('CS-SD')}
+              className="p-4 text-left border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 group"
+            >
+              <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-200 dark:group-hover:bg-indigo-900/50 transition-colors">
+                <RefreshCw size={20} />
+              </div>
+              <div>
+                <div className="font-semibold text-slate-900 dark:text-slate-100">Consolidation and Subdivision (CS-SD)</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Complex split and merge operation</div>
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
       {/* JSON Viewer Modal */}
       <Dialog open={showJson} onOpenChange={setShowJson}>
-        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col" aria-describedby={ undefined }>
           <DialogHeader>
             <DialogTitle>Form Data (JSON)</DialogTitle>
           </DialogHeader>
@@ -875,8 +1289,7 @@ const RealPropertyDataEntry: React.FC = () => {
               }, null, 2)}
             </pre>
           </div>
-        </DialogContent>
-      </Dialog>
+        </DialogContent></Dialog>
     </div>
   );
 };

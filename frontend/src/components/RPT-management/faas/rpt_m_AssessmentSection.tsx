@@ -9,11 +9,12 @@ interface AssessmentSectionProps {
   isEnabled?: boolean;
   assessmentRecords?: RptAssRecord[];
   isLoading?: boolean;
+  onUpdate?: (records: any[]) => void;
 }
 
 type AssessmentType = 'land' | 'building' | 'machinery';
 
-const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assessmentRecords = [], isLoading = false }) => {
+const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assessmentRecords = [], isLoading = false, onUpdate }) => {
   const [activeType, setActiveType] = useState<AssessmentType>('land'); // Default to land as it's often the base
 
   // Filter records by type
@@ -44,6 +45,56 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assess
         // Let's keep current selection or default to land.
     }
   }, [assessmentRecords, isLoading]);
+
+  const handleUpdate = (type: AssessmentType, updatedTypeRecords: any[]) => {
+    if (!onUpdate) return;
+    
+    // Filter out records of the *current type* from the *original* list to preserve others
+    let otherRecords: any[] = [];
+    
+    if (type === 'land') {
+      otherRecords = assessmentRecords.filter(r => r.KIND !== 'L' && r.KIND !== 'Land');
+    } else if (type === 'building') {
+      otherRecords = assessmentRecords.filter(r => r.KIND !== 'B' && r.KIND !== 'Building');
+    } else if (type === 'machinery') {
+      otherRecords = assessmentRecords.filter(r => r.KIND !== 'M' && r.KIND !== 'Machinery');
+    }
+    
+    // Map the updated records to ensure they have the correct KIND if missing
+    const mappedUpdatedRecords = updatedTypeRecords.map(r => {
+        let kind = r.KIND || r.kind;
+        if (!kind) {
+            if (type === 'land') kind = 'Land';
+            if (type === 'building') kind = 'Building';
+            if (type === 'machinery') kind = 'Machinery';
+        }
+        
+        // Ensure format compatibility if needed
+        // The child components (LandAssessment etc) return their own Record types (LandRecord)
+        // We might need to map them back to RptAssRecord format if backend expects strict structure
+        // But for now we assume backend handles flexible JSON or child returns compatible structure
+        
+        return {
+            ...r,
+            KIND: kind,
+            // Map common fields to ensure they are available in RptAssRecord format
+            TDN: r.TDN || r.id,
+            CLASSIFICATION: r.CLASSIFICATION || r.classification,
+            ACTUAL_USE: r.ACTUAL_USE || r.actualUse,
+            SUB_CLASS: r.SUB_CLASS || r.subClass,
+            AREA: r.AREA || r.area,
+            UNIT_VALUE: r.UNIT_VALUE || r.unitValue,
+            MARKET_VAL: r.MARKET_VAL || r.baseMarketValue,
+            ASS_LEVEL: r.ASS_LEVEL || r.assessmentLevel,
+            ASS_VALUE: r.ASS_VALUE || r.assessedValue,
+            TAXABLE_RATE: r.taxable ? 100 : 0, // Simplified mapping
+            IdleLand: r.IdleLand || r.idleLand
+        };
+    });
+
+    const mergedRecords = [...otherRecords, ...mappedUpdatedRecords];
+    onUpdate(mergedRecords);
+  };
 
   if (isLoading) {
     return (
@@ -102,6 +153,7 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assess
           <LandAssessment
             records={landRecords}
             isEnabled={isEnabled}
+            onUpdate={(records) => handleUpdate('land', records)}
           />
         )}
 
@@ -109,6 +161,7 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assess
           <BuildingAssessment 
             records={buildingRecords}
             isEnabled={isEnabled}
+            onUpdate={(records) => handleUpdate('building', records)}
           />
         )}
 
@@ -116,6 +169,7 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assess
           <MachineryAssessment
             records={machineryRecords}
             isEnabled={isEnabled}
+            onUpdate={(records) => handleUpdate('machinery', records)}
           />
         )}
       </div>

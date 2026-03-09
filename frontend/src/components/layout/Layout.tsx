@@ -20,20 +20,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <Sidebar />
       <Header />
-      <div className={`pt-16 transition-all duration-300 ${
+      <div className={`pt-16 transition-all duration-300 flex flex-col min-h-screen ${
         isCollapsed ? 'ml-16' : 'ml-64'
       }`}>
         <main
+          className="flex-1 flex flex-col"
           data-testid="main-content"
         >
-          <div className="p-6">
+          <div className="flex-1 p-6 flex flex-col">
             {!hideBreadcrumb && <Breadcrumb />}
             {children}
           </div>
         </main>
         
         {/* Footer */}
-        <footer className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 mt-24">
+        <footer className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 mt-auto">
           <div className="px-6 py-4">
             <p className="text-xs text-center text-slate-600 dark:text-slate-400">
               © {new Date().getFullYear()} Real Property Tax System. All rights reserved.

@@ -4,10 +4,10 @@ import { useThemeColor } from '@/context/ThemeColorContext';
 
 interface PropertyRecord {
   id: string;
-  tdn: string;
-  arp: string;
-  pin: string;
-  ownerNo: string;
+  TDN: string;
+  ARP: string;
+  PIN: string;
+  OWNER_NO: string;
   owner: string;
   // Added fields for mapping
   EFF_DATE?: string;
@@ -33,6 +33,8 @@ interface PropertyRecord {
 interface PropertyInformationSectionProps {
   isEnabled: boolean;
   selectedRecord: PropertyRecord | null;
+  onUpdate?: (updatedData: Partial<PropertyRecord>) => void;
+  isAdding?: boolean;
 }
 
 interface PropertyInfoData {
@@ -135,6 +137,8 @@ const emptyData: PropertyInfoData = {
 const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
   isEnabled,
   selectedRecord,
+  onUpdate,
+  isAdding = false
 }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const [data, setData] = useState<PropertyInfoData>(defaultData);
@@ -159,9 +163,9 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
           barangayName: selectedRecord.BARANGAY || '',
           ccn: selectedRecord.CCN || '',
           // motherTdn: !!selectedRecord.MTDN, // Logic unclear, leaving as is or default
-          tdNo: selectedRecord.tdn || '',
-          arpNo: selectedRecord.arp || '',
-          propertyIndexNo: selectedRecord.pin || '',
+          tdNo: selectedRecord.TDN || '',
+          arpNo: selectedRecord.ARP || '',
+          propertyIndexNo: selectedRecord.PIN || '',
           improvementNo: selectedRecord.IMP_NO || '',
           buildingName: selectedRecord.BLDGNAME || '',
           buildingUnit: selectedRecord.BLDGUNIT || '',
@@ -186,9 +190,24 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
     }
   }, [selectedRecord]);
 
+  // Auto-formatter for TDN
+  const formatTdn = (value: string) => {
+    const raw = value.replace(/[^a-zA-Z0-9]/g, '');
+    if (raw.length <= 2) return raw;
+    if (raw.length <= 4) return `${raw.slice(0, 2)}-${raw.slice(2)}`;
+    if (raw.length <= 8) return `${raw.slice(0, 2)}-${raw.slice(2, 4)}-${raw.slice(4)}`;
+    return `${raw.slice(0, 2)}-${raw.slice(2, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 13)}`;
+  };
+
   const handleChange = (field: keyof PropertyInfoData, value: string | boolean) => {
     setData(prev => {
-      const newData = { ...prev, [field]: value };
+      let finalValue = value;
+      
+      if (field === 'tdNo' && typeof value === 'string') {
+          finalValue = formatTdn(value);
+      }
+
+      const newData = { ...prev, [field]: finalValue };
       
       // Auto-update barangay name
       if (field === 'barangay') {
@@ -196,6 +215,34 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
         if (bgy) newData.barangayName = bgy.name;
       }
       
+      // Auto-update TDN prefix based on Effectivity Date
+      if (field === 'effectivityDate' && typeof value === 'string' && value) {
+          const year = parseInt(value.split('-')[0], 10);
+          if (!isNaN(year)) {
+              // Rule: (Year % 100) - 1.
+              // 2026 -> 25.
+              const prefix = ((year % 100) - 1).toString().padStart(2, '0');
+              
+              if (newData.tdNo && newData.tdNo.length >= 2) {
+                  newData.tdNo = prefix + newData.tdNo.substring(2);
+              } else if (!newData.tdNo) {
+                  newData.tdNo = prefix + '-';
+              }
+
+              // Also sync ARP
+              if (newData.arpNo && newData.arpNo.length >= 2) {
+                   newData.arpNo = prefix + newData.arpNo.substring(2);
+              } else if (!newData.arpNo) {
+                   newData.arpNo = prefix + '-';
+              }
+          }
+      }
+
+      // Auto-sync ARP when TDN changes
+      if (field === 'tdNo' && typeof finalValue === 'string') {
+          newData.arpNo = finalValue;
+      }
+
       // Auto-update update code description
       if (field === 'updateCode') {
         const code = updateCodeOptions.find(c => c.value === value);
@@ -364,7 +411,7 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
                 type="text"
                 value={data.tdNo}
                 onChange={(e) => handleChange('tdNo', e.target.value)}
-                disabled={!isEnabled}
+                disabled={!isEnabled || (!isAdding && isEnabled)}
                 className={`${inputClass} font-mono`}
                 data-testid="input-td-no"
               />
@@ -377,7 +424,7 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
                 type="text"
                 value={data.arpNo}
                 onChange={(e) => handleChange('arpNo', e.target.value)}
-                disabled={!isEnabled}
+                disabled={!isEnabled || (!isAdding && isEnabled)}
                 className={`${inputClass} font-mono`}
                 data-testid="input-arp-no"
               />
@@ -390,7 +437,7 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
                 type="text"
                 value={data.propertyIndexNo}
                 onChange={(e) => handleChange('propertyIndexNo', e.target.value)}
-                disabled={!isEnabled}
+                disabled={!isEnabled || (!isAdding && isEnabled)}
                 className={`${inputClass} font-mono`}
                 data-testid="input-property-index-no"
               />

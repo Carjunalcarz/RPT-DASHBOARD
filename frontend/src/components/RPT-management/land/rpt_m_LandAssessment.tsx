@@ -3,12 +3,13 @@ import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, TreePine, ArrowDownUp
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { RptAssRecord } from '@/services/rptAssService';
 import { getLandClassifications, getLandMarketValues, getMunicipalities, getAgriculturalTypes, LandClassification, LandMarketValue, Municipality } from '@/services/landTaxService';
-import LandAdjustmentModal, { LandAdjustment } from './LandAdjustmentModal';
-import TreesModal, { TreePlant } from './TreesModal';
+import LandAdjustmentModal, { LandAdjustment } from './rpt_m_LandAdjustmentModal';
+import TreesModal, { TreePlant } from './rpt_m_TreesModal';
 
 interface LandAssessmentProps {
   records?: RptAssRecord[];
   isEnabled?: boolean;
+  onUpdate?: (records: any[]) => void;
 }
 
 interface LandRecord {
@@ -66,7 +67,7 @@ const defaultFormData: FormData = {
   idleLand: false,
 };
 
-const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, isEnabled }) => {
+const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, isEnabled, onUpdate }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const [records, setRecords] = useState<LandRecord[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<LandRecord | null>(null);
@@ -290,7 +291,9 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
   const handleDelete = () => {
     if (!selectedRecord) return;
     if (window.confirm('Are you sure you want to delete this record?')) {
-      setRecords(prev => prev.filter(r => r.id !== selectedRecord.id));
+      const newRecords = records.filter(r => r.id !== selectedRecord.id);
+      setRecords(newRecords);
+      if (onUpdate) onUpdate(newRecords);
       setSelectedRecord(null);
       setFormData(defaultFormData);
     }
@@ -329,11 +332,14 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
       trees: selectedRecord?.trees || [],
     };
 
+    let newRecords: LandRecord[] = [];
     if (isAdding) {
-      setRecords(prev => [...prev, newRecord]);
+      newRecords = [...records, newRecord];
     } else {
-      setRecords(prev => prev.map(r => r.id === selectedRecord!.id ? newRecord : r));
+      newRecords = records.map(r => r.id === selectedRecord!.id ? newRecord : r);
     }
+    setRecords(newRecords);
+    if (onUpdate) onUpdate(newRecords);
 
     setSelectedRecord(newRecord);
     setIsEditing(false);
@@ -344,16 +350,20 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
   const handleSaveAdjustments = (newAdjustments: LandAdjustment[]) => {
     if (!selectedRecord) return;
     const updatedRecord = { ...selectedRecord, adjustments: newAdjustments };
+    const newRecords = records.map(r => r.id === updatedRecord.id ? updatedRecord : r);
+    setRecords(newRecords);
+    if (onUpdate) onUpdate(newRecords);
     setSelectedRecord(updatedRecord);
-    setRecords(prev => prev.map(r => r.id === updatedRecord.id ? updatedRecord : r));
   };
 
   // Handle Save Trees
   const handleSaveTrees = (newTrees: TreePlant[]) => {
     if (!selectedRecord) return;
     const updatedRecord = { ...selectedRecord, trees: newTrees };
+    const newRecords = records.map(r => r.id === updatedRecord.id ? updatedRecord : r);
+    setRecords(newRecords);
+    if (onUpdate) onUpdate(newRecords);
     setSelectedRecord(updatedRecord);
-    setRecords(prev => prev.map(r => r.id === updatedRecord.id ? updatedRecord : r));
   };
 
   // Handle Cancel

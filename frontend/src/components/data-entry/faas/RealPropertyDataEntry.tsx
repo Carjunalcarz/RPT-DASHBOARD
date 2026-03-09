@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import {
   Plus, Edit2, Trash2, Save, X, RefreshCw, Printer,
   FileText, CreditCard, Search, ChevronDown, Building2,
-  User, MapPin, Info, DollarSign, GripHorizontal, Sparkles, Code
+  User, MapPin, Info, DollarSign, GripHorizontal, Sparkles, Code, Loader2
 } from 'lucide-react';
 import { dummyPropertyRecord, dummyAssessmentRecords } from './dummyData';
 import { useThemeColor } from '@/context/ThemeColorContext';
@@ -91,6 +91,26 @@ interface PropertyRecord {
   tpdDeputy?: boolean;
   trees?: any[];
   status?: 'draft' | 'for-review' | 'approved';
+  TRANS_CD?: string; // Transaction Code (Update Code)
+  
+  // Additional fields for PropertyInformationSection
+  EFF_DATE?: string;
+  DEC_DATE?: string;
+  EFF_CANC?: string;
+  DIST_NO?: string;
+  BCODE?: string;
+  BARANGAY?: string;
+  CCN?: string;
+  MTDN?: string;
+  IMP_NO?: string;
+  BLDGNAME?: string;
+  BLDGUNIT?: string;
+  CER_TIT_NO?: string;
+  TCT_DATE?: string;
+  CAD_LOT_NO?: string;
+  ASS_LOT_NO?: string;
+  BLOCK_NO?: string;
+  LOTE_NO?: string;
 } // Add new field for display
 
 
@@ -109,6 +129,7 @@ const RealPropertyDataEntry: React.FC = () => {
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Search/Filter state
   const [searchField, setSearchField] = useState('TDN');
@@ -120,9 +141,96 @@ const RealPropertyDataEntry: React.FC = () => {
   // Sub-component editing state
   const [isSubComponentEditing, setIsSubComponentEditing] = useState(false);
 
-  // Active tab state
-  const [activeTab, setActiveTab] = useState('property-info');
-  const [showJson, setShowJson] = useState(false);
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
+
+  // ... (previous state declarations)
+
+  const handleTransactionClick = () => {
+    setShowTransactionModal(true);
+  };
+
+  const handleTransactionSelect = (type: string) => {
+    if (!selectedRecord) {
+      toast.error('Please select a property first.');
+      return;
+    }
+
+    // Create a new record based on the selected one
+    // This initiates a new transaction workflow
+    const newRecord: PropertyRecord = {
+      ...selectedRecord,
+      // Generate a temporary ID for the transaction
+      id: `TRANS-${type}-${Date.now()}`,
+      
+      // Clear unique identifiers that should be new for the transaction
+      // tdn: '', 
+      // arp: '',
+      
+      // Explicitly set these to empty strings for the UI inputs if they are undefined in selectedRecord
+      // TDN: '',
+      // ARP: '',
+      
+      // Link to the previous record (The "Foundation" of the transaction)
+      pOldTdn: selectedRecord.tdn,
+      pPin: selectedRecord.pin,
+      pOwner: selectedRecord.owner,
+      pOwnerNo: selectedRecord.ownerNo,
+      pEffDate: selectedRecord.pEffDate, // Or current date? Usually previous eff date.
+      pAssessedValue: selectedRecord.pAssessedValue, // Should be calculated or carried over
+      
+      // Set the Transaction Type
+      TRANS_CD: type,
+      
+      // Reset status and dates for the new workflow
+      status: 'draft',
+      appraisedDate: new Date().toISOString().split('T')[0],
+      assessorDate: '',
+      recAppDate: '',
+      approvedDate: '',
+      
+      // Clear approvals
+      sgdAppraised: false,
+      sgdRecommend: false,
+      sgdApproved: false,
+      sgdAssessed: false,
+      sgdProv: false,
+      sgdCity: false,
+      sgdDeputy: false,
+    };
+
+    // Update state to reflect the new transaction record
+    setSelectedRecord(newRecord);
+    
+    // Set UI to "Add/Edit" mode to allow data entry
+    setIsAdding(true); 
+    setIsEditing(true); 
+    
+    // Close modal and notify user
+    setShowTransactionModal(false);
+    toast.success(`Transaction '${type}' initiated. Source data loaded.`);
+  };
+
+  const handlePropertyInfoUpdate = (updatedData: Partial<PropertyRecord>) => {
+    if (!selectedRecord) return;
+    
+    // Merge updates into selectedRecord
+    const updatedRecord = { ...selectedRecord, ...updatedData };
+    
+    // Update local state
+    setSelectedRecord(updatedRecord);
+    
+    // If we are editing, we might want to update the main records list too if the ID matches
+    // But for drafts/new transactions, it's just local until saved.
+    // However, the table relies on `records`.
+    // If this is a new transaction (isAdding=true), it's not in `records` yet?
+    // Wait, handleSaveDraft saves it to backend.
+    
+    // Let's just update selectedRecord for now. 
+    // If we want real-time update in the table row (if it exists there), we need to update `records`.
+    if (records.some(r => r.id === updatedRecord.id)) {
+        setRecords(prev => prev.map(r => r.id === updatedRecord.id ? updatedRecord : r));
+    }
+  };
 
   // Filter Validation
   const validateFilter = (field: string, value: string): string | null => {
@@ -335,6 +443,19 @@ const RealPropertyDataEntry: React.FC = () => {
     setIsLoading(isSwrLoading);
   }, [isSwrLoading]);
 
+  // Prevent accidental navigation/refresh when editing
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isEditing || isAdding) {
+        e.preventDefault();
+        e.returnValue = ''; // Standard for Chrome/Firefox
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isEditing, isAdding]);
+
   // Handlers
   const handleRowSelect = (record: PropertyRecord) => {
     if (isEditing || isAdding) return;
@@ -390,7 +511,7 @@ const RealPropertyDataEntry: React.FC = () => {
       if (selectedRecord && (!selectedRecord.id || selectedRecord.id.includes('DUMMY'))) {
           setSelectedRecord({
               ...selectedRecord,
-              id: savedRecord.id,
+              id: savedRecord.id || selectedRecord.id, // Fallback to existing if undefined
               status: 'draft'
           });
       }
@@ -400,54 +521,254 @@ const RealPropertyDataEntry: React.FC = () => {
     }
   };
 
+  const checkDuplicatePinTdn = async (pin: string, tdn: string): Promise<string | null> => {
+    // Skip check if values are empty (validation should handle required fields separately if needed)
+    if (!pin && !tdn) return null;
+
+    try {
+      // Check PIN uniqueness
+      if (pin) {
+        const pinResult = await getRptMastDataDirect({
+          page: 1,
+          limit: 5,
+          searchField: 'PIN',
+          filterValue: pin
+        });
+        
+        // Check for exact match
+        // If we are editing an existing record that is already in the database (not a draft), 
+        // we should exclude it from the check.
+        // However, selectedRecord here might be a draft with a temporary ID.
+        // If it's a new transaction (TRANS-...), it shouldn't match any existing active record.
+        const duplicatePin = pinResult.data.find(r => r.PIN === pin);
+        
+        if (duplicatePin) {
+           // If the found record is the same as the one we are editing (by TDN/ID), it's fine.
+           // But how do we know?
+           // If selectedRecord.tdn matches duplicatePin.TDN, it's the same record.
+           // But if we are changing the PIN of an existing record, duplicatePin will be the record holding the *old* PIN?
+           // No, duplicatePin is the record holding the *new* PIN we are trying to set.
+           // If we find ANY record with this PIN, and it's not THIS record, it's a duplicate.
+           
+           // If selectedRecord is a Draft/New, it has no presence in RPTMAST yet.
+           // So ANY match in RPTMAST is a conflict.
+           
+           // If selectedRecord is an existing RPTMAST record being edited:
+           // We allow saving if the match IS the current record.
+           // checking ID or TDN.
+           
+           // Allow if the found record is the predecessor (parent) of the current transaction
+           // This handles Revisions where PIN remains the same but TDN changes
+           if (duplicatePin.TDN !== selectedRecord?.tdn && duplicatePin.TDN !== selectedRecord?.pOldTdn) {
+             // It belongs to someone else
+             return `PIN ${pin} already exists (Used by TDN: ${duplicatePin.TDN})`;
+           }
+        }
+      }
+
+      // Check TDN uniqueness
+      if (tdn) {
+        const tdnResult = await getRptMastDataDirect({
+          page: 1,
+          limit: 5,
+          searchField: 'TDN',
+          filterValue: tdn
+        });
+
+        const duplicateTdn = tdnResult.data.find(r => r.TDN === tdn);
+        if (duplicateTdn) {
+           // If we are editing the record, finding itself is fine.
+           // We compare IDs or unique keys.
+           // If selectedRecord is new (has TRANS- id), it shouldn't match anything.
+           // If selectedRecord is existing, duplicateTdn.TDN === selectedRecord.tdn is expected.
+           
+           // But wait, if I am *changing* the TDN, selectedRecord.tdn is the *new* value (bound to input).
+           // So `selectedRecord.tdn` is already the new value `tdn`.
+           // This logic is circular if I rely on `selectedRecord.tdn`.
+           
+           // I need to know the *original* TDN to exclude it.
+           // But `PropertyRecord` doesn't strictly store `originalTdn`.
+           // However, `records` array has the list. 
+           // If I am editing, `selectedRecord.id` should match the one in DB if it came from DB.
+           // But `selectedRecord.id` is composed of `${TDN}-${index}` in the `records` mapping.
+           
+           // Let's rely on the fact that if it's a new transaction (id starts with TRANS or isAdding is true),
+           // ANY existence is bad.
+           
+           const isNewRecord = isAdding || (selectedRecord?.id && selectedRecord.id.startsWith('TRANS'));
+           
+           if (isNewRecord) {
+               return `TDN ${tdn} already exists (Owner: ${duplicateTdn.Owner_Name || 'Unknown'}, Status: ${duplicateTdn.TRANS_CD || 'Active'}).`;
+           } else {
+               // Editing existing.
+               // Fix ID parsing for UUIDs vs Composite IDs
+               const currentId = selectedRecord?.id || '';
+               const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}/.test(currentId);
+               
+               // If we are editing a Draft (UUID), we can't easily compare with MSSQL record ID (TDN-Index).
+               // But if we found a record in MSSQL with the same TDN, and we are editing a Draft...
+               // It means the Draft is trying to use a TDN that is already Active.
+               // This is generally NOT allowed (unless it's a correction of that active record).
+               
+               // However, if we are editing an Active Record (Composite ID), we check if it's the same record.
+               if (!isUuid) {
+                   // Composite ID: TDN-Index
+                   // Extract TDN from ID (everything before the last dash)
+                   const lastDashIndex = currentId.lastIndexOf('-');
+                   const originalTdn = lastDashIndex > 0 ? currentId.substring(0, lastDashIndex) : currentId;
+                   
+                   if (duplicateTdn.TDN !== originalTdn) {
+                       return `TDN ${tdn} already exists (Owner: ${duplicateTdn.Owner_Name || 'Unknown'}).`;
+                   }
+               } else {
+                   // Editing a Draft.
+                   // If we find an Active Record with this TDN, it's a conflict.
+                   // Unless the Draft IS a representation of that Active Record?
+                   // But Drafts are usually *pending changes* or *new records*.
+                   // If I am editing a Draft and I set TDN to an existing Active TDN, I am creating a collision.
+                   return `TDN ${tdn} matches an Active Record (Owner: ${duplicateTdn.Owner_Name || 'Unknown'}).`;
+               }
+           }
+        }
+      }
+
+    } catch (error: any) {
+      console.error('Validation check failed:', error);
+      // We will now return the error message to be handled by the caller
+      // If we want a dialog/alert here, we can trigger it, but returning the string allows the caller (save/submit) to decide how to show it.
+      // The user requested "dialogue toaster". Sonner toast is already what we use.
+      // If they mean a modal dialog, we would need state for that.
+      // But standard "toaster" usually refers to the toast notifications we already have.
+      // Maybe they want the toast to be more prominent or persistent?
+      // Or they mean `window.alert` or a custom Dialog component?
+      // Given "toaster" in the prompt, let's stick to toast but make it very clear.
+      // The previous implementation returns the string, and the caller shows the toast.
+      return `Validation check failed: ${error.message || 'Network Error'}`;
+    }
+    return null;
+  };
+
   const handleSaveDraft = async () => {
     if (!selectedRecord) return;
+
+    // Check duplicates
+    const errorMsg = await checkDuplicatePinTdn(selectedRecord.pin, selectedRecord.tdn);
+    if (errorMsg) {
+      // Use a persistent toast for validation errors so the user has time to read it
+      toast.error('Validation Error', {
+        description: errorMsg,
+        duration: Infinity, // User must dismiss
+        action: {
+          label: 'Dismiss',
+          onClick: () => console.log('Dismissed')
+        }
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    const toastId = toast.loading('Saving draft...');
+
     try {
+      // Prepare data for saving
+      // If ID is temporary (starts with TRANS or DUMMY), remove it so backend creates a new record
+      const isTempId = selectedRecord.id && (selectedRecord.id.startsWith('TRANS') || selectedRecord.id.startsWith('DUMMY') || selectedRecord.id.includes('DUMMY'));
+      
+      const { id, ...recordData } = selectedRecord;
       const dataToSave = {
-        ...selectedRecord,
+        ...recordData,
+        // Only include ID if it's a real persistent ID
+        ...(isTempId ? {} : { id: selectedRecord.id }),
         assessments: assessmentRecords,
         status: 'draft'
       };
+
       const savedRecord = await saveDraft(dataToSave);
+      
+      toast.dismiss(toastId);
       toast.success('Draft saved successfully');
       
-      // Update local state with the saved record (e.g. get the ID)
+      // Update local state with the saved record (capture the new backend ID)
       setSelectedRecord({
         ...selectedRecord,
-        id: savedRecord.id, // Ensure we capture the backend ID
+        id: savedRecord.id || selectedRecord.id, // Ensure we capture the backend ID
         status: 'draft'
       });
-    } catch (error) {
-      toast.error('Failed to save draft');
+      
+      // If it was a new record, we might want to refresh the list or add it to records
+      if (isTempId && savedRecord.id) {
+          // Ideally refresh list, but for now just update local view
+          // setRecords(prev => [savedRecord, ...prev]); 
+      }
+    } catch (error: any) {
+      toast.dismiss(toastId);
+      // Prioritize the error message from the backend response (AppError)
+      const backendMessage = error.response?.data?.message;
+      const errorMessage = backendMessage || error.message || 'Failed to save draft';
+      
+      toast.error(errorMessage, {
+        duration: 5000, // Longer duration for reading
+        description: backendMessage ? 'Please check your input.' : 'Server Error'
+      });
+      console.error('Save Draft Error:', error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleSubmit = async () => {
     if (!selectedRecord) return;
+
+    // Check duplicates
+    const errorMsg = await checkDuplicatePinTdn(selectedRecord.pin, selectedRecord.tdn);
+    if (errorMsg) {
+      toast.error('Validation Error', {
+        description: errorMsg,
+        duration: Infinity,
+        action: {
+          label: 'Dismiss',
+          onClick: () => console.log('Dismissed')
+        }
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    const toastId = toast.loading('Submitting record...');
+
     try {
       // First ensure it's saved
+      // Similar logic to saveDraft
+      const isTempId = selectedRecord.id && (selectedRecord.id.startsWith('TRANS') || selectedRecord.id.startsWith('DUMMY') || selectedRecord.id.includes('DUMMY'));
+      
+      const { id, ...recordData } = selectedRecord;
       const dataToSave = {
-        ...selectedRecord,
+        ...recordData,
+        ...(isTempId ? {} : { id: selectedRecord.id }),
         assessments: assessmentRecords,
         status: 'for-review' // Optimistically set status
       };
       
-      // If it's a new record (no ID), saveDraft will create it. 
-      // If it exists, we can use submitForReview or just saveDraft with status='for-review' 
-      // depending on backend implementation.
-      // My backend implementation of saveDraft handles creation.
-      // submitForReview updates status.
-      
       let recordId = selectedRecord.id;
       
-      if (!recordId || recordId.includes('DUMMY') || recordId.length < 10) {
-         // Create first
+      // If it's a new/temp record, we MUST save it first to get an ID
+      if (isTempId) {
          const saved = await saveDraft(dataToSave);
-         recordId = saved.id;
+         recordId = saved.id || ''; 
+      } else {
+         // If it exists, we can just save with new status (which saveDraft handles if we pass status)
+         // OR call submitForReview if we want to trigger specific workflow
+         // But submitForReview takes ID. So we need to ensure data is up to date.
+         // Let's just use saveDraft to ensure all fields are updated, then submit.
+         const saved = await saveDraft(dataToSave);
+         recordId = saved.id || recordId;
       }
       
-      await submitForReview(recordId!);
+      if (!recordId) throw new Error("Failed to obtain Record ID");
+
+      await submitForReview(recordId);
       
+      toast.dismiss(toastId);
       toast.success('Record submitted for review');
       setSelectedRecord({
         ...selectedRecord,
@@ -456,8 +777,19 @@ const RealPropertyDataEntry: React.FC = () => {
       });
       setIsAdding(false);
       setIsEditing(false);
-    } catch (error) {
-      toast.error('Failed to submit record');
+    } catch (error: any) {
+      toast.dismiss(toastId);
+      // Prioritize the error message from the backend response (AppError)
+      const backendMessage = error.response?.data?.message;
+      const errorMessage = backendMessage || error.message || 'Failed to submit record';
+      
+      toast.error(errorMessage, {
+        duration: 5000,
+        description: backendMessage ? 'Please check your input.' : 'Server Error'
+      });
+      console.error('Submit Error:', error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -474,6 +806,10 @@ const RealPropertyDataEntry: React.FC = () => {
       setSelectedRecord(null);
     }
   };
+
+  // Active tab state
+  const [activeTab, setActiveTab] = useState('property-info');
+  const [showJson, setShowJson] = useState(false);
 
   const handleSave = () => {
     // Save logic here
@@ -553,45 +889,79 @@ const RealPropertyDataEntry: React.FC = () => {
             </button>
           )}
 
+          {/* Save/Cancel - Main Record Control */}
+          {/* Note: 'Save' here is redundant if we have 'Save Draft' and 'Submit'. 
+              However, 'Save' might be intended for local edit finalization before syncing?
+              Actually, the original design had Edit -> Save/Cancel.
+              With the new Draft/Submit workflow, the 'Save' button is confusing.
+              
+              Let's Hide/Remove the old 'Save' button if we are in the new workflow.
+              OR rename it to 'Apply Changes' if it's just exiting edit mode.
+              But 'Save Draft' does the persistence.
+              
+              Let's clean up the toolbar to be logical:
+              1. Add (Starts new record)
+              2. Edit (Enables form)
+              3. Delete (Removes record)
+              ---
+              4. Save Draft (Persists to Server as Draft)
+              5. Submit (Persists to Server as For-Review)
+              
+              The old 'Save' button logic was:
+              setIsEditing(false);
+              setIsAdding(false);
+              toast.success('Record saved successfully');
+              
+              It didn't actually call an API in the original dummy version.
+              Now 'Save Draft' calls the API.
+              
+              Decision: Remove the old green 'Save' button and rely on 'Save Draft' / 'Submit'.
+              BUT, we need a way to exit "Edit Mode" (unlock the UI).
+              'Save Draft' can optionally exit edit mode, or we keep a 'Done Editing' button.
+              
+              Let's consolidate:
+              - 'Save Draft': Saves to DB, keeps you in edit mode or exits? Usually keeps you there.
+              - 'Submit': Saves and exits edit mode + locks.
+              
+              If the user clicks 'Edit', the form unlocks.
+              If they click 'Save Draft', it saves but stays unlocked?
+              
+              Let's hide the old confusing 'Save' button and make 'Save Draft' the primary way to save work in progress.
+          */}
+          
           <button
             onClick={handleSaveDraft}
-            disabled={!selectedRecord || selectedRecord.status === 'for-review' || selectedRecord.status === 'approved'}
+            disabled={!selectedRecord || selectedRecord.status === 'for-review' || selectedRecord.status === 'approved' || isSaving}
             className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-blue-700 dark:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Save as Draft"
+            title="Save as Draft (Work in Progress)"
           >
-            <Save size={14} />
-            Save Draft
+            {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {isSaving ? 'Saving...' : 'Save Draft'}
           </button>
 
           <button
             onClick={handleSubmit}
-            disabled={!selectedRecord || selectedRecord.status === 'for-review' || selectedRecord.status === 'approved'}
+            disabled={!selectedRecord || selectedRecord.status === 'for-review' || selectedRecord.status === 'approved' || isSaving}
             className="px-3 py-2 text-xs bg-green-600 hover:bg-green-700 text-white border border-transparent rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Submit for Review"
+            title="Submit for Review (Finalize)"
           >
-            <Save size={14} />
-            Submit
+            {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {isSaving ? 'Submitting...' : 'Submit'}
           </button>
 
-          <button
-            onClick={() => setShowJson(true)}
-            disabled={!selectedRecord}
-            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-orange-700 dark:text-orange-400 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Show JSON Data"
-          >
-            <Code size={14} />
-            JSON
-          </button>
+          <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1" />
 
+          {/* Edit/Delete Controls */}
           <button
             onClick={handleEdit}
-            disabled={!selectedRecord || isFormEnabled}
+            disabled={!selectedRecord || isFormEnabled || selectedRecord.status === 'for-review'}
             className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-blue-700 dark:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="btn-edit"
           >
             <Edit2 size={14} />
             Edit
           </button>
+          
           <button
             onClick={handleDelete}
             disabled={!selectedRecord || isFormEnabled}
@@ -602,31 +972,31 @@ const RealPropertyDataEntry: React.FC = () => {
             Delete
           </button>
           
-          <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1" />
-          
-          {/* Save/Cancel */}
-          <button
-            onClick={handleSave}
-            disabled={!isFormEnabled || isSubComponentEditing}
-            className="px-3 py-2 text-xs bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="btn-save"
-          >
-            <Save size={14} />
-            Save
-          </button>
-          <button
-            onClick={handleCancel}
-            disabled={!isFormEnabled || isSubComponentEditing}
-            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="btn-cancel"
-          >
-            <X size={14} />
-            Cancel
-          </button>
-          
+          {/* Cancel Changes */}
+          {isFormEnabled && (
+            <button
+              onClick={handleCancel}
+              className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
+              data-testid="btn-cancel"
+            >
+              <X size={14} />
+              Cancel Transaction
+            </button>
+          )}
+
           <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1" />
           
           {/* Utility Buttons */}
+          <button
+            onClick={() => setShowJson(true)}
+            disabled={!selectedRecord}
+            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-orange-700 dark:text-orange-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Show JSON Data"
+          >
+            <Code size={14} />
+            JSON
+          </button>
+
           <button
             onClick={handleRefresh}
             className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
@@ -651,7 +1021,11 @@ const RealPropertyDataEntry: React.FC = () => {
             <Info size={14} />
             Other Info
           </button>
-          <button className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5">
+          <button 
+            onClick={handleTransactionClick}
+            disabled={!selectedRecord}
+            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <FileText size={14} />
             Transaction
           </button>
@@ -670,7 +1044,8 @@ const RealPropertyDataEntry: React.FC = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-auto p-4 space-y-4">
-        {/* Records Grid */}
+        {/* Records Grid - Hidden when in adding/editing mode */}
+        {(!isAdding && !isEditing) && (
         <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col">
           <div 
             className="overflow-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600"
@@ -766,8 +1141,10 @@ const RealPropertyDataEntry: React.FC = () => {
              />
           </div>
         </div>
+        )}
 
-          {/* Search and Filter Section */}
+          {/* Search and Filter Section - Hidden when in adding/editing mode */}
+          {(!isAdding && !isEditing) && (
           <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-4">
             <div className="flex flex-wrap items-center gap-4">
               {/* Search Field */}
@@ -854,6 +1231,7 @@ const RealPropertyDataEntry: React.FC = () => {
               </div>
             </div>
           </div>
+          )}
 
         {/* Tabs Navigation */}
         <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
@@ -886,7 +1264,9 @@ const RealPropertyDataEntry: React.FC = () => {
               <>
                 <PropertyInformationSection
                   isEnabled={isFormEnabled}
+                  isAdding={isAdding}
                   selectedRecord={selectedRecord}
+                  onUpdate={handlePropertyInfoUpdate}
                 />
                 <PropertyOwnerSection
                   isEnabled={isFormEnabled}
@@ -943,9 +1323,112 @@ const RealPropertyDataEntry: React.FC = () => {
           </div>
         </div>
       </div>
+      {/* Transaction Modal */}
+      <Dialog open={showTransactionModal} onOpenChange={setShowTransactionModal}>
+        <DialogContent className="max-w-md" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>Select Transaction Type</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 py-4">
+            <button
+              onClick={() => handleTransactionSelect('GR')}
+              className="p-4 text-left border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 group"
+            >
+              <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 group-hover:bg-blue-200 dark:group-hover:bg-blue-900/50 transition-colors">
+                <FileText size={20} />
+              </div>
+              <div>
+                <div className="font-semibold text-slate-900 dark:text-slate-100">General Revision (GR)</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Mass update of property assessments</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handleTransactionSelect('REV')}
+              className="p-4 text-left border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 group"
+            >
+              <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-600 dark:text-orange-400 group-hover:bg-orange-200 dark:group-hover:bg-orange-900/50 transition-colors">
+                <RefreshCw size={20} />
+              </div>
+              <div>
+                <div className="font-semibold text-slate-900 dark:text-slate-100">Revision (REV)</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Specific updates or corrections</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handleTransactionSelect('MIGRATE')}
+              className="p-4 text-left border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 group"
+            >
+              <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 group-hover:bg-purple-200 dark:group-hover:bg-purple-900/50 transition-colors">
+                <Sparkles size={20} />
+              </div>
+              <div>
+                <div className="font-semibold text-slate-900 dark:text-slate-100">Migrate (MIGRATE)</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Import or transfer legacy data</div>
+              </div>
+            </button>
+
+            <div className="border-t border-slate-200 dark:border-slate-700 my-2"></div>
+
+            <button
+              onClick={() => handleTransactionSelect('CN')}
+              className="p-4 text-left border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 group"
+            >
+              <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-red-600 dark:text-red-400 group-hover:bg-red-200 dark:group-hover:bg-red-900/50 transition-colors">
+                <X size={20} />
+              </div>
+              <div>
+                <div className="font-semibold text-slate-900 dark:text-slate-100">Cancellation (CN)</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Cancel existing assessment</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handleTransactionSelect('CS')}
+              className="p-4 text-left border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 group"
+            >
+              <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 dark:text-green-400 group-hover:bg-green-200 dark:group-hover:bg-green-900/50 transition-colors">
+                <Building2 size={20} />
+              </div>
+              <div>
+                <div className="font-semibold text-slate-900 dark:text-slate-100">Consolidation (CS)</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Combine multiple properties</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handleTransactionSelect('SD')}
+              className="p-4 text-left border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 group"
+            >
+              <div className="w-10 h-10 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center text-yellow-600 dark:text-yellow-400 group-hover:bg-yellow-200 dark:group-hover:bg-yellow-900/50 transition-colors">
+                <GripHorizontal size={20} />
+              </div>
+              <div>
+                <div className="font-semibold text-slate-900 dark:text-slate-100">Subdivision (SD)</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Split property into multiple lots</div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => handleTransactionSelect('CS-SD')}
+              className="p-4 text-left border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3 group"
+            >
+              <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-200 dark:group-hover:bg-indigo-900/50 transition-colors">
+                <RefreshCw size={20} />
+              </div>
+              <div>
+                <div className="font-semibold text-slate-900 dark:text-slate-100">Consolidation and Subdivision (CS-SD)</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">Complex split and merge operation</div>
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* JSON Viewer Modal */}
       <Dialog open={showJson} onOpenChange={setShowJson}>
-        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Form Data (JSON)</DialogTitle>
           </DialogHeader>

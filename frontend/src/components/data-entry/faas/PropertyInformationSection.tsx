@@ -33,6 +33,8 @@ interface PropertyRecord {
 interface PropertyInformationSectionProps {
   isEnabled: boolean;
   selectedRecord: PropertyRecord | null;
+  onUpdate?: (updatedData: Partial<PropertyRecord>) => void;
+  isAdding?: boolean;
 }
 
 interface PropertyInfoData {
@@ -135,6 +137,8 @@ const emptyData: PropertyInfoData = {
 const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
   isEnabled,
   selectedRecord,
+  onUpdate,
+  isAdding = false
 }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const [data, setData] = useState<PropertyInfoData>(defaultData);
@@ -186,14 +190,75 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
     }
   }, [selectedRecord]);
 
+  // Auto-formatter for TDN
+  const formatTdn = (value: string) => {
+    // Remove non-alphanumeric chars to process raw input
+    const raw = value.replace(/[^a-zA-Z0-9]/g, '');
+    
+    // Format: YY-CC-BBBB-SSSSS
+    // Example: 22-01-0001-00088
+    
+    if (raw.length <= 2) return raw;
+    if (raw.length <= 4) return `${raw.slice(0, 2)}-${raw.slice(2)}`;
+    if (raw.length <= 8) return `${raw.slice(0, 2)}-${raw.slice(2, 4)}-${raw.slice(4)}`;
+    return `${raw.slice(0, 2)}-${raw.slice(2, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 13)}`;
+  };
+
   const handleChange = (field: keyof PropertyInfoData, value: string | boolean) => {
     setData(prev => {
-      const newData = { ...prev, [field]: value };
+      let finalValue = value;
+      
+      // Apply auto-formatting for TDN
+      if (field === 'tdNo' && typeof value === 'string') {
+          // Allow user to backspace by checking if length decreased
+          // But strict formatting usually reapplies. 
+          // Let's just apply formatTdn if the user is typing (length increased) or if we want strict format.
+          // Simple approach: Always format.
+          finalValue = formatTdn(value);
+      }
+
+      const newData = { ...prev, [field]: finalValue };
       
       // Auto-update barangay name
       if (field === 'barangay') {
         const bgy = barangayOptions.find(b => b.value === value);
         if (bgy) newData.barangayName = bgy.name;
+      }
+
+      // Auto-update TDN prefix based on Effectivity Date
+      // Rule: Prefix = (Year - 2001) or specific mapping.
+      // User requirement: 2026 -> 25. 2023 -> 22.
+      // Formula: (Year % 100) - 1.
+      if (field === 'effectivityDate' && typeof value === 'string' && value) {
+          const year = parseInt(value.split('-')[0], 10);
+          if (!isNaN(year)) {
+              const prefix = ((year % 100) - 1).toString().padStart(2, '0');
+              
+              // Update TDN if it exists
+              if (newData.tdNo && newData.tdNo.length >= 2) {
+                  // Replace first 2 chars with new prefix
+                  newData.tdNo = prefix + newData.tdNo.substring(2);
+              } else if (!newData.tdNo) {
+                  // If empty, start with prefix
+                  newData.tdNo = prefix + '-';
+              }
+              
+              // Also sync ARP to match TDN prefix logic
+              // Since "TDN and ARP is same"
+              if (newData.arpNo && newData.arpNo.length >= 2) {
+                   newData.arpNo = prefix + newData.arpNo.substring(2);
+              } else if (!newData.arpNo) {
+                   newData.arpNo = prefix + '-';
+              }
+          }
+      }
+      
+      // Auto-sync ARP when TDN changes
+      if (field === 'tdNo' && typeof finalValue === 'string') {
+          // If ARP is empty or user wants them synced, update ARP too
+          // Or just enforce it always? "TDN and ARP is same"
+          // Let's enforce it.
+          newData.arpNo = finalValue;
       }
       
       // Auto-update update code description
@@ -202,6 +267,32 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
         if (code) newData.updateCodeDesc = code.desc;
       }
       
+      // Propagate changes to parent
+      if (onUpdate) {
+        onUpdate({
+            EFF_DATE: newData.effectivityDate,
+            DEC_DATE: newData.declarationDate,
+            EFF_CANC: newData.cancelledDate,
+            DIST_NO: newData.district,
+            BCODE: newData.barangay,
+            BARANGAY: newData.barangayName,
+            CCN: newData.ccn,
+            tdn: newData.tdNo,
+            arp: newData.arpNo,
+            pin: newData.propertyIndexNo,
+            IMP_NO: newData.improvementNo,
+            BLDGNAME: newData.buildingName,
+            BLDGUNIT: newData.buildingUnit,
+            TRANS_CD: newData.updateCode,
+            CER_TIT_NO: newData.tctOctCct,
+            TCT_DATE: newData.tctDate,
+            CAD_LOT_NO: newData.cadLotNo,
+            ASS_LOT_NO: newData.surveyNo,
+            BLOCK_NO: newData.blockNo,
+            LOTE_NO: newData.lotNo,
+        });
+      }
+
       return newData;
     });
   };
@@ -364,7 +455,7 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
                 type="text"
                 value={data.tdNo}
                 onChange={(e) => handleChange('tdNo', e.target.value)}
-                disabled={!isEnabled}
+                disabled={!isEnabled || (!isAdding && isEnabled)}
                 className={`${inputClass} font-mono`}
                 data-testid="input-td-no"
               />
@@ -377,7 +468,7 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
                 type="text"
                 value={data.arpNo}
                 onChange={(e) => handleChange('arpNo', e.target.value)}
-                disabled={!isEnabled}
+                disabled={!isEnabled || (!isAdding && isEnabled)}
                 className={`${inputClass} font-mono`}
                 data-testid="input-arp-no"
               />
@@ -390,7 +481,7 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
                 type="text"
                 value={data.propertyIndexNo}
                 onChange={(e) => handleChange('propertyIndexNo', e.target.value)}
-                disabled={!isEnabled}
+                disabled={!isEnabled || (!isAdding && isEnabled)}
                 className={`${inputClass} font-mono`}
                 data-testid="input-property-index-no"
               />

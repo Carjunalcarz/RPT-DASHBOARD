@@ -18,7 +18,7 @@ import {
   MemorandumRecord,
   SignatoryRecord,
   SwornStatementRecord,
-} from './signatoriesCrud';
+} from './rpt_m_signatoriesCrud';
 
 const baseSignatory: SignatoryRecord = {
   id: 's-1',
@@ -75,7 +75,7 @@ const baseSworn: SwornStatementRecord = {
   updatedBy: 'Admin',
 };
 
-describe('signatoriesCrud', () => {
+describe('rpt_m_signatoriesCrud', () => {
   it('validates signatory fields', () => {
     const errors = validateSignatory({ name: '', title: '', status: 'Approved', dateSigned: '' });
     expect(errors.name).toBeTruthy();

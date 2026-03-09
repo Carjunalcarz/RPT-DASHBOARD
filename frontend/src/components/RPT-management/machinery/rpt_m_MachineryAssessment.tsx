@@ -3,11 +3,12 @@ import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, Settings, ArrowDownUp
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { RptAssRecord } from '@/services/rptAssService';
 import { getClassifications, getActualUses, getSubClasses, Classification, ActualUse, SubClass } from '@/services/classificationService';
-import MachineryItemsModal from './MachineryItemsModal';
+import MachineryItemsModal from './rpt_m_MachineryItemsModal';
 
 interface MachineryAssessmentProps {
   records?: RptAssRecord[];
   isEnabled?: boolean;
+  onUpdate?: (records: any[]) => void;
 }
 
 interface MachineryRecord {
@@ -53,7 +54,7 @@ const defaultFormData: FormData = {
   idleLand: false,
 };
 
-const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiRecords, isEnabled }) => {
+const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiRecords, isEnabled, onUpdate }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const [records, setRecords] = useState<MachineryRecord[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<MachineryRecord | null>(null);
@@ -202,7 +203,9 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
   const handleDelete = () => {
     if (!selectedRecord) return;
     if (window.confirm('Are you sure you want to delete this record?')) {
-      setRecords(prev => prev.filter(r => r.id !== selectedRecord.id));
+      const newRecords = records.filter(r => r.id !== selectedRecord.id);
+      setRecords(newRecords);
+      if (onUpdate) onUpdate(newRecords);
       setSelectedRecord(null);
       setFormData(defaultFormData);
     }
@@ -227,11 +230,14 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
       idleLand: formData.idleLand,
     };
 
+    let newRecords: MachineryRecord[] = [];
     if (isAdding) {
-      setRecords(prev => [...prev, newRecord]);
+      newRecords = [...records, newRecord];
     } else {
-      setRecords(prev => prev.map(r => r.id === selectedRecord!.id ? newRecord : r));
+      newRecords = records.map(r => r.id === selectedRecord!.id ? newRecord : r);
     }
+    setRecords(newRecords);
+    if (onUpdate) onUpdate(newRecords);
 
     setSelectedRecord(newRecord);
     setIsEditing(false);

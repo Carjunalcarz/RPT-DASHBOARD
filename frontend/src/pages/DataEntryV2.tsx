@@ -1,5 +1,5 @@
 import React from 'react';
-import RealPropertyDataEntry from '@/components/data-entry-mirror/faas/RealPropertyDataEntry';
+import RealPropertyDataEntry from '@/components/RPT-management/faas/rpt_m_RealPropertyDataEntry';
 import { Building2, Home, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useThemeColor } from '@/context/ThemeColorContext';
@@ -50,7 +50,7 @@ const DataEntryV2: React.FC = () => {
             <span>Home</span>
           </Link>
           <ChevronRight size={12} className="text-blue-300" />
-          <span className="text-white font-medium">Data Entry (Mirror)</span>
+          <span className="text-white font-medium">RPT Management</span>
         </nav>
 
         {/* Header Content */}
@@ -60,8 +60,8 @@ const DataEntryV2: React.FC = () => {
               <Building2 size={18} className="text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white leading-tight">REAL PROPERTY DATA ENTRY (MIRROR)</h1>
-              <p className="text-blue-100 text-xs font-medium tracking-wide opacity-90">[Magallanes] - FAAS/TDN Management</p>
+              <h1 className="text-lg font-bold text-white leading-tight">REAL PROPERTY DATA ENTRY</h1>
+              <p className="text-blue-100 text-xs font-medium tracking-wide opacity-90">[Magallanes] - RPT Management</p>
             </div>
           </div>
         </div>
