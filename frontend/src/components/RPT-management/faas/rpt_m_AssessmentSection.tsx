@@ -76,6 +76,7 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assess
         
         return {
             ...r,
+            trees: r.trees || [], // Explicitly preserve trees
             KIND: kind,
             // Map common fields to ensure they are available in RptAssRecord format
             TDN: r.TDN || r.id,

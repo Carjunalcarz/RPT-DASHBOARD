@@ -6,6 +6,7 @@ import { getLandClassifications, getLandMarketValues, getMunicipalities, getAgri
 import LandAdjustmentModal, { LandAdjustment } from './LandAdjustmentModal';
 import TreesModal, { TreePlant } from './TreesModal';
 import { dummyLandFormData } from '../faas/dummyData';
+import { toast } from 'sonner';
 
 interface LandAssessmentProps {
   records?: RptAssRecord[];
@@ -76,6 +77,7 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
   const [formData, setFormData] = useState<FormData>(defaultFormData);
   const [isEditing, setIsEditing] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
   const [isTreesOpen, setIsTreesOpen] = useState(false);
   const [isLoadingUnitValue, setIsLoadingUnitValue] = useState(false);
@@ -336,60 +338,69 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
   };
 
   // Handle Save
-  const handleSave = () => {
-    // Calculate Assessed Value
-    const unitVal = parseFloat(formData.unitValue) || 0;
-    const areaVal = parseFloat(formData.area) || 0;
-    const assLvl = parseFloat(formData.assessmentLevel) || 0;
+  const handleSave = async () => {
+    setIsSaving(true);
+    const toastId = toast.loading('Saving land assessment...');
     
-    const baseMarketValue = unitVal * areaVal;
-    
-    const newRecord: LandRecord = {
-      id: isAdding ? `${selectedTdn}-Land-${Date.now()}` : selectedRecord!.id,
-      uniqueId: selectedRecord?.uniqueId || `${selectedTdn}-Land-${Date.now()}-${Math.random()}`,
-      tdn: selectedTdn,
-      kind: 'Land',
-        classification: formData.classification,
-        actualUse: formData.subClass, 
-        subClass: formData.subClass,
-        classLevel: formData.classLevel,
-        municipality: formData.municipality,
-        area: areaVal,
-        ifDefault: formData.ifDefault,
-      unitValue: unitVal,
-      baseMarketValue: baseMarketValue,
-      adjustedMarketValue: baseMarketValue,
-      assessmentLevel: assLvl,
-      assessedValue: baseMarketValue * (assLvl / 100),
-      taxable: formData.taxable,
-      beneficialUse: formData.beneficialUse,
-      idleLand: formData.idleLand,
-      adjustments: selectedRecord?.adjustments || [],
-      trees: selectedRecord?.trees || [],
-    };
+    try {
+      // Simulate API call delay as requested
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Calculate Assessed Value
+      const unitVal = parseFloat(formData.unitValue) || 0;
+      const areaVal = parseFloat(formData.area) || 0;
+      const assLvl = parseFloat(formData.assessmentLevel) || 0;
+      
+      const baseMarketValue = unitVal * areaVal;
+      
+      const newRecord: LandRecord = {
+        id: isAdding ? `${selectedTdn}-Land-${Date.now()}` : selectedRecord!.id,
+        uniqueId: selectedRecord?.uniqueId || `${selectedTdn}-Land-${Date.now()}-${Math.random()}`,
+        tdn: selectedTdn,
+        kind: 'Land',
+          classification: formData.classification,
+          actualUse: formData.subClass, 
+          subClass: formData.subClass,
+          classLevel: formData.classLevel,
+          municipality: formData.municipality,
+          area: areaVal,
+          ifDefault: formData.ifDefault,
+        unitValue: unitVal,
+        baseMarketValue: baseMarketValue,
+        adjustedMarketValue: baseMarketValue,
+        assessmentLevel: assLvl,
+        assessedValue: baseMarketValue * (assLvl / 100),
+        taxable: formData.taxable,
+        beneficialUse: formData.beneficialUse,
+        idleLand: formData.idleLand,
+        adjustments: selectedRecord?.adjustments || [],
+        trees: selectedRecord?.trees || [],
+      };
 
-    let updatedRecords;
-    if (isAdding) {
-      updatedRecords = [...records, newRecord];
-    } else {
-      updatedRecords = records.map(r => r.id === selectedRecord!.id ? newRecord : r);
-    }
-    
-    // We must update the state immediately to reflect changes in the UI
-    setRecords(updatedRecords);
-    
-    // Then propagate to parent if callback exists
-    if (onUpdate) {
-      onUpdate(updatedRecords);
-    } else {
-        // Fallback: If no parent update, just log it. 
-        // This might happen if AssessmentSection didn't pass the prop correctly or context is missing.
-        console.warn('No onUpdate callback provided to LandAssessment. Changes are local only.');
-    }
+      let updatedRecords;
+      if (isAdding) {
+        updatedRecords = [...records, newRecord];
+      } else {
+        updatedRecords = records.map(r => r.id === selectedRecord!.id ? newRecord : r);
+      }
+      
+      // We must update the state immediately to reflect changes in the UI
+      setRecords(updatedRecords);
+      
+      // Then propagate to parent if callback exists
+      if (onUpdate) {
+        onUpdate(updatedRecords);
+      }
 
-    setSelectedRecord(newRecord);
-    setIsEditing(false);
-    setIsAdding(false);
+      setSelectedRecord(newRecord);
+      setIsEditing(false);
+      setIsAdding(false);
+      toast.success('Land assessment saved successfully', { id: toastId });
+    } catch (error) {
+      toast.error('Failed to save land assessment', { id: toastId });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Handle Save Adjustments
@@ -527,12 +538,12 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
           <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1 self-center" />
           <button
             onClick={handleSave}
-            disabled={!isLocalFormEnabled}
+            disabled={!isLocalFormEnabled || isSaving}
             className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="save-land-btn"
           >
-            <Save size={14} />
-            Save
+            {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {isSaving ? 'Saving...' : 'Save'}
           </button>
           <button
             onClick={handleCancel}
@@ -563,7 +574,7 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
           <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1 self-center" />
           <button
             onClick={() => setIsAdjustmentOpen(true)}
-            disabled={!selectedRecord || isLocalFormEnabled}
+            disabled={!selectedRecord}
             className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 text-orange-600 dark:text-orange-400 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ArrowDownUp size={14} />
@@ -571,7 +582,7 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
           </button>
           <button
             onClick={() => setIsTreesOpen(true)}
-            disabled={!selectedRecord || isLocalFormEnabled}
+            disabled={!selectedRecord}
             className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-green-50 dark:hover:bg-green-900/20 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 text-green-600 dark:text-green-400 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Trees size={14} />
@@ -665,7 +676,8 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
         onOpenChange={setIsTreesOpen}
         initialTrees={selectedRecord?.trees || []}
         onSave={handleSaveTrees}
-        tdn={selectedTdn} // Pass the selected TDN
+        tdn={selectedTdn}
+        readOnly={!(isEnabled || isLocalFormEnabled)}
       />
 
 

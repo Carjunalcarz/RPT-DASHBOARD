@@ -213,6 +213,7 @@ const AssessmentTable: React.FC = () => {
     pin: '053-07-0002-003-32',
     tdNo: 'TD-2024-001',
     arpNo: 'ARP-2024-001',
+    province: 'Agusan del Norte',
     municipality: 'Tubay',
     barangay: 'Poblacion',
     effectivityDate: '2024-01-01',

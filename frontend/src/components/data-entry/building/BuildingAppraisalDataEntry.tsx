@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Plus, Edit2, Trash2, Save, X, RefreshCw, Printer,
   Search, Filter, MoreHorizontal, FileText,
-  Building2, ArrowUpDown
+  Building2, ArrowUpDown, Loader2
 } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { 
@@ -28,6 +28,7 @@ const BuildingAppraisalDataEntry: React.FC = () => {
   const [selectedRecord, setSelectedRecord] = useState<BuildingAppraisal | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
   // Search and Filter
   const [searchText, setSearchText] = useState('');
@@ -126,18 +127,26 @@ const BuildingAppraisalDataEntry: React.FC = () => {
       return;
     }
 
+    setIsSaving(true);
+    const toastId = toast.loading(isEditing ? 'Updating appraisal...' : 'Creating appraisal...');
+    
     try {
+      // Simulate API call delay as requested
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
       if (isEditing && selectedRecord) {
         await updateBuildingAppraisal(selectedRecord.id, formData);
-        toast.success('Appraisal updated successfully');
+        toast.success('Appraisal updated successfully', { id: toastId });
       } else {
         await createBuildingAppraisal(formData);
-        toast.success('Appraisal created successfully');
+        toast.success('Appraisal created successfully', { id: toastId });
       }
       setIsModalOpen(false);
       fetchData();
     } catch (error) {
-      toast.error('Failed to save appraisal');
+      toast.error('Failed to save appraisal', { id: toastId });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -337,15 +346,18 @@ const BuildingAppraisalDataEntry: React.FC = () => {
           <DialogFooter>
             <button
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-md shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-600 dark:hover:bg-slate-700"
+              disabled={isSaving}
+              className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-md shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-600 dark:hover:bg-slate-700 disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              disabled={isSaving}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center gap-2 disabled:opacity-50"
             >
-              Save
+              {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+              {isSaving ? 'Saving...' : 'Save'}
             </button>
           </DialogFooter>
         </DialogContent>

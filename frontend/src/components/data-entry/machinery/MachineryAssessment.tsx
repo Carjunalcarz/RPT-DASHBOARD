@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, Settings, ArrowDownUp, Sparkles } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, Settings, ArrowDownUp, Sparkles, Loader2 } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { RptAssRecord } from '@/services/rptAssService';
 import { getClassifications, getActualUses, getSubClasses, Classification, ActualUse, SubClass } from '@/services/classificationService';
 import MachineryItemsModal from './MachineryItemsModal';
 import { dummyMachineryFormData } from '../faas/dummyData';
+import { toast } from 'sonner';
 
 interface MachineryAssessmentProps {
   records?: RptAssRecord[];
@@ -61,6 +62,7 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
   const [formData, setFormData] = useState<FormData>(defaultFormData);
   const [isEditing, setIsEditing] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
   
   // Dynamic Options State
@@ -213,34 +215,47 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
     }
   };
 
-  const handleSave = () => {
-    const newRecord: MachineryRecord = {
-      id: isAdding ? Date.now().toString() : selectedRecord!.id,
-      tdn: selectedRecord?.tdn, // Preserve TDN
-      kind: 'Machinery',
-      classification: formData.classification,
-      actualUse: formData.actualUse,
-      subClass: formData.subClass,
-      area: parseFloat(formData.area) || 0,
-      unitValue: parseFloat(formData.unitValue) || 0,
-      baseMarketValue: computedValues.baseMarketValue,
-      adjustedMarketValue: computedValues.adjustedMarketValue,
-      assessmentLevel: parseFloat(formData.assessmentLevel) || 0,
-      assessedValue: computedValues.assessedValue,
-      taxable: formData.taxable,
-      beneficialUse: formData.beneficialUse,
-      idleLand: formData.idleLand,
-    };
+  const handleSave = async () => {
+    setIsSaving(true);
+    const toastId = toast.loading('Saving machinery assessment...');
+    
+    try {
+      // Simulate API call delay as requested
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const newRecord: MachineryRecord = {
+        id: isAdding ? Date.now().toString() : selectedRecord!.id,
+        tdn: selectedRecord?.tdn, // Preserve TDN
+        kind: 'Machinery',
+        classification: formData.classification,
+        actualUse: formData.actualUse,
+        subClass: formData.subClass,
+        area: parseFloat(formData.area) || 0,
+        unitValue: parseFloat(formData.unitValue) || 0,
+        baseMarketValue: computedValues.baseMarketValue,
+        adjustedMarketValue: computedValues.adjustedMarketValue,
+        assessmentLevel: parseFloat(formData.assessmentLevel) || 0,
+        assessedValue: computedValues.assessedValue,
+        taxable: formData.taxable,
+        beneficialUse: formData.beneficialUse,
+        idleLand: formData.idleLand,
+      };
 
-    if (isAdding) {
-      setRecords(prev => [...prev, newRecord]);
-    } else {
-      setRecords(prev => prev.map(r => r.id === selectedRecord!.id ? newRecord : r));
+      if (isAdding) {
+        setRecords(prev => [...prev, newRecord]);
+      } else {
+        setRecords(prev => prev.map(r => r.id === selectedRecord!.id ? newRecord : r));
+      }
+
+      setSelectedRecord(newRecord);
+      setIsEditing(false);
+      setIsAdding(false);
+      toast.success('Machinery assessment saved successfully', { id: toastId });
+    } catch (error) {
+      toast.error('Failed to save machinery assessment', { id: toastId });
+    } finally {
+      setIsSaving(false);
     }
-
-    setSelectedRecord(newRecord);
-    setIsEditing(false);
-    setIsAdding(false);
   };
 
   const handleCancel = () => {
@@ -319,8 +334,13 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
             <Trash2 size={14} /> Delete
           </button>
           <div className="w-px h-6 bg-slate-300 mx-1 self-center" />
-          <button onClick={handleSave} disabled={!isLocalFormEnabled} className="px-3 py-1.5 text-xs bg-blue-600 text-white hover:bg-blue-700 rounded shadow-sm flex items-center gap-1.5 disabled:opacity-50">
-            <Save size={14} /> Save
+          <button
+            onClick={handleSave}
+            disabled={!isLocalFormEnabled || isSaving}
+            className="px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {isSaving ? 'Saving...' : 'Save'}
           </button>
           <button onClick={handleCancel} disabled={!isLocalFormEnabled} className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 border rounded shadow-sm flex items-center gap-1.5 disabled:opacity-50">
             <X size={14} /> Cancel

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, ChevronDown } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
+import { useAuth } from '@/context/AuthContext';
 
 interface PropertyRecord {
   id: string;
@@ -28,6 +29,7 @@ interface PropertyRecord {
   ASS_LOT_NO?: string; // Survey No?
   BLOCK_NO?: string;
   LOTE_NO?: string;
+  pOldTdn?: string;
 }
 
 interface PropertyInformationSectionProps {
@@ -47,6 +49,7 @@ interface PropertyInfoData {
   ccn: string;
   motherTdn: boolean;
   tdNo: string;
+  pOldTdn: string;
   arpNo: string;
   propertyIndexNo: string;
   improvementNo: string;
@@ -72,6 +75,7 @@ const defaultData: PropertyInfoData = {
   ccn: '',
   motherTdn: false,
   tdNo: '',
+  pOldTdn: '',
   arpNo: '',
   propertyIndexNo: '',
   improvementNo: '',
@@ -119,6 +123,7 @@ const emptyData: PropertyInfoData = {
   ccn: '',
   motherTdn: false,
   tdNo: '',
+  pOldTdn: '',
   arpNo: '',
   propertyIndexNo: '',
   improvementNo: '',
@@ -141,7 +146,11 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
   isAdding = false
 }) => {
   const { headerColor, headerColorDark } = useThemeColor();
+  const { user } = useAuth();
   const [data, setData] = useState<PropertyInfoData>(defaultData);
+
+  // Check if current user is admin
+  const isAdmin = user?.role === 'admin' || user?.role === 'Administrator';
 
   useEffect(() => {
     // Reset to empty data on mount if no record selected
@@ -164,7 +173,8 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
           ccn: selectedRecord.CCN || '',
           // motherTdn: !!selectedRecord.MTDN, // Logic unclear, leaving as is or default
           tdNo: selectedRecord.TDN || '',
-          arpNo: selectedRecord.ARP || '',
+          pOldTdn: (selectedRecord as any).pOldTdn || '',
+          arpNo: selectedRecord.TDN || '', // ARP should use CURRENT TDN
           propertyIndexNo: selectedRecord.PIN || '',
           improvementNo: selectedRecord.IMP_NO || '',
           buildingName: selectedRecord.BLDGNAME || '',
@@ -216,7 +226,9 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
       }
       
       // Auto-update TDN prefix based on Effectivity Date
-      if (field === 'effectivityDate' && typeof value === 'string' && value) {
+      // Only apply this logic if adding a NEW record. 
+      // For edits, TDN should remain stable unless explicitly changed (which is locked anyway).
+      if (isAdding && field === 'effectivityDate' && typeof value === 'string' && value) {
           const year = parseInt(value.split('-')[0], 10);
           if (!isNaN(year)) {
               // Rule: (Year % 100) - 1.
@@ -236,11 +248,40 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
                    newData.arpNo = prefix + '-';
               }
           }
+      } else if (!isAdding && isEnabled && field === 'effectivityDate' && typeof value === 'string' && value) {
+          // Rule for Editing: If effectivity date changes, update TDN prefix too
+          // This applies when editing an existing record via Transaction (which sets isAdding=true usually, but just in case)
+          // Actually, transactions usually set isAdding=true. 
+          // If we are just editing a draft, isAdding might be false?
+          // If isEnabled is true, we allow editing effectivity date.
+          
+          const year = parseInt(value.split('-')[0], 10);
+          if (!isNaN(year)) {
+              const prefix = ((year % 100) - 1).toString().padStart(2, '0');
+              
+              if (newData.tdNo && newData.tdNo.length >= 2) {
+                  // Only update if prefix is different
+                  if (newData.tdNo.substring(0, 2) !== prefix) {
+                      newData.tdNo = prefix + newData.tdNo.substring(2);
+                  }
+              }
+              
+              if (newData.arpNo && newData.arpNo.length >= 2) {
+                  if (newData.arpNo.substring(0, 2) !== prefix) {
+                      newData.arpNo = prefix + newData.arpNo.substring(2);
+                  }
+              }
+          }
       }
 
       // Auto-sync ARP when TDN changes
       if (field === 'tdNo' && typeof finalValue === 'string') {
           newData.arpNo = finalValue;
+      }
+      
+      // Auto-sync TDN when ARP changes (per user request: TDN = ARP)
+      if (field === 'arpNo' && typeof finalValue === 'string') {
+          newData.tdNo = finalValue;
       }
 
       // Auto-update update code description
@@ -249,6 +290,42 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
         if (code) newData.updateCodeDesc = code.desc;
       }
       
+      // Propagate changes to parent
+      if (onUpdate) {
+          const updatePayload: any = {};
+          
+          if (field === 'effectivityDate') updatePayload.EFF_DATE = value as string;
+          if (field === 'declarationDate') updatePayload.DEC_DATE = value as string;
+          if (field === 'cancelledDate') updatePayload.EFF_CANC = value as string;
+          if (field === 'district') updatePayload.DIST_NO = value as string;
+          if (field === 'barangay') {
+              updatePayload.BCODE = value as string;
+              updatePayload.BARANGAY = newData.barangayName;
+          }
+          if (field === 'ccn') updatePayload.CCN = value as string;
+          // if (field === 'motherTdn') updatePayload.MTDN = value as boolean;
+          if (field === 'tdNo') updatePayload.TDN = finalValue as string;
+          if (field === 'pOldTdn') updatePayload.pOldTdn = value as string;
+          if (field === 'arpNo') updatePayload.ARP = finalValue as string;
+          if (field === 'propertyIndexNo') updatePayload.PIN = value as string;
+          if (field === 'improvementNo') updatePayload.IMP_NO = value as string;
+          if (field === 'buildingName') updatePayload.BLDGNAME = value as string;
+          if (field === 'buildingUnit') updatePayload.BLDGUNIT = value as string;
+          if (field === 'updateCode') updatePayload.TRANS_CD = value as string;
+          if (field === 'tctOctCct') updatePayload.CER_TIT_NO = value as string;
+          if (field === 'tctDate') updatePayload.TCT_DATE = value as string;
+          if (field === 'cadLotNo') updatePayload.CAD_LOT_NO = value as string;
+          if (field === 'surveyNo') updatePayload.ASS_LOT_NO = value as string;
+          if (field === 'blockNo') updatePayload.BLOCK_NO = value as string;
+          if (field === 'lotNo') updatePayload.LOTE_NO = value as string;
+
+          // Propagate dependent updates
+          if (newData.tdNo !== prev.tdNo && field !== 'tdNo') updatePayload.TDN = newData.tdNo;
+          if (newData.arpNo !== prev.arpNo && field !== 'arpNo') updatePayload.ARP = newData.arpNo;
+
+          onUpdate(updatePayload);
+      }
+
       return newData;
     });
   };
@@ -298,6 +375,7 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
                 type="date"
                 value={data.effectivityDate}
                 onChange={(e) => handleChange('effectivityDate', e.target.value)}
+                // Enable effectivity date editing even if not adding, as long as form is enabled
                 disabled={!isEnabled}
                 className={inputClass}
                 data-testid="input-effectivity-date"
@@ -411,9 +489,26 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
                 type="text"
                 value={data.tdNo}
                 onChange={(e) => handleChange('tdNo', e.target.value)}
+                // Disabled if not enabled OR (if it's not adding AND user is admin - TDN shouldn't be editable by admin in edit mode)
+                // Actually, request says "PIN and TDN must NOT be editable in the admin edit page".
+                // They can only be changed through transaction.
+                // So if it's existing record (not isAdding), it should be disabled.
                 disabled={!isEnabled || (!isAdding && isEnabled)}
                 className={`${inputClass} font-mono`}
                 data-testid="input-td-no"
+              />
+            </div>
+
+            {/* OLD T.D. No. */}
+            <div>
+              <label className={labelClass}>OLD T.D. No.:</label>
+              <input
+                type="text"
+                value={data.pOldTdn}
+                onChange={(e) => handleChange('pOldTdn', e.target.value)}
+                disabled={!isEnabled || (!isAdding && isEnabled)}
+                className={`${inputClass} font-mono`}
+                data-testid="input-p-old-tdn"
               />
             </div>
 
@@ -437,6 +532,7 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
                 type="text"
                 value={data.propertyIndexNo}
                 onChange={(e) => handleChange('propertyIndexNo', e.target.value)}
+                // PIN disabled in edit mode for admin
                 disabled={!isEnabled || (!isAdding && isEnabled)}
                 className={`${inputClass} font-mono`}
                 data-testid="input-property-index-no"

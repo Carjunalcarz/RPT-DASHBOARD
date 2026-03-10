@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Edit2, Save, X } from 'lucide-react';
+import { Edit2, Save, X, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface SignatoriesTabProps {
   isEditing: boolean;
@@ -44,6 +45,7 @@ const SignatoriesTab: React.FC<SignatoriesTabProps> = ({
 }) => {
   const [formData, setFormData] = useState<SignatoryFormData>(defaultFormData);
   const [originalData, setOriginalData] = useState<SignatoryFormData>(defaultFormData);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (isEditing && onDataChange) {
@@ -56,9 +58,21 @@ const SignatoriesTab: React.FC<SignatoriesTabProps> = ({
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSave = () => {
-    setOriginalData(formData);
-    onSave();
+  const handleSave = async () => {
+    setIsSaving(true);
+    const toastId = toast.loading('Saving signatories...');
+    
+    try {
+      // Simulate API call delay as requested
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      setOriginalData(formData);
+      onSave();
+      toast.success('Signatories saved successfully', { id: toastId });
+    } catch (error) {
+      toast.error('Failed to save signatories', { id: toastId });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -107,7 +121,8 @@ const SignatoriesTab: React.FC<SignatoriesTabProps> = ({
             <>
               <button
                 onClick={handleCancel}
-                className="px-4 py-2 text-sm bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors font-medium flex items-center gap-2"
+                disabled={isSaving}
+                className="px-4 py-2 text-sm bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors font-medium flex items-center gap-2 disabled:opacity-50"
                 data-testid="cancel-signatories-button"
               >
                 <X size={14} />
@@ -115,11 +130,12 @@ const SignatoriesTab: React.FC<SignatoriesTabProps> = ({
               </button>
               <button
                 onClick={handleSave}
-                className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium flex items-center gap-2"
+                disabled={isSaving}
+                className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-medium flex items-center gap-2 disabled:opacity-50"
                 data-testid="save-signatories-button"
               >
-                <Save size={14} />
-                Save Changes
+                {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                {isSaving ? 'Saving...' : 'Save Changes'}
               </button>
             </>
           )}

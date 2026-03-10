@@ -15,6 +15,7 @@ interface PropertyRecord {
 interface PropertyOwnerSectionProps {
   isEnabled: boolean;
   selectedRecord: any | null; // Use any or specific type if shared
+  onUpdate?: (updatedData: any) => void;
 }
 
 interface OwnerData {
@@ -68,7 +69,7 @@ const emptyData: OwnerAdminData = {
   },
 };
 
-const PropertyOwnerSection: React.FC<PropertyOwnerSectionProps> = ({ isEnabled, selectedRecord }) => {
+const PropertyOwnerSection: React.FC<PropertyOwnerSectionProps> = ({ isEnabled, selectedRecord, onUpdate }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const [data, setData] = useState<OwnerAdminData>(defaultData);
 
@@ -95,17 +96,48 @@ const PropertyOwnerSection: React.FC<PropertyOwnerSectionProps> = ({ isEnabled, 
   }, [selectedRecord]);
 
   const handleOwnerChange = (field: keyof OwnerData, value: string) => {
-    setData(prev => ({
-      ...prev,
-      owner: { ...prev.owner, [field]: value },
-    }));
+    setData(prev => {
+        const newData = {
+            ...prev,
+            owner: { ...prev.owner, [field]: value },
+        };
+        
+        // Propagate changes to parent
+        if (onUpdate) {
+            const updatePayload: any = {};
+            // Map local state to parent record fields
+            if (field === 'code') updatePayload.OWN_CD = value;
+            if (field === 'number') updatePayload.OWNER_NO = value;
+            if (field === 'name') updatePayload.owner = value;
+            if (field === 'address') updatePayload.Owner_Address = value;
+            
+            onUpdate(updatePayload);
+        }
+        
+        return newData;
+    });
   };
 
   const handleAdminChange = (field: keyof OwnerData, value: string) => {
-    setData(prev => ({
-      ...prev,
-      administrator: { ...prev.administrator, [field]: value },
-    }));
+    setData(prev => {
+        const newData = {
+            ...prev,
+            administrator: { ...prev.administrator, [field]: value },
+        };
+
+        // Propagate changes to parent
+        if (onUpdate) {
+            const updatePayload: any = {};
+            if (field === 'code') updatePayload.ADM_CD = value;
+            if (field === 'number') updatePayload.ADMIN_NO = value;
+            if (field === 'name') updatePayload.Administrator_Name = value;
+            if (field === 'address') updatePayload.Administrator_Address = value;
+            
+            onUpdate(updatePayload);
+        }
+
+        return newData;
+    });
   };
 
   const inputClass = `w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${

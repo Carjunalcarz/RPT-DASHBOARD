@@ -14,6 +14,7 @@ dotenv.config();
 const { errorHandler } = require('./middleware/errorHandler');
 const rateLimiter = require('./middleware/rateLimiter');
 const requestLogger = require('./middleware/requestLogger');
+const idempotency = require('./middleware/idempotency');
 const logger = require('./utils/logger');
 const healthRoutes = require('./routes/healthRoutes');
 const itemRoutes = require('./routes/items');
@@ -75,6 +76,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Cookie Parser
 app.use(cookieParser());
+
+// Idempotency
+app.use(idempotency);
 
 // Debug Middleware to trace Cookie/Token flow (After Cookie Parser)
 app.use((req, res, next) => {

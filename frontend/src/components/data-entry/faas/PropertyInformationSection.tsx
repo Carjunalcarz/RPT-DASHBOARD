@@ -234,21 +234,37 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
           if (!isNaN(year)) {
               const prefix = ((year % 100) - 1).toString().padStart(2, '0');
               
-              // Update TDN if it exists
-              if (newData.tdNo && newData.tdNo.length >= 2) {
-                  // Replace first 2 chars with new prefix
-                  newData.tdNo = prefix + newData.tdNo.substring(2);
-              } else if (!newData.tdNo) {
-                  // If empty, start with prefix
-                  newData.tdNo = prefix + '-';
-              }
+              // If isAdding (new record), always update
+              // If !isAdding (editing), only update if prefix actually changed
+              // This prevents unnecessary updates but enforces the rule if date changes
               
-              // Also sync ARP to match TDN prefix logic
-              // Since "TDN and ARP is same"
-              if (newData.arpNo && newData.arpNo.length >= 2) {
-                   newData.arpNo = prefix + newData.arpNo.substring(2);
-              } else if (!newData.arpNo) {
-                   newData.arpNo = prefix + '-';
+              if (isAdding) {
+                  // Standard logic for new record
+                  if (newData.tdNo && newData.tdNo.length >= 2) {
+                      newData.tdNo = prefix + newData.tdNo.substring(2);
+                  } else if (!newData.tdNo) {
+                      newData.tdNo = prefix + '-';
+                  }
+                  
+                  if (newData.arpNo && newData.arpNo.length >= 2) {
+                      newData.arpNo = prefix + newData.arpNo.substring(2);
+                  } else if (!newData.arpNo) {
+                      newData.arpNo = prefix + '-';
+                  }
+              } else if (isEnabled) {
+                  // Logic for editing existing record (via transaction)
+                  // Only update if prefix is different to avoid jitter
+                  if (newData.tdNo && newData.tdNo.length >= 2) {
+                      if (newData.tdNo.substring(0, 2) !== prefix) {
+                          newData.tdNo = prefix + newData.tdNo.substring(2);
+                      }
+                  }
+                  
+                  if (newData.arpNo && newData.arpNo.length >= 2) {
+                      if (newData.arpNo.substring(0, 2) !== prefix) {
+                          newData.arpNo = prefix + newData.arpNo.substring(2);
+                      }
+                  }
               }
           }
       }
@@ -277,9 +293,9 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
             BCODE: newData.barangay,
             BARANGAY: newData.barangayName,
             CCN: newData.ccn,
-            tdn: newData.tdNo,
-            arp: newData.arpNo,
-            pin: newData.propertyIndexNo,
+            TDN: newData.tdNo,
+            ARP: newData.arpNo,
+            PIN: newData.propertyIndexNo,
             IMP_NO: newData.improvementNo,
             BLDGNAME: newData.buildingName,
             BLDGUNIT: newData.buildingUnit,

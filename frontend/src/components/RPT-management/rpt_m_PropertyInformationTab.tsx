@@ -12,6 +12,7 @@ interface PropertyInformationTabProps {
 interface PropertyFormData {
   effectivityDate: string;
   tdNo: string;
+  pOldTdn: string;
   updateCode: string;
   declarationDate: string;
   arpNo: string;
@@ -48,6 +49,7 @@ interface PropertyFormData {
 const defaultFormData: PropertyFormData = {
   effectivityDate: '2024-01-01',
   tdNo: 'TD-2024-001',
+  pOldTdn: 'OLD-TD-2023-001',
   updateCode: 'new',
   declarationDate: '2024-01-15',
   arpNo: 'ARP-2024-001',
@@ -218,6 +220,7 @@ const PropertyInformationTab: React.FC<PropertyInformationTabProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {renderInput('Effectivity Date:', 'effectivityDate', 'date')}
             {renderInput('T.D. No.:', 'tdNo')}
+            {renderInput('OLD T.D. No.:', 'pOldTdn')}
             {renderSelect('Update Code:', 'updateCode', updateCodeOptions)}
             {renderInput('Declaration Date:', 'declarationDate', 'date')}
             {renderInput('A.R.P No.:', 'arpNo')}

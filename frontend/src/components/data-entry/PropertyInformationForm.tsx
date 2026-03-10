@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import FormInput from './FormInput';
 import FormSelect from './FormSelect';
 import DateInput from './DateInput';
+import { Loader2, Save } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface PropertyFormData {
   effectivityDate: string;
@@ -27,10 +29,23 @@ interface PropertyFormData {
 }
 
 const PropertyInformationForm: React.FC = () => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { register, handleSubmit, formState: { errors } } = useForm<PropertyFormData>();
 
-  const onSubmit = (data: PropertyFormData) => {
-    console.log('Form data:', data);
+  const onSubmit = async (data: PropertyFormData) => {
+    setIsSubmitting(true);
+    const toastId = toast.loading('Saving property information...');
+    
+    try {
+      // Simulate API call delay as requested
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('Form data:', data);
+      toast.success('Property information saved successfully', { id: toastId });
+    } catch (error) {
+      toast.error('Failed to save property information', { id: toastId });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const updateCodeOptions = [
@@ -259,9 +274,11 @@ const PropertyInformationForm: React.FC = () => {
         </button>
         <button
           type="submit"
-          className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors font-medium"
+          disabled={isSubmitting}
+          className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 dark:bg-blue-50 dark:hover:bg-blue-600 text-white rounded-lg transition-colors font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Save Property Information
+          {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+          {isSubmitting ? 'Saving...' : 'Save Property Information'}
         </button>
       </div>
     </form>

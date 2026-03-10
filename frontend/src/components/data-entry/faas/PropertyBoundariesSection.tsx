@@ -5,6 +5,7 @@ import { useThemeColor } from '@/context/ThemeColorContext';
 interface PropertyBoundariesSectionProps {
   isEnabled: boolean;
   selectedRecord: any | null;
+  onUpdate?: (updatedData: any) => void;
 }
 
 interface BoundaryData {
@@ -37,7 +38,7 @@ const emptyData: BoundaryData = {
   west: '',
 };
 
-const PropertyBoundariesSection: React.FC<PropertyBoundariesSectionProps> = ({ isEnabled, selectedRecord }) => {
+const PropertyBoundariesSection: React.FC<PropertyBoundariesSectionProps> = ({ isEnabled, selectedRecord, onUpdate }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const [data, setData] = useState<BoundaryData>(defaultData);
 
@@ -65,7 +66,25 @@ const PropertyBoundariesSection: React.FC<PropertyBoundariesSectionProps> = ({ i
   }, [selectedRecord]);
 
   const handleChange = (field: keyof BoundaryData, value: string) => {
-    setData(prev => ({ ...prev, [field]: value }));
+    setData(prev => {
+      const newData = { ...prev, [field]: value };
+      
+      // Propagate changes to parent
+      if (onUpdate) {
+        const updatePayload: any = {};
+        if (field === 'street') updatePayload.STREET_CD = value;
+        if (field === 'streetName') updatePayload.STREET = value;
+        if (field === 'location') updatePayload.LOCATION = value;
+        if (field === 'north') updatePayload.NORTH = value;
+        if (field === 'south') updatePayload.SOUTH = value;
+        if (field === 'east') updatePayload.EAST = value;
+        if (field === 'west') updatePayload.WEST = value;
+        
+        onUpdate(updatePayload);
+      }
+      
+      return newData;
+    });
   };
 
   const inputClass = `w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${

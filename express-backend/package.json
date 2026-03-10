@@ -38,6 +38,7 @@
     "supabase": "^2.76.12",
     "swagger-jsdoc": "^6.2.0",
     "swagger-ui-express": "^5.0.0",
+    "uuid": "^13.0.0",
     "winston": "^3.11.0",
     "winston-daily-rotate-file": "^5.0.0"
   },

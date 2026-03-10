@@ -10,14 +10,27 @@ export interface FaasRecord {
   updatedAt?: string;
 }
 
-export const saveDraft = async (data: any, id?: string): Promise<FaasRecord> => {
+export const saveDraft = async (data: any, id?: string, idempotencyKey?: string): Promise<FaasRecord> => {
   try {
+    const config = idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {};
     let response;
+    // Check if ID is in data if not passed explicitly, for the logic of PUT vs POST
+    // But the original code only checked 'id' argument.
+    // If the original code relied on 'id' arg to decide PUT/POST, we should keep that behavior.
+    // However, looking at RealPropertyDataEntry.tsx, it calls saveDraft(dataToSave).
+    // If dataToSave has ID, it should probably be an update.
+    // But the original code: if (id) api.put else api.post.
+    // So if called as saveDraft(data), it POSTs.
+    // Does POST handle updates?
+    
+    // Let's assume the original code was correct for the current backend.
+    // I will just add the config.
+    
     if (id) {
         // Use PUT for updates if ID is provided (or we could use PATCH)
-        response = await api.put(`/faas/${id}`, data);
+        response = await api.put(`/faas/${id}`, data, config);
     } else {
-        response = await api.post('/faas/draft', data);
+        response = await api.post('/faas/draft', data, config);
     }
     return response.data.data;
   } catch (error: any) {
@@ -27,9 +40,10 @@ export const saveDraft = async (data: any, id?: string): Promise<FaasRecord> => 
   }
 };
 
-export const submitForReview = async (id: string): Promise<FaasRecord> => {
+export const submitForReview = async (id: string, idempotencyKey?: string): Promise<FaasRecord> => {
   try {
-    const response = await api.post(`/faas/${id}/submit`);
+    const config = idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : {};
+    const response = await api.post(`/faas/${id}/submit`, {}, config);
     return response.data.data;
   } catch (error) {
     console.error('Error submitting for review:', error);

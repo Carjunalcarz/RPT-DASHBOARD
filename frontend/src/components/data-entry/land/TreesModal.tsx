@@ -26,6 +26,7 @@ interface TreesModalProps {
   onSave?: (trees: TreePlant[]) => void;
   initialTrees?: TreePlant[];
   tdn?: string;
+  readOnly?: boolean;
 }
 
 const TreesModal: React.FC<TreesModalProps> = ({
@@ -34,6 +35,7 @@ const TreesModal: React.FC<TreesModalProps> = ({
   onSave,
   initialTrees = [],
   tdn,
+  readOnly = false,
 }) => {
   const [trees, setTrees] = useState<TreePlant[]>(initialTrees);
   const [treeLibrary, setTreeLibrary] = useState<TreeLibraryRecord[]>([]);
@@ -67,8 +69,12 @@ const TreesModal: React.FC<TreesModalProps> = ({
   };
 
   useEffect(() => {
-    // If TDN is provided, fetch trees from API
-    if (open && tdn) {
+    // If we have initial trees, always use them first
+    if (initialTrees && initialTrees.length > 0) {
+      setTrees(initialTrees);
+    } 
+    // Otherwise, if TDN is provided and we haven't loaded anything yet, fetch from API
+    else if (open && tdn) {
       getTreesByTdn(tdn).then((data: RptTreeRecord[]) => {
         if (data && data.length > 0) {
           const mappedTrees: TreePlant[] = [];
@@ -103,11 +109,15 @@ const TreesModal: React.FC<TreesModalProps> = ({
           
           setTrees(mappedTrees);
         } else {
-           setTrees(initialTrees);
+           // If API returns nothing, keep whatever state we had or empty
+           setTrees([]); 
         }
       });
     } else {
-      setTrees(initialTrees);
+      // If no TDN and no initial trees, just reset
+      if (!initialTrees || initialTrees.length === 0) {
+         setTrees([]);
+      }
     }
   }, [open, tdn, initialTrees, treeLibrary]); // Re-run when library loads to update descriptions
 
@@ -222,7 +232,8 @@ const TreesModal: React.FC<TreesModalProps> = ({
               <select
                 value={formData.code}
                 onChange={(e) => handleTreeSelect(e.target.value)}
-                className="w-full px-2 py-1.5 text-xs border rounded bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
+                disabled={readOnly}
+                className="w-full px-2 py-1.5 text-xs border rounded bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="">Select Plant/Tree</option>
                 {treeLibrary.map((t, index) => {
@@ -243,7 +254,8 @@ const TreesModal: React.FC<TreesModalProps> = ({
               <select
                 value={formData.type}
                 onChange={(e) => setFormData({ ...formData, type: e.target.value as 'FB' | 'NFB' })}
-                className="w-full px-2 py-1.5 text-xs border rounded bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
+                disabled={readOnly}
+                className="w-full px-2 py-1.5 text-xs border rounded bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="FB">Fruit Bearing</option>
                 <option value="NFB">Non-FB</option>
@@ -257,8 +269,9 @@ const TreesModal: React.FC<TreesModalProps> = ({
                 type="text"
                 value={formData.class}
                 onChange={(e) => setFormData({ ...formData, class: e.target.value })}
+                disabled={readOnly}
                 placeholder="A, B, C..."
-                className="w-full px-2 py-1.5 text-xs border rounded bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600"
+                className="w-full px-2 py-1.5 text-xs border rounded bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
             <div className="w-32">
@@ -269,8 +282,9 @@ const TreesModal: React.FC<TreesModalProps> = ({
                 type="number"
                 value={formData.unitPrice}
                 onChange={(e) => setFormData({ ...formData, unitPrice: e.target.value })}
+                disabled={readOnly}
                 placeholder="0.00"
-                className="w-full px-2 py-1.5 text-xs border rounded bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-right"
+                className="w-full px-2 py-1.5 text-xs border rounded bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-right disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
             <div className="w-24">
@@ -281,13 +295,14 @@ const TreesModal: React.FC<TreesModalProps> = ({
                 type="number"
                 value={formData.quantity}
                 onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                disabled={readOnly}
                 placeholder="0"
-                className="w-full px-2 py-1.5 text-xs border rounded bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-right"
+                className="w-full px-2 py-1.5 text-xs border rounded bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-right disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
             <button
               onClick={handleAdd}
-              disabled={!formData.name || !formData.unitPrice || !formData.quantity}
+              disabled={!formData.name || !formData.unitPrice || !formData.quantity || readOnly}
               className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-xs flex items-center gap-1 disabled:opacity-50"
             >
               <Plus size={14} />
@@ -336,12 +351,14 @@ const TreesModal: React.FC<TreesModalProps> = ({
                       <td className="px-3 py-2 text-right">{tree.quantity}</td>
                       <td className="px-3 py-2 text-right font-medium">{formatCurrency(tree.totalValue)}</td>
                       <td className="px-3 py-2 text-center">
-                        <button
-                          onClick={() => handleDelete(tree.id)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        {!readOnly && (
+                          <button
+                            onClick={() => handleDelete(tree.id)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -363,15 +380,17 @@ const TreesModal: React.FC<TreesModalProps> = ({
             onClick={() => onOpenChange(false)}
             className="px-4 py-2 text-xs border border-slate-300 dark:border-slate-600 rounded hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
           >
-            Cancel
+            {readOnly ? 'Close' : 'Cancel'}
           </button>
-          <button
-            onClick={handleSave}
-            className="px-4 py-2 text-xs bg-green-600 hover:bg-green-700 text-white rounded transition-colors flex items-center gap-2"
-          >
-            <Save size={14} />
-            Save Plants/Trees
-          </button>
+          {!readOnly && (
+            <button
+              onClick={handleSave}
+              className="px-4 py-2 text-xs bg-green-600 hover:bg-green-700 text-white rounded transition-colors flex items-center gap-2"
+            >
+              <Save size={14} />
+              Save Plants/Trees
+            </button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -213,8 +213,19 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
         taxable: r.TAXABILITY === 'true' || r.TAXABILITY === 'TAXABLE' || r.TAXABLE_RATE > 0, // Handle boolean or string
         beneficialUse: r.BU === 'true' || r.BU === '1', // Handle boolean or string representation
         idleLand: r.IdleLand || false,
+        adjustments: (r as any).adjustments || [],
+        trees: (r as any).trees || [], // Explicitly ensure trees are mapped
       }));
       setRecords(mapped);
+      
+      // If we have a selected record, we need to update it with the new data from apiRecords
+      // Otherwise, the modal will open with old data
+      if (selectedRecord) {
+        const updatedSelected = mapped.find(r => r.id === selectedRecord.id || r.tdn === selectedRecord.tdn);
+        if (updatedSelected) {
+            setSelectedRecord(updatedSelected);
+        }
+      }
     }
   }, [apiRecords]);
 
@@ -504,7 +515,7 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
           <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1 self-center" />
           <button
             onClick={() => setIsAdjustmentOpen(true)}
-            disabled={!selectedRecord || isLocalFormEnabled}
+            disabled={!selectedRecord}
             className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 text-orange-600 dark:text-orange-400 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ArrowDownUp size={14} />
@@ -512,7 +523,7 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
           </button>
           <button
             onClick={() => setIsTreesOpen(true)}
-            disabled={!selectedRecord || isLocalFormEnabled}
+            disabled={!selectedRecord}
             className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-green-50 dark:hover:bg-green-900/20 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 text-green-600 dark:text-green-400 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Trees size={14} />
@@ -606,7 +617,8 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
         onOpenChange={setIsTreesOpen}
         initialTrees={selectedRecord?.trees || []}
         onSave={handleSaveTrees}
-        tdn={selectedTdn} // Pass the selected TDN
+        tdn={selectedTdn}
+        readOnly={!(isEnabled || isLocalFormEnabled)}
       />
 
 

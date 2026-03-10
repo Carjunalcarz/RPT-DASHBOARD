@@ -128,6 +128,48 @@ const RealPropertyDataEntry: React.FC = () => {
   const [activeTab, setActiveTab] = useState('property-info');
   const [showJson, setShowJson] = useState(false);
   const [showTransactionModal, setShowTransactionModal] = useState(false);
+  
+  const [isRestored, setIsRestored] = useState(false);
+  const PERSISTENCE_KEY = 'rpt_m_data_entry_state';
+
+  // Restore state on mount
+  useEffect(() => {
+    const savedState = localStorage.getItem(PERSISTENCE_KEY);
+    if (savedState) {
+      try {
+        const parsedState = JSON.parse(savedState);
+        const { record, assessments, editing, adding } = parsedState;
+        
+        if (record) {
+          setSelectedRecord(record);
+          setAssessmentRecords(assessments || []);
+          setIsEditing(editing || false);
+          setIsAdding(adding || false);
+          toast.info('Restored previous session', { id: 'restore-session' });
+        }
+      } catch (e) {
+        console.error('Failed to restore state', e);
+      }
+    }
+    setIsRestored(true);
+  }, []);
+
+  // Save state on change
+  useEffect(() => {
+    if (!isRestored) return;
+
+    if (selectedRecord) {
+      const stateToSave = {
+        record: selectedRecord,
+        assessments: assessmentRecords,
+        editing: isEditing,
+        adding: isAdding
+      };
+      localStorage.setItem(PERSISTENCE_KEY, JSON.stringify(stateToSave));
+    } else {
+      localStorage.removeItem(PERSISTENCE_KEY);
+    }
+  }, [selectedRecord, assessmentRecords, isEditing, isAdding, isRestored]);
 
   const handleTransactionClick = () => {
     setShowTransactionModal(true);
@@ -135,22 +177,34 @@ const RealPropertyDataEntry: React.FC = () => {
 
   const handleTransactionSelect = (type: string) => {
     if (!selectedRecord) {
-      toast.error('Please select a property first.');
+      toast.error('Please select a property first.', { id: 'select-property-error' });
       return;
     }
 
     const newRecord: PropertyRecord = {
       ...selectedRecord,
+      // Generate a temporary ID for the transaction
       id: `TRANS-${type}-${Date.now()}`,
-      TDN: '', 
-      ARP: '',
+      
+      // Keep existing TDN and ARP so they are visible/editable, but mark them as potentially needing update
+      // The PropertyInformationSection logic will update the prefix if effectivity date changes
+      // TDN: '', 
+      // ARP: '',
+      TDN: selectedRecord.TDN,
+      ARP: selectedRecord.ARP,
+      
+      // Link to the previous record (The "Foundation" of the transaction)
       pOldTdn: selectedRecord.TDN,
       pPin: selectedRecord.PIN,
       pOwner: selectedRecord.owner,
       pOwnerNo: selectedRecord.OWNER_NO,
-      pEffDate: selectedRecord.pEffDate,
-      pAssessedValue: selectedRecord.pAssessedValue,
+      pEffDate: selectedRecord.pEffDate, // Or current date? Usually previous eff date.
+      pAssessedValue: selectedRecord.pAssessedValue, // Should be calculated or carried over
+      
+      // Set the Transaction Type
       TRANS_CD: type,
+      
+      // Reset status and dates for the new workflow
       status: 'draft',
       appraisedDate: new Date().toISOString().split('T')[0],
       // Reset approvals
@@ -181,13 +235,11 @@ const RealPropertyDataEntry: React.FC = () => {
         if (!/^[a-zA-Z0-9-%]+$/.test(value)) return 'PIN must contain only letters, numbers, and hyphens';
         break;
       case 'TDN':
+      case 'pOldTdn':
+      case 'ARP':
         // Numeric check (or alphanumeric if TDNs can have letters, but usually numeric/dashes)
         // Let's allow dashes too just in case
-        if (!/^[0-9-%]+$/.test(value)) return 'TDN must be numeric (hyphens allowed)';
-        break;
-      case 'ARP':
-        // Similar to TDN
-        if (!/^[0-9-%]+$/.test(value)) return 'ARP must be numeric (hyphens allowed)';
+        if (!/^[0-9-%]+$/.test(value)) return `${field} must be numeric (hyphens allowed)`;
         break;
       case 'OWNER':
         if (value.length < 2) return 'Owner name must be at least 2 characters';
@@ -282,16 +334,24 @@ const RealPropertyDataEntry: React.FC = () => {
     if (apiData?.data) {
       const mappedRecords: PropertyRecord[] = apiData.data.map((item: any) => {
         const innerData = item.data || {};
+        
+        // Ensure TDN and ARP are prioritized from item.tdn or innerData
+        const currentTdn = item.tdn || innerData.tdn || innerData.TDN || '';
+        const currentPin = innerData.pin || innerData.PIN || '';
+        
+        // Remove lowercase keys to avoid redundancy
+        const { tdn, pin, arp, ...cleanInnerData } = innerData;
+
         return {
-          ...innerData,
+          ...cleanInnerData,
           id: item.id,
-          TDN: item.tdn || innerData.tdn || innerData.TDN || '',
+          TDN: currentTdn,
+          ARP: currentTdn, // ARP should always match TDN as per user request
+          PIN: currentPin,
           status: item.status,
           // Ensure essential fields have defaults if missing in JSON
           owner: innerData.owner || innerData.owner_name || 'N/A',
           barangay: innerData.barangay || 'N/A',
-          ARP: innerData.ARP || '',
-          PIN: innerData.PIN || '',
           OWNER_NO: innerData.OWNER_NO || '',
         };
       });
@@ -330,15 +390,21 @@ const RealPropertyDataEntry: React.FC = () => {
               const record = await getFaasRecord(savedDraftId);
               if (record) {
                   const innerData = record.data || {};
+                  const currentTdn = record.tdn || innerData.tdn || innerData.TDN || '';
+                  const currentPin = innerData.pin || innerData.PIN || '';
+                  
+                  // Clean lowercase keys
+                  const { tdn, pin, arp, ...cleanInnerData } = innerData;
+
                   const mappedRecord: PropertyRecord = {
-                      ...innerData,
+                      ...cleanInnerData,
                       id: record.id,
-                      TDN: record.tdn || innerData.tdn || innerData.TDN || '',
+                      TDN: currentTdn,
+                      ARP: currentTdn, // Use TDN for ARP
+                      PIN: currentPin,
                       status: record.status,
                       owner: innerData.owner || innerData.owner_name || 'N/A',
                       barangay: innerData.barangay || 'N/A',
-                      ARP: innerData.ARP || '',
-                      PIN: innerData.PIN || '',
                       OWNER_NO: innerData.OWNER_NO || '',
                   };
                   
@@ -384,6 +450,14 @@ const RealPropertyDataEntry: React.FC = () => {
     }
   };
 
+  // Handle updates from child components
+  const handleRecordUpdate = useCallback((updatedData: Partial<PropertyRecord>) => {
+    setSelectedRecord(prev => {
+      if (!prev) return null;
+      return { ...prev, ...updatedData };
+    });
+  }, []);
+
   const handleAdd = () => {
     setIsAdding(true);
     setIsEditing(false);
@@ -417,16 +491,26 @@ const RealPropertyDataEntry: React.FC = () => {
             // Check if it's actually a transaction
             const isTransaction = selectedRecord.id && selectedRecord.id.startsWith('TRANS');
             
+            // Allow cancelling if it's a draft transaction OR if it's a new record being added (which has a TRANS- id locally)
             if (isTransaction) {
                 // If it's a drafted transaction that hasn't been submitted/approved, we can just delete it
                 // But if we want to log it as "Cancelled", we might want a specific endpoint
                 await cancelFaasTransaction(selectedRecord.id);
                 toast.success('Transaction cancelled successfully');
             } else {
+                // If it's not a transaction ID but user clicked cancel transaction, it might be a misunderstanding or legacy data.
+                // However, for drafted records that are NOT yet transactions (just simple adds), we should just delete/reset.
+                // But the button is only shown if id starts with TRANS.
                 toast.error('This is not an active transaction.');
                 return;
             }
 
+            if (selectedRecord.id === localStorage.getItem(PERSISTENCE_KEY)) {
+                 // Actually persistence key stores the whole state object, not just ID.
+                 // We should clear the state.
+                 localStorage.removeItem(PERSISTENCE_KEY);
+            }
+            // Also check currentDraftId legacy
             if (selectedRecord.id === localStorage.getItem('currentDraftId')) {
                 localStorage.removeItem('currentDraftId');
             }
@@ -438,7 +522,18 @@ const RealPropertyDataEntry: React.FC = () => {
             mutate();
         } catch (error) {
             console.error('Failed to cancel transaction:', error);
-            toast.error('Failed to cancel transaction');
+            // If error is 404 (Not Found), it means it's a local-only transaction not yet saved to backend.
+            // In that case, just clearing local state is enough.
+            if ((error as any)?.response?.status === 404 || (error as any)?.message?.includes('not found')) {
+                 toast.info('Local transaction discarded.');
+                 localStorage.removeItem(PERSISTENCE_KEY);
+                 setRecords(prev => prev.filter(r => r.id !== selectedRecord.id));
+                 setSelectedRecord(null);
+                 setIsEditing(false);
+                 setIsAdding(false);
+            } else {
+                 toast.error('Failed to cancel transaction');
+            }
         }
     }
   };
@@ -486,8 +581,13 @@ const RealPropertyDataEntry: React.FC = () => {
     setAssessmentRecords(updatedAssessmentRecords);
     
     // Construct the full record payload
+    // Clean lowercase keys and ensure TDN/ARP sync
+    const { id: _, tdn, pin, arp, ...recordData } = selectedRecord as any;
     const dataToSave = {
-      ...selectedRecord,
+      ...recordData,
+      TDN: selectedRecord.TDN,
+      ARP: selectedRecord.TDN, // Ensure ARP = TDN
+      PIN: selectedRecord.PIN,
       assessments: updatedAssessmentRecords,
       status: 'draft'
     };
@@ -526,48 +626,60 @@ const RealPropertyDataEntry: React.FC = () => {
     if (!pin && !tdn) return null;
 
     try {
-      // Check PIN uniqueness
+      // 1. Check Supabase (New System) - Primary Validation
+      // We check for conflicts in Drafts/For-Review/Approved records in Supabase
+      
+      // Check PIN in Supabase
       if (pin) {
-        const pinResult = await getRptMastDataDirect({
-          page: 1,
-          limit: 5,
+        const pinResult = await listFaasRecords({
           searchField: 'PIN',
-          filterValue: pin
+          filterValue: pin,
+          limit: 1
         });
-        
-        const duplicatePin = pinResult.data.find(r => r.PIN === pin);
-        
+
+        const duplicatePin = pinResult.data?.find((r: any) => {
+            // If editing an existing Supabase record, ID matches
+            if (selectedRecord?.id && r.id === selectedRecord.id) return false;
+            // If editing a new transaction (TRANS-...), no Supabase record should match
+            return true;
+        });
+
         if (duplicatePin) {
-            // Allow if the found record is the predecessor (parent)
-            if (duplicatePin.TDN !== selectedRecord?.TDN && duplicatePin.TDN !== selectedRecord?.pOldTdn) {
-              return `PIN ${pin} already exists (Used by TDN: ${duplicatePin.TDN})`;
-            }
+             const duplicateTdn = duplicatePin.tdn || duplicatePin.data?.tdn || duplicatePin.data?.TDN;
+
+             // Allow if the PIN belongs to the parent record (General Revision / Update)
+             // This ensures we can reuse the PIN for the new revision of the same property
+             if (selectedRecord?.pOldTdn && duplicateTdn === selectedRecord.pOldTdn) {
+                 // Valid continuity - The found record is the predecessor of this transaction
+             } else {
+                 const tdn = duplicateTdn || 'Unknown TDN';
+                 return `PIN ${pin} already exists in a pending/approved record (TDN: ${tdn}, Status: ${duplicatePin.status})`;
+             }
          }
       }
 
-      // Check TDN uniqueness
+      // Check TDN in Supabase
       if (tdn) {
-        const tdnResult = await getRptMastDataDirect({
-          page: 1,
-          limit: 5,
+        const tdnResult = await listFaasRecords({
           searchField: 'TDN',
-          filterValue: tdn
+          filterValue: tdn,
+          limit: 1
         });
 
-        const duplicateTdn = tdnResult.data.find(r => r.TDN === tdn);
-        if (duplicateTdn) {
-           const isNewRecord = isAdding || (selectedRecord?.id && selectedRecord.id.startsWith('TRANS'));
-           
-           if (isNewRecord) {
-               return `TDN ${tdn} already exists.`;
-           } else {
-               const originalTdn = selectedRecord?.id?.split('-')[0];
-               if (duplicateTdn.TDN !== originalTdn) {
-                   return `TDN ${tdn} already exists.`;
-               }
-           }
-        }
+        const duplicateTdn = tdnResult.data?.find((r: any) => {
+             if (selectedRecord?.id && r.id === selectedRecord.id) return false;
+             return true;
+         });
+ 
+         if (duplicateTdn) {
+             const ownerName = duplicateTdn.data?.owner || duplicateTdn.data?.owner_name || duplicateTdn.data?.OWNER_NAME || 'Unknown Owner';
+             return `TDN already exists in the records under the name: ${ownerName}. Please use a new TDN.`;
+         }
       }
+
+      // 2. Legacy Check (RPTMAST) - Disabled/Warning Only
+      // As per user request, we only validate against Supabase FAAS_records.
+      // Legacy conflicts are allowed for migration purposes.
 
     } catch (error: any) {
       console.error('Validation check failed:', error);
@@ -597,13 +709,19 @@ const RealPropertyDataEntry: React.FC = () => {
     const toastId = toast.loading('Saving draft...');
 
     try {
+      // Artificial delay to show spinner
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
       // Prepare data for saving
       const isTempId = selectedRecord.id && (selectedRecord.id.startsWith('TRANS') || selectedRecord.id.startsWith('DUMMY') || selectedRecord.id.includes('DUMMY'));
       
-      const { id, ...recordData } = selectedRecord;
+      // Clean lowercase keys and ensure TDN/ARP sync
+      const { id, tdn, pin, arp, ...recordData } = selectedRecord as any;
       const dataToSave = {
         ...recordData,
-        ...(isTempId ? {} : { id: selectedRecord.id }),
+        TDN: selectedRecord.TDN,
+        ARP: selectedRecord.TDN, // Ensure ARP = TDN as per user request
+        PIN: selectedRecord.PIN,
         assessments: assessmentRecords,
         status: 'draft'
       };
@@ -617,11 +735,21 @@ const RealPropertyDataEntry: React.FC = () => {
       const savedId = savedRecord.id || selectedRecord.id;
       localStorage.setItem('currentDraftId', savedId);
 
-      setSelectedRecord({
+      const updatedRecord = {
         ...selectedRecord,
         id: savedId,
+        assessments: assessmentRecords, // Explicitly update assessments
         status: 'draft'
-      });
+      };
+
+      setSelectedRecord(updatedRecord);
+      
+      // Update the record in the main list (records state)
+      setRecords(prev => prev.map(r => r.id === selectedRecord.id ? updatedRecord : r));
+      
+      // Exit edit mode after successful save
+      setIsEditing(false);
+      setIsAdding(false);
     } catch (error: any) {
       toast.dismiss(toastId);
       // Prioritize the error message from the backend response (AppError)
@@ -659,13 +787,19 @@ const RealPropertyDataEntry: React.FC = () => {
     const toastId = toast.loading('Submitting record...');
 
     try {
+      // Artificial delay to show spinner
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
       // First ensure it's saved
       const isTempId = selectedRecord.id && (selectedRecord.id.startsWith('TRANS') || selectedRecord.id.startsWith('DUMMY') || selectedRecord.id.includes('DUMMY'));
       
-      const { id, ...recordData } = selectedRecord;
+      // Clean lowercase keys and ensure TDN/ARP sync
+      const { id, tdn, pin, arp, ...recordData } = selectedRecord as any;
       const dataToSave = {
         ...recordData,
-        ...(isTempId ? {} : { id: selectedRecord.id }),
+        TDN: selectedRecord.TDN,
+        ARP: selectedRecord.TDN, // Ensure ARP = TDN
+        PIN: selectedRecord.PIN,
         assessments: assessmentRecords,
         status: 'for-review'
       };
@@ -919,9 +1053,10 @@ const RealPropertyDataEntry: React.FC = () => {
                 `}</style>
                 <tr>
                   <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[180px]">TDN</th>
+                  <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[180px]">OLD TDN</th>
                   <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[180px]">ARP</th>
                   <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[200px]">PIN</th>
-                  <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[180px]">OWNER NO.</th>
+                  <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[150px]">STATUS</th>
                   <th className="px-4 py-3 text-left font-semibold tracking-wide min-w-[250px]">OWNER</th>
                   <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[100px]">CITY CODE</th>
                   <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[100px]">BRGY CODE</th>
@@ -952,9 +1087,22 @@ const RealPropertyDataEntry: React.FC = () => {
                     data-testid={`record-row-${record.id}`}
                   >
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.TDN}</td>
-                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.ARP}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.pOldTdn || ''}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.TDN}</td>
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.PIN}</td>
-                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.OWNER_NO}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                        record.status === 'approved' 
+                          ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' 
+                          : record.status === 'for-review'
+                          ? 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800'
+                          : record.status === 'draft'
+                          ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800'
+                          : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
+                      }`}>
+                        {record.status || 'N/A'}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap truncate max-w-xs">{record.owner}</td>
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap text-center">{record.cityCode}</td>
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap text-center">{record.barangayCode}</td>
@@ -1008,6 +1156,7 @@ const RealPropertyDataEntry: React.FC = () => {
                   data-testid="search-field"
                 >
                   <option value="TDN">TDN</option>
+                  <option value="pOldTdn">OLD TDN</option>
                   <option value="ARP">ARP</option>
                   <option value="PIN">PIN</option>
                   <option value="OWNER">OWNER</option>
@@ -1031,7 +1180,12 @@ const RealPropertyDataEntry: React.FC = () => {
                         : 'border-slate-200 dark:border-slate-700'
                     }`}
                     data-testid="filter-value"
-                    placeholder={searchField === 'TDN' ? 'Enter TDN...' : `Enter ${searchField}...`}
+                    placeholder={
+                      searchField === 'TDN' ? 'Enter TDN...' : 
+                      searchField === 'pOldTdn' ? 'Enter OLD TDN...' :
+                      searchField === 'ARP' ? 'Enter ARP...' :
+                      `Enter ${searchField}...`
+                    }
                   />
                   <button 
                     onClick={handleApplyFilter}
@@ -1113,14 +1267,18 @@ const RealPropertyDataEntry: React.FC = () => {
                 <PropertyInformationSection
                   isEnabled={isFormEnabled}
                   selectedRecord={selectedRecord}
+                  onUpdate={handleRecordUpdate}
+                  isAdding={isAdding}
                 />
                 <PropertyOwnerSection
                   isEnabled={isFormEnabled}
                   selectedRecord={selectedRecord}
+                  onUpdate={handleRecordUpdate}
                 />
                 <PropertyBoundariesSection
                   isEnabled={isFormEnabled}
                   selectedRecord={selectedRecord}
+                  onUpdate={handleRecordUpdate}
                 />
               </>
             )}
@@ -1138,6 +1296,7 @@ const RealPropertyDataEntry: React.FC = () => {
               <ReferenceSection 
                 selectedRecord={selectedRecord} 
                 isEnabled={isFormEnabled} 
+                onUpdate={handleRecordUpdate}
               />
             )}
             
@@ -1146,6 +1305,7 @@ const RealPropertyDataEntry: React.FC = () => {
                 selectedRecord={selectedRecord} 
                 isEnabled={isFormEnabled} 
                 onEditModeChange={setIsSubComponentEditing}
+                onUpdate={handleRecordUpdate}
               />
             )}
             

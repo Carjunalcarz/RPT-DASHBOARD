@@ -8,11 +8,36 @@ class FaasService {
    * Validate TDN and PIN uniqueness
    * @param {Object} data 
    * @param {string} currentId 
+   * @param {Object} existingRecord - Optional existing record to check for changes
    */
-  async validateTransaction(data, currentId = null) {
+  async validateTransaction(data, currentId = null, existingRecord = null) {
     const tdn = data.tdn || data.TDN;
     const pin = data.pin || data.PIN;
     const pOldTdn = data.pOldTdn; // Parent TDN if transaction
+    // Assuming pPin is passed from frontend as pPin or P_PIN
+    const pPin = data.pPin || data.P_PIN; 
+
+    // Rule 1: PIN Immutability
+    // If pPin exists (meaning this is a revision/transaction from an existing property),
+    // the new PIN must match the old PIN.
+    if (pPin && pin && pin !== pPin) {
+        throw new AppError("PIN is immutable and cannot be changed once assigned.", 400);
+    }
+
+    // Optimization: If updating an existing draft and critical fields (TDN/PIN) haven't changed, skip MSSQL check
+    // This significantly speeds up auto-save
+    let skipMssqlCheck = false;
+    if (existingRecord) {
+        const existingData = existingRecord.data || {};
+        const existingTdn = existingRecord.tdn || existingData.TDN;
+        const existingPin = existingData.PIN;
+        
+        // If TDN and PIN are identical to what's already saved, we assume it's still valid
+        // (or at least we don't need to block saving a draft for a re-check)
+        if (existingTdn === tdn && existingPin === pin) {
+            skipMssqlCheck = true;
+        }
+    }
 
     const checks = [];
 
@@ -33,26 +58,72 @@ class FaasService {
       );
     }
 
-    // 2. Check MSSQL (Active Records)
-    if (tdn || pin) {
-        checks.push(
-            rptMastService.checkDuplicate(tdn, pin).then(mssqlCheck => {
-                if (mssqlCheck.tdnExists) {
-                   if (data.TRANS_CD) {
-                       throw new AppError(`TDN ${tdn} is currently active. Please assign a new TDN for this transaction.`, 409);
-                   }
-                }
-    
-                if (mssqlCheck.pinExists) {
-                  const isParent = pOldTdn && mssqlCheck.pinRecord.TDN === pOldTdn;
-                  if (!isParent) {
-                    throw new AppError(`PIN ${pin} already exists (Used by TDN: ${mssqlCheck.pinRecord.TDN})`, 409);
+      // 2. Check MSSQL (Active Records)
+      // Only run MSSQL check if TDN or PIN is present and we're NOT updating an existing draft with the SAME TDN/PIN.
+      if ((tdn || pin) && !skipMssqlCheck) {
+          checks.push(
+              rptMastService.checkDuplicate(tdn, pin).then(mssqlCheck => {
+                  if (mssqlCheck.tdnExists) {
+                     // Check if it's a valid "No Change" operation (New TDN === Old TDN)
+                     // If existingRecord is null (new transaction) but data.pOldTdn matches tdn, 
+                     // it implies the transaction intends to keep the same TDN.
+                     
+                     if (pOldTdn && mssqlCheck.tdnRecord.TDN === pOldTdn && tdn === pOldTdn) {
+                         // This is a "Same TDN" transaction. Allow it.
+                     } else {
+                         // Rule 3: TDN Update Validation
+                          // If submitted TDN exists...
+                          
+                          // Check if it belongs to another PIN
+                          if (mssqlCheck.tdnRecord.PIN !== pin) {
+                             // --- MODIFICATION: Allow legacy conflict during migration/encoding ---
+                             // throw new AppError("TDN already exists and is assigned to another property.", 409);
+                             logger.warn(`Legacy Conflict Warning: TDN ${tdn} exists in MSSQL but allowing save to Supabase.`);
+                          } else {
+                              // If it belongs to the SAME PIN, it implies we are either:
+                              // 1. Updating the Active Record directly (if not a new transaction)
+                              // 2. Or creating a Revision where we haven't changed the TDN yet (so it matches parent).
+                              // This case is covered by the `if (pOldTdn && ... tdn === pOldTdn)` check above.
+                              // But what if tdn !== pOldTdn, but tdn exists and has same PIN?
+                              // This implies we are trying to reuse an OLD TDN of the same property?
+                              // Or there is a duplicate TDN in the system for the same PIN.
+                              // The rule says: "If the submitted TDN matches the current (old) TDN, the update is valid."
+                              // "If ... does not match ... check if ... already belongs to another PIN."
+                              
+                              // So if it belongs to the SAME PIN, it is NOT rejected by that rule.
+                              // Thus, implicitly allowed or requires further check.
+                              // For now, we allow it if PIN matches.
+                          }
+                     }
                   }
-                }
-            })
-        );
-    }
-
+      
+                  if (mssqlCheck.pinExists) {
+                    // Rule 3 (part 2): TDN Update Validation
+                    // If we are changing TDN (tdn != pOldTdn), and the NEW TDN exists (handled above),
+                    // we also need to ensure the PIN we are using is valid.
+                    
+                    // If pinExists, it means the PIN is already in use by SOME record.
+                    // If that record is NOT the parent record, it's a conflict?
+                    // Actually, for a Revision, we EXPECT the PIN to exist (it's the same property).
+                    // So pinExists is GOOD if it matches pOldTdn's record.
+                    
+                    const isParent = pOldTdn && mssqlCheck.pinRecord.TDN === pOldTdn;
+                    
+                    // If the PIN exists but belongs to a DIFFERENT property (different TDN chain not linked to parent),
+                    // then we might have an issue. But PIN is supposed to be unique per property.
+                    // If we are reusing the PIN, it MUST be the same property.
+                    
+                    // If mssqlCheck.pinRecord.TDN !== pOldTdn, it means the PIN is currently assigned to another TDN.
+                    // If we are doing a revision, we are essentially "taking over" this PIN for the new TDN.
+                    // This is valid.
+                    
+                    // The error "TDN already exists and is assigned to another property" is handled in the tdnExists block.
+                    // Here we check if PIN is being hijacked? No, Rule 1 handles PIN immutability.
+                  }
+              })
+          );
+      }
+    
     // Run checks in parallel
     await Promise.all(checks);
   }
@@ -88,8 +159,8 @@ class FaasService {
       // Determine the ID to exclude from validation
       const currentId = existingRecord ? existingRecord.id : (id || data.id);
       
-      // Perform Validation
-      await this.validateTransaction(data, currentId);
+      // Perform Validation (Passing existingRecord to optimize checks)
+      await this.validateTransaction(data, currentId, existingRecord);
 
       let record;
       let action;
@@ -124,12 +195,14 @@ class FaasService {
         });
       }
 
-      // Audit Log
-      await this.logAudit(action, record.id, { tdn }, userEmail, userId);
+      // Audit Log (Non-blocking)
+      this.logAudit(action, record.id, { tdn }, userEmail, userId).catch(err => {
+          logger.warn(`Background audit log failed for ${action}:`, err.message);
+      });
 
-      // Log migration/sync event if this originated from MSSQL (TDN exists)
+      // Log migration/sync event if this originated from MSSQL (TDN exists) (Non-blocking)
       if (tdn) {
-          await supabasePrisma.migrationLog.create({
+          supabasePrisma.migrationLog.create({
               data: {
                   sourceId: tdn,
                   targetId: record.id,
@@ -140,6 +213,8 @@ class FaasService {
                       timestamp: new Date()
                   }
               }
+          }).catch(err => {
+              logger.warn(`Background migration log failed for ${tdn}:`, err.message);
           });
       }
 

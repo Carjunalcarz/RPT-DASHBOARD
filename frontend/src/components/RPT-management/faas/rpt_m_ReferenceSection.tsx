@@ -53,9 +53,10 @@ const defaultFormData: ReferenceFormData = {
 interface ReferenceSectionProps {
   selectedRecord?: any;
   isEnabled?: boolean;
+  onUpdate?: (updatedData: any) => void;
 }
 
-const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: initialRecord, isEnabled = true }) => {
+const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: initialRecord, isEnabled = true, onUpdate }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const [records, setRecords] = useState<ReferenceRecord[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<ReferenceRecord | null>(null);
@@ -161,6 +162,23 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
       setRecords(prev => [...prev, newRecord]);
     }
     
+    // Propagate changes to parent
+    if (onUpdate) {
+      onUpdate({
+        pNewTdn: formData.tdn,
+        canArp: formData.arp,
+        pPin: formData.pin,
+        pEffDate: formData.effDate,
+        pOwnerCode: formData.ownerCode,
+        pOwnerNo: formData.ownerNo,
+        pOwner: formData.ownerName,
+        pMarketValue: parseFloat(formData.marketValue) || 0,
+        pAssessedValue: parseFloat(formData.assessedValue) || 0,
+        pArea: parseFloat(formData.area) || 0,
+        pAreaM: formData.areaUnit === 'ha',
+      });
+    }
+
     setSelectedRecord(newRecord);
     setIsEditing(false);
     // Save logic here (e.g. API call if needed)

@@ -144,6 +144,7 @@ class RptMastService {
     s.ReviewedDate,
     s.SGD_REVIEWED,
     s.TPD_REVIEWED,
+    tree_data.trees_json,
 
     ms.TDN AS P_NEW_TDN,
     ms.CANCELS AS P_OLD_TDN,
@@ -157,8 +158,6 @@ class RptMastService {
     ms.IF_DEFAULT AS P_AREA_M,
     ms.EFF_DATE AS P_EFF_DATE,
     p.Name AS P_OWNER
-
-
 
 FROM RPTAS_AGUSAN.dbo.RPTMAST m
 
@@ -195,6 +194,26 @@ OUTER APPLY (
     FROM RPTAS_AGUSAN.dbo.Rptowner 
     WHERE Owner_No = ms.Powner_no
 ) p
+-- Include Trees Data
+OUTER APPLY (
+    SELECT 
+        (
+            SELECT 
+                t.TDN,
+                t.Prod_Code,
+                t.Area,
+                t.Tot_FB,
+                t.Non_FB,
+                t.FB,
+                t.Age,
+                t.Unit_Price,
+                t.Market_Value,
+                t.NFB_UnitPrice
+            FROM RPTAS_AGUSAN.dbo.RPT_TREE t
+            WHERE t.TDN = m.TDN
+            FOR JSON PATH
+        ) AS trees_json
+) tree_data
  
 
 WHERE 
@@ -243,10 +262,25 @@ WHERE
 
       logger.info('Executing RPTAS_AGUSAN migration query via MSSQL driver...');
 
-      logger.info('Executing RPTAS_AGUSAN migration query via MSSQL driver...');
-
       const result = await pool.request().query(baseQuery);
-      const records = result.recordset;
+      const records = result.recordset.map(record => {
+          // Parse trees_json if it exists
+          let trees = [];
+          if (record.trees_json) {
+              try {
+                  trees = JSON.parse(record.trees_json);
+              } catch (e) {
+                  logger.warn(`Failed to parse trees_json for TDN ${record.TDN}`, e);
+              }
+          }
+          // Remove the raw json string from the record to keep it clean
+          delete record.trees_json;
+          
+          return {
+              ...record,
+              trees: trees
+          };
+      });
 
       logger.info(`Query executed successfully. Records found: ${records.length}`);
 

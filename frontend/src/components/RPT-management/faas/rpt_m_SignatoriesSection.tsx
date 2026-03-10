@@ -168,9 +168,15 @@ interface SignatoriesSectionProps {
   selectedRecord?: any;
   isEnabled?: boolean;
   onEditModeChange?: (isEditing: boolean) => void;
+  onUpdate?: (updatedData: any) => void;
 }
 
-const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ selectedRecord: initialRecord, isEnabled = true, onEditModeChange }) => {
+const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ 
+  selectedRecord: initialRecord, 
+  isEnabled = true, 
+  onEditModeChange,
+  onUpdate
+}) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const { user } = useAuth();
   const [activeSubTab, setActiveSubTab] = useState<'signatories' | 'memorandum' | 'sworn' | 'documentation' | 'remarks'>('signatories');
@@ -409,6 +415,54 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ selectedRecord:
     try {
       pushNotice('success', 'Saving changes...');
       await updateSignatory(initialRecord.tdn, formData);
+      
+      // Propagate changes to parent (faas_records system)
+      if (onUpdate) {
+        onUpdate({
+          appraisedBy: formData.appraisedBy,
+          appraisedPos: formData.appraisedPosition,
+          appraisedDate: formData.appraisedDate,
+          sgdAppraised: formData.appraisedSGD,
+          tpdAppraised: formData.appraisedTPD,
+          
+          assessor: formData.assessedBy,
+          assessorPos: formData.assessedPosition,
+          assessorDate: formData.assessedDate,
+          sgdAssessed: formData.assessedSGD,
+          tpdAssessed: formData.assessedTPD,
+          
+          recApproval: formData.recommendingBy,
+          recApprovalPos: formData.recommendingPosition,
+          recAppDate: formData.recommendingDate,
+          sgdRecommend: formData.recommendingSGD,
+          tpdRecommend: formData.recommendingTPD,
+          
+          approved: formData.approvedBy,
+          approvedPos: formData.approvedPosition,
+          approvedDate: formData.approvedDate,
+          sgdApproved: formData.approvedSGD,
+          tpdApproved: formData.approvedTPD,
+          
+          provAssessor: formData.provincialAssessor,
+          provAssessorPos: formData.provincialPosition,
+          provAssessorDate: formData.provincialDate,
+          sgdProv: formData.provincialSGD,
+          tpdProv: formData.provincialTPD,
+          
+          cityAssessor: formData.cityAssessor,
+          cityAssessorPos: formData.cityPosition,
+          cityAssessorDate: formData.cityDate,
+          sgdCity: formData.citySGD,
+          tpdCity: formData.cityTPD,
+          
+          deputy: formData.deputy,
+          deputyPos: formData.deputyPosition,
+          deputyDate: formData.deputyDate,
+          sgdDeputy: formData.deputySGD,
+          tpdDeputy: formData.deputyTPD,
+        });
+      }
+      
       pushNotice('success', 'Changes saved successfully.');
       setIsEditing(false);
     } catch (error) {

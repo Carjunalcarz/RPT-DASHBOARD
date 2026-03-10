@@ -53,9 +53,10 @@ const defaultFormData: ReferenceFormData = {
 interface ReferenceSectionProps {
   selectedRecord?: any;
   isEnabled?: boolean;
+  onUpdate?: (data: any) => void;
 }
 
-const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: initialRecord, isEnabled = true }) => {
+const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: initialRecord, isEnabled = true, onUpdate }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const [records, setRecords] = useState<ReferenceRecord[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<ReferenceRecord | null>(null);
@@ -65,7 +66,6 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
   // Populate form when selectedRecord prop changes
   useEffect(() => {
     if (initialRecord) {
-      console.log('ReferenceSection received record:', initialRecord); // Debugging
       // Map API fields to form data
       setFormData({
         tdn: initialRecord.pNewTdn || '', // Use mapped fields from parent
@@ -106,17 +106,30 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
     }
   }, [initialRecord]);
 
+  const updateParent = (data: Partial<ReferenceFormData>) => {
+    if (!onUpdate) return;
+    
+    // Merge current form data with updates
+    const updatedForm = { ...formData, ...data };
+    
+    onUpdate({
+      pNewTdn: updatedForm.tdn,
+      pPin: updatedForm.pin,
+      canArp: updatedForm.arp,
+      pEffDate: updatedForm.effDate,
+      pOwnerCode: updatedForm.ownerCode,
+      pOwnerNo: updatedForm.ownerNo,
+      pOwner: updatedForm.ownerName,
+      pMarketValue: parseFloat(updatedForm.marketValue || '0'),
+      pAssessedValue: parseFloat(updatedForm.assessedValue || '0'),
+      pArea: parseFloat(updatedForm.area || '0'),
+      pAreaM: updatedForm.areaUnit === 'ha'
+    });
+  };
+
   const handleRowSelect = (record: ReferenceRecord) => {
     if (isEditing) return;
     setSelectedRecord(record);
-    // In a real scenario, we might need to fetch full details if the table record is partial.
-    // For now, since we only have one record populated from the same source, the form data is already set or persisted.
-    // If we support multiple records, we need to find the full data corresponding to this ID.
-    
-    // If we have multiple records, we should update formData here based on the selected record.
-    // However, ReferenceRecord interface is a subset. 
-    // Ideally, `records` should store the full `ReferenceFormData` or `initialRecord` structure.
-    // For this specific task (showing the single P_* record), we assume form matches current view.
   };
 
   const handleAdd = () => {
@@ -136,6 +149,22 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
       setRecords(prev => prev.filter(r => r.id !== selectedRecord.id));
       setSelectedRecord(null);
       setFormData(defaultFormData);
+      
+      // Update parent to clear values
+      if (onUpdate) {
+        onUpdate({
+          pNewTdn: '',
+          pPin: '',
+          canArp: '',
+          pEffDate: '',
+          pOwnerCode: '',
+          pOwnerNo: '',
+          pOwner: '',
+          pMarketValue: 0,
+          pAssessedValue: 0,
+          pArea: 0
+        });
+      }
     }
   };
 
@@ -163,7 +192,9 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
     
     setSelectedRecord(newRecord);
     setIsEditing(false);
-    // Save logic here (e.g. API call if needed)
+    
+    // Sync with parent
+    updateParent({});
   };
 
   const handleCancel = () => {
@@ -173,6 +204,15 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
 
   const handleRefresh = () => {
     // Refresh logic here
+  };
+  
+  const handleBlur = () => {
+    // Optional: Sync on blur if we want real-time updates without clicking save
+    // However, if isEditing is true, we might want to wait for Save.
+    // But for "Global Save Draft" to work, we need to sync.
+    if (isEditing) {
+      updateParent({});
+    }
   };
 
   const isLocalFormEnabled = isEditing;
@@ -280,11 +320,11 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
               }
             `}</style>
             <tr>
-              <th className="px-2 py-2 text-left font-medium border-r border-white/30">TDN</th>
+              <th className="px-2 py-2 text-left font-medium border-r border-white/30">Previous TDN</th>
               <th className="px-2 py-2 text-left font-medium border-r border-white/30">Extn.</th>
               <th className="px-2 py-2 text-left font-medium border-r border-white/30">ARP</th>
               <th className="px-2 py-2 text-left font-medium border-r border-white/30">Extn.</th>
-              <th className="px-2 py-2 text-left font-medium border-r border-white/30">PIN</th>
+              <th className="px-2 py-2 text-left font-medium border-r border-white/30">Previous PIN</th>
               <th className="px-2 py-2 text-left font-medium border-r border-white/30">Extn.</th>
               <th className="px-2 py-2 text-right font-medium border-r border-white/30">Market Value</th>
               <th className="px-2 py-2 text-right font-medium">Assessed Value</th>
@@ -330,11 +370,12 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
         <div className="grid grid-cols-12 gap-2">
           {/* Row 1: TDN, ARP, PIN */}
           <div className="col-span-2">
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">TDN:</label>
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Previous TDN:</label>
             <input
               type="text"
               value={formData.tdn}
               onChange={(e) => setFormData({ ...formData, tdn: e.target.value })}
+              onBlur={handleBlur}
               disabled={!isEditing}
               className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
             />
@@ -345,6 +386,7 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
               type="text"
               value={formData.extn1}
               onChange={(e) => setFormData({ ...formData, extn1: e.target.value })}
+              onBlur={handleBlur}
               disabled={!isEditing}
               className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
             />
@@ -355,6 +397,7 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
               type="text"
               value={formData.arp}
               onChange={(e) => setFormData({ ...formData, arp: e.target.value })}
+              onBlur={handleBlur}
               disabled={!isEditing}
               className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
             />
@@ -365,16 +408,18 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
               type="text"
               value={formData.extn2}
               onChange={(e) => setFormData({ ...formData, extn2: e.target.value })}
+              onBlur={handleBlur}
               disabled={!isEditing}
               className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
             />
           </div>
           <div className="col-span-2">
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">PIN:</label>
+            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Previous PIN:</label>
             <input
               type="text"
               value={formData.pin}
               onChange={(e) => setFormData({ ...formData, pin: e.target.value })}
+              onBlur={handleBlur}
               disabled={!isEditing}
               className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
             />
@@ -385,6 +430,7 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
               type="text"
               value={formData.extn3}
               onChange={(e) => setFormData({ ...formData, extn3: e.target.value })}
+              onBlur={handleBlur}
               disabled={!isEditing}
               className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
             />
@@ -397,6 +443,7 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
               type="date"
               value={formData.effDate}
               onChange={(e) => setFormData({ ...formData, effDate: e.target.value })}
+              onBlur={handleBlur}
               disabled={!isEditing}
               className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
             />
@@ -407,6 +454,7 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
               type="text"
               value={formData.ownerCode}
               onChange={(e) => setFormData({ ...formData, ownerCode: e.target.value })}
+              onBlur={handleBlur}
               disabled={!isEditing}
               className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
             />
@@ -417,6 +465,7 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
               type="text"
               value={formData.ownerNo}
               onChange={(e) => setFormData({ ...formData, ownerNo: e.target.value })}
+              onBlur={handleBlur}
               disabled={!isEditing}
               className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
             />
@@ -427,6 +476,7 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
               type="text"
               value={formData.ownerName}
               onChange={(e) => setFormData({ ...formData, ownerName: e.target.value })}
+              onBlur={handleBlur}
               disabled={!isEditing}
               className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
             />
@@ -439,6 +489,7 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
               type="text"
               value={formData.marketValue}
               onChange={(e) => setFormData({ ...formData, marketValue: e.target.value })}
+              onBlur={handleBlur}
               disabled={!isEditing}
               className="w-full px-2 py-1 text-xs text-right bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
             />
@@ -449,6 +500,7 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
               type="text"
               value={formData.assessedValue}
               onChange={(e) => setFormData({ ...formData, assessedValue: e.target.value })}
+              onBlur={handleBlur}
               disabled={!isEditing}
               className="w-full px-2 py-1 text-xs text-right bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
             />
@@ -459,6 +511,7 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
               type="text"
               value={formData.improvement}
               onChange={(e) => setFormData({ ...formData, improvement: e.target.value })}
+              onBlur={handleBlur}
               disabled={!isEditing}
               className="w-full px-2 py-1 text-xs text-right bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
             />
@@ -469,6 +522,7 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
               type="text"
               value={formData.area}
               onChange={(e) => setFormData({ ...formData, area: e.target.value })}
+              onBlur={handleBlur}
               disabled={!isEditing}
               className="w-full px-2 py-1 text-xs text-right bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
             />
@@ -478,6 +532,7 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
             <select
               value={formData.areaUnit}
               onChange={(e) => setFormData({ ...formData, areaUnit: e.target.value })}
+              onBlur={handleBlur}
               disabled={!isEditing}
               className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
             >

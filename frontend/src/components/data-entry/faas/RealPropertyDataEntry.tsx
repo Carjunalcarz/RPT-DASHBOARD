@@ -26,7 +26,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { saveDraft, submitForReview } from '@/services/faasService';
+import { saveDraft, submitForReview, listFaasRecords } from '@/services/faasService';
+import { useIdempotency } from '@/hooks/useIdempotency';
 
 // Types
 interface PropertyRecord {
@@ -111,6 +112,7 @@ interface PropertyRecord {
   ASS_LOT_NO?: string;
   BLOCK_NO?: string;
   LOTE_NO?: string;
+  pOldTdn?: string;
 } // Add new field for display
 
 
@@ -142,6 +144,50 @@ const RealPropertyDataEntry: React.FC = () => {
   const [isSubComponentEditing, setIsSubComponentEditing] = useState(false);
 
   const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [isRestored, setIsRestored] = useState(false);
+  const PERSISTENCE_KEY = 'rpt_data_entry_state';
+
+  // Idempotency Hook
+  const { idempotencyKey, refreshKey, getKey } = useIdempotency();
+
+  // Restore state on mount
+  useEffect(() => {
+    const savedState = localStorage.getItem(PERSISTENCE_KEY);
+    if (savedState) {
+      try {
+        const parsedState = JSON.parse(savedState);
+        const { record, assessments, editing, adding } = parsedState;
+        
+        if (record) {
+          setSelectedRecord(record);
+          setAssessmentRecords(assessments || []);
+          setIsEditing(editing || false);
+          setIsAdding(adding || false);
+          toast.info('Restored previous session', { id: 'restore-session' });
+        }
+      } catch (e) {
+        console.error('Failed to restore state', e);
+      }
+    }
+    setIsRestored(true);
+  }, []);
+
+  // Save state on change
+  useEffect(() => {
+    if (!isRestored) return;
+
+    if (selectedRecord) {
+      const stateToSave = {
+        record: selectedRecord,
+        assessments: assessmentRecords,
+        editing: isEditing,
+        adding: isAdding
+      };
+      localStorage.setItem(PERSISTENCE_KEY, JSON.stringify(stateToSave));
+    } else {
+      localStorage.removeItem(PERSISTENCE_KEY);
+    }
+  }, [selectedRecord, assessmentRecords, isEditing, isAdding, isRestored]);
 
   // ... (previous state declarations)
 
@@ -151,9 +197,11 @@ const RealPropertyDataEntry: React.FC = () => {
 
   const handleTransactionSelect = (type: string) => {
     if (!selectedRecord) {
-      toast.error('Please select a property first.');
+      toast.error('Please select a property first.', { id: 'select-property-error' });
       return;
     }
+
+    refreshKey(); // New transaction, new key
 
     // Create a new record based on the selected one
     // This initiates a new transaction workflow
@@ -169,6 +217,8 @@ const RealPropertyDataEntry: React.FC = () => {
       // Explicitly set these to empty strings for the UI inputs if they are undefined in selectedRecord
       // TDN: '',
       // ARP: '',
+      tdn: selectedRecord.tdn,
+      arp: selectedRecord.arp,
       
       // Link to the previous record (The "Foundation" of the transaction)
       pOldTdn: selectedRecord.tdn,
@@ -243,13 +293,11 @@ const RealPropertyDataEntry: React.FC = () => {
         if (!/^[a-zA-Z0-9-%]+$/.test(value)) return 'PIN must contain only letters, numbers, and hyphens';
         break;
       case 'TDN':
+      case 'pOldTdn':
+      case 'ARP':
         // Numeric check (or alphanumeric if TDNs can have letters, but usually numeric/dashes)
         // Let's allow dashes too just in case
-        if (!/^[0-9-%]+$/.test(value)) return 'TDN must be numeric (hyphens allowed)';
-        break;
-      case 'ARP':
-        // Similar to TDN
-        if (!/^[0-9-%]+$/.test(value)) return 'ARP must be numeric (hyphens allowed)';
+        if (!/^[0-9-%]+$/.test(value)) return `${field} must be numeric (hyphens allowed)`;
         break;
       case 'OWNER':
         if (value.length < 2) return 'Owner name must be at least 2 characters';
@@ -346,7 +394,7 @@ const RealPropertyDataEntry: React.FC = () => {
         ...item,
         id: `${item.TDN}-${index}`, // Ensure unique ID even with duplicate TDNs
         tdn: item.TDN || '',
-        arp: item.ARP || '',
+        arp: item.TDN || '', // ARP should use CURRENT TDN
         pin: item.PIN || '',
         ownerNo: item.OWNER_NO || '',
         owner: item.Owner_Name || 'N/A',
@@ -474,6 +522,7 @@ const RealPropertyDataEntry: React.FC = () => {
   };
 
   const handleAdd = () => {
+    refreshKey();
     setIsAdding(true);
     setIsEditing(false);
     setSelectedRecord(null);
@@ -526,123 +575,95 @@ const RealPropertyDataEntry: React.FC = () => {
     if (!pin && !tdn) return null;
 
     try {
-      // Check PIN uniqueness
+      // 1. Check Supabase (New System) - This is the primary check for duplicates in the new system
+      // We check for conflicts in Drafts/For-Review/Approved records in Supabase
+      
+      // Check PIN in Supabase
       if (pin) {
-        const pinResult = await getRptMastDataDirect({
-          page: 1,
-          limit: 5,
+        const pinResult = await listFaasRecords({
           searchField: 'PIN',
-          filterValue: pin
+          filterValue: pin,
+          limit: 1 // We only need to know if at least one exists
         });
-        
-        // Check for exact match
-        // If we are editing an existing record that is already in the database (not a draft), 
-        // we should exclude it from the check.
-        // However, selectedRecord here might be a draft with a temporary ID.
-        // If it's a new transaction (TRANS-...), it shouldn't match any existing active record.
-        const duplicatePin = pinResult.data.find(r => r.PIN === pin);
-        
+
+        // Filter out the current record if we are editing
+        const duplicatePin = pinResult.data?.find((r: any) => {
+            // If editing an existing Supabase record, ID matches
+            if (selectedRecord?.id && r.id === selectedRecord.id) return false;
+            // If editing a new transaction (TRANS-...), no Supabase record should match
+            return true;
+        });
+
         if (duplicatePin) {
-           // If the found record is the same as the one we are editing (by TDN/ID), it's fine.
-           // But how do we know?
-           // If selectedRecord.tdn matches duplicatePin.TDN, it's the same record.
-           // But if we are changing the PIN of an existing record, duplicatePin will be the record holding the *old* PIN?
-           // No, duplicatePin is the record holding the *new* PIN we are trying to set.
-           // If we find ANY record with this PIN, and it's not THIS record, it's a duplicate.
-           
-           // If selectedRecord is a Draft/New, it has no presence in RPTMAST yet.
-           // So ANY match in RPTMAST is a conflict.
-           
-           // If selectedRecord is an existing RPTMAST record being edited:
-           // We allow saving if the match IS the current record.
-           // checking ID or TDN.
-           
-           // Allow if the found record is the predecessor (parent) of the current transaction
-           // This handles Revisions where PIN remains the same but TDN changes
-           if (duplicatePin.TDN !== selectedRecord?.tdn && duplicatePin.TDN !== selectedRecord?.pOldTdn) {
-             // It belongs to someone else
-             return `PIN ${pin} already exists (Used by TDN: ${duplicatePin.TDN})`;
-           }
+            const duplicateTdn = duplicatePin.tdn || duplicatePin.data?.tdn || duplicatePin.data?.TDN;
+
+            // Allow if the PIN belongs to the parent record (General Revision / Update)
+            if (selectedRecord?.pOldTdn && duplicateTdn === selectedRecord.pOldTdn) {
+                 // Valid continuity
+            } else {
+                 const tdn = duplicateTdn || 'Unknown TDN';
+                 return `PIN ${pin} already exists in a pending/approved record (TDN: ${tdn}, Status: ${duplicatePin.status})`;
+            }
         }
       }
 
-      // Check TDN uniqueness
+      // Check TDN in Supabase
       if (tdn) {
-        const tdnResult = await getRptMastDataDirect({
-          page: 1,
-          limit: 5,
+        const tdnResult = await listFaasRecords({
           searchField: 'TDN',
-          filterValue: tdn
+          filterValue: tdn,
+          limit: 1
         });
 
+        const duplicateTdn = tdnResult.data?.find((r: any) => {
+            if (selectedRecord?.id && r.id === selectedRecord.id) return false;
+            return true;
+        });
+
+        if (duplicateTdn) {
+            const ownerName = duplicateTdn.data?.owner || duplicateTdn.data?.owner_name || duplicateTdn.data?.OWNER_NAME || 'Unknown Owner';
+            return `TDN already exists in the records under the name: ${ownerName}. Please use a new TDN.`;
+        }
+      }
+
+      // 2. Legacy Check (RPTMAST) - Optional / Warning Only
+      // We perform this check to inform the user if they are duplicating a Legacy record,
+      // but we do NOT block them if they intend to migrate/encode it.
+      // However, for strict "New Discovery", this might be relevant.
+      // Given the user feedback "still validating... but no data in supabase", we will relax this check.
+      
+      /* 
+      // Legacy Check Logic (Commented out to unblock migration/encoding workflow)
+      // If we want to re-enable this, we should add a confirmation dialog or "Force Save" option.
+      
+      if (pin) {
+        const pinResult = await getRptMastDataDirect({ page: 1, limit: 1, searchField: 'PIN', filterValue: pin });
+        const duplicatePin = pinResult.data.find(r => r.PIN === pin);
+        if (duplicatePin) {
+           // Allow if it's the parent of the current transaction
+           if (duplicatePin.TDN !== selectedRecord?.tdn && duplicatePin.TDN !== selectedRecord?.pOldTdn) {
+             console.warn(`Legacy Conflict: PIN ${pin} exists in RPTMAST (TDN: ${duplicatePin.TDN})`);
+             // return `PIN ${pin} already exists in Legacy System (Used by TDN: ${duplicatePin.TDN})`;
+           }
+        }
+      }
+      
+      if (tdn) {
+        const tdnResult = await getRptMastDataDirect({ page: 1, limit: 1, searchField: 'TDN', filterValue: tdn });
         const duplicateTdn = tdnResult.data.find(r => r.TDN === tdn);
         if (duplicateTdn) {
-           // If we are editing the record, finding itself is fine.
-           // We compare IDs or unique keys.
-           // If selectedRecord is new (has TRANS- id), it shouldn't match anything.
-           // If selectedRecord is existing, duplicateTdn.TDN === selectedRecord.tdn is expected.
-           
-           // But wait, if I am *changing* the TDN, selectedRecord.tdn is the *new* value (bound to input).
-           // So `selectedRecord.tdn` is already the new value `tdn`.
-           // This logic is circular if I rely on `selectedRecord.tdn`.
-           
-           // I need to know the *original* TDN to exclude it.
-           // But `PropertyRecord` doesn't strictly store `originalTdn`.
-           // However, `records` array has the list. 
-           // If I am editing, `selectedRecord.id` should match the one in DB if it came from DB.
-           // But `selectedRecord.id` is composed of `${TDN}-${index}` in the `records` mapping.
-           
-           // Let's rely on the fact that if it's a new transaction (id starts with TRANS or isAdding is true),
-           // ANY existence is bad.
-           
-           const isNewRecord = isAdding || (selectedRecord?.id && selectedRecord.id.startsWith('TRANS'));
-           
-           if (isNewRecord) {
-               return `TDN ${tdn} already exists (Owner: ${duplicateTdn.Owner_Name || 'Unknown'}, Status: ${duplicateTdn.TRANS_CD || 'Active'}).`;
-           } else {
-               // Editing existing.
-               // Fix ID parsing for UUIDs vs Composite IDs
-               const currentId = selectedRecord?.id || '';
-               const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}/.test(currentId);
-               
-               // If we are editing a Draft (UUID), we can't easily compare with MSSQL record ID (TDN-Index).
-               // But if we found a record in MSSQL with the same TDN, and we are editing a Draft...
-               // It means the Draft is trying to use a TDN that is already Active.
-               // This is generally NOT allowed (unless it's a correction of that active record).
-               
-               // However, if we are editing an Active Record (Composite ID), we check if it's the same record.
-               if (!isUuid) {
-                   // Composite ID: TDN-Index
-                   // Extract TDN from ID (everything before the last dash)
-                   const lastDashIndex = currentId.lastIndexOf('-');
-                   const originalTdn = lastDashIndex > 0 ? currentId.substring(0, lastDashIndex) : currentId;
-                   
-                   if (duplicateTdn.TDN !== originalTdn) {
-                       return `TDN ${tdn} already exists (Owner: ${duplicateTdn.Owner_Name || 'Unknown'}).`;
-                   }
-               } else {
-                   // Editing a Draft.
-                   // If we find an Active Record with this TDN, it's a conflict.
-                   // Unless the Draft IS a representation of that Active Record?
-                   // But Drafts are usually *pending changes* or *new records*.
-                   // If I am editing a Draft and I set TDN to an existing Active TDN, I am creating a collision.
-                   return `TDN ${tdn} matches an Active Record (Owner: ${duplicateTdn.Owner_Name || 'Unknown'}).`;
-               }
-           }
+           // ... (Complex logic for editing vs new)
+           // For now, just log warning
+           console.warn(`Legacy Conflict: TDN ${tdn} exists in RPTMAST`);
+           // return `TDN ${tdn} already exists in Legacy System`;
         }
       }
+      */
 
     } catch (error: any) {
       console.error('Validation check failed:', error);
-      // We will now return the error message to be handled by the caller
-      // If we want a dialog/alert here, we can trigger it, but returning the string allows the caller (save/submit) to decide how to show it.
-      // The user requested "dialogue toaster". Sonner toast is already what we use.
-      // If they mean a modal dialog, we would need state for that.
-      // But standard "toaster" usually refers to the toast notifications we already have.
-      // Maybe they want the toast to be more prominent or persistent?
-      // Or they mean `window.alert` or a custom Dialog component?
-      // Given "toaster" in the prompt, let's stick to toast but make it very clear.
-      // The previous implementation returns the string, and the caller shows the toast.
+      // Return error message only if critical failure, otherwise allow save?
+      // Better to fail safe.
       return `Validation check failed: ${error.message || 'Network Error'}`;
     }
     return null;
@@ -670,6 +691,9 @@ const RealPropertyDataEntry: React.FC = () => {
     const toastId = toast.loading('Saving draft...');
 
     try {
+      // Artificial delay to show spinner
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
       // Prepare data for saving
       // If ID is temporary (starts with TRANS or DUMMY), remove it so backend creates a new record
       const isTempId = selectedRecord.id && (selectedRecord.id.startsWith('TRANS') || selectedRecord.id.startsWith('DUMMY') || selectedRecord.id.includes('DUMMY'));
@@ -683,8 +707,9 @@ const RealPropertyDataEntry: React.FC = () => {
         status: 'draft'
       };
 
-      const savedRecord = await saveDraft(dataToSave);
+      const savedRecord = await saveDraft(dataToSave, isTempId ? undefined : selectedRecord.id, idempotencyKey);
       
+      refreshKey(); // New key for next action
       toast.dismiss(toastId);
       toast.success('Draft saved successfully');
       
@@ -737,6 +762,9 @@ const RealPropertyDataEntry: React.FC = () => {
     const toastId = toast.loading('Submitting record...');
 
     try {
+      // Artificial delay to show spinner
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
       // First ensure it's saved
       // Similar logic to saveDraft
       const isTempId = selectedRecord.id && (selectedRecord.id.startsWith('TRANS') || selectedRecord.id.startsWith('DUMMY') || selectedRecord.id.includes('DUMMY'));
@@ -753,20 +781,26 @@ const RealPropertyDataEntry: React.FC = () => {
       
       // If it's a new/temp record, we MUST save it first to get an ID
       if (isTempId) {
-         const saved = await saveDraft(dataToSave);
+         const saved = await saveDraft(dataToSave, undefined, idempotencyKey);
          recordId = saved.id || ''; 
+         // refreshKey(); // No need to refresh yet, let's use a fresh key for submit
       } else {
          // If it exists, we can just save with new status (which saveDraft handles if we pass status)
          // OR call submitForReview if we want to trigger specific workflow
          // But submitForReview takes ID. So we need to ensure data is up to date.
          // Let's just use saveDraft to ensure all fields are updated, then submit.
-         const saved = await saveDraft(dataToSave);
+         const saved = await saveDraft(dataToSave, dataToSave.id, idempotencyKey);
          recordId = saved.id || recordId;
+         // refreshKey(); 
       }
       
       if (!recordId) throw new Error("Failed to obtain Record ID");
 
-      await submitForReview(recordId);
+      // Generate a NEW key for the submit action to avoid conflict with the save action
+      const submitKey = refreshKey(); 
+      await submitForReview(recordId, submitKey);
+      
+      refreshKey(); // New key for next action
       
       toast.dismiss(toastId);
       toast.success('Record submitted for review');
@@ -795,6 +829,7 @@ const RealPropertyDataEntry: React.FC = () => {
 
   const handleEdit = () => {
     if (!selectedRecord) return;
+    refreshKey();
     setIsEditing(true);
     setIsAdding(false);
   };
@@ -1068,9 +1103,10 @@ const RealPropertyDataEntry: React.FC = () => {
                 `}</style>
                 <tr>
                   <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[180px]">TDN</th>
+                  <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[180px]">OLD TDN</th>
                   <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[180px]">ARP</th>
                   <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[200px]">PIN</th>
-                  <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[180px]">OWNER NO.</th>
+                  <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[150px]">STATUS</th>
                   <th className="px-4 py-3 text-left font-semibold tracking-wide min-w-[250px]">OWNER</th>
                   <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[100px]">CITY CODE</th>
                   <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[100px]">BRGY CODE</th>
@@ -1101,9 +1137,22 @@ const RealPropertyDataEntry: React.FC = () => {
                     data-testid={`record-row-${record.id}`}
                   >
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.tdn}</td>
-                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.arp}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.pOldTdn || ''}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.tdn}</td>
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.pin}</td>
-                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.ownerNo}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                        record.status === 'approved' 
+                          ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' 
+                          : record.status === 'for-review'
+                          ? 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800'
+                          : record.status === 'draft'
+                          ? 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800'
+                          : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
+                      }`}>
+                        {record.status || 'N/A'}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap truncate max-w-xs">{record.owner}</td>
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap text-center">{record.cityCode}</td>
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap text-center">{record.barangayCode}</td>
@@ -1159,6 +1208,7 @@ const RealPropertyDataEntry: React.FC = () => {
                   data-testid="search-field"
                 >
                   <option value="TDN">TDN</option>
+                  <option value="pOldTdn">OLD TDN</option>
                   <option value="ARP">ARP</option>
                   <option value="PIN">PIN</option>
                   <option value="OWNER">OWNER</option>
@@ -1182,7 +1232,12 @@ const RealPropertyDataEntry: React.FC = () => {
                         : 'border-slate-200 dark:border-slate-700'
                     }`}
                     data-testid="filter-value"
-                    placeholder={searchField === 'TDN' ? 'Enter TDN...' : `Enter ${searchField}...`}
+                    placeholder={
+                      searchField === 'TDN' ? 'Enter TDN...' : 
+                      searchField === 'pOldTdn' ? 'Enter OLD TDN...' :
+                      searchField === 'ARP' ? 'Enter ARP...' :
+                      `Enter ${searchField}...`
+                    }
                   />
                   <button 
                     onClick={handleApplyFilter}
@@ -1271,10 +1326,12 @@ const RealPropertyDataEntry: React.FC = () => {
                 <PropertyOwnerSection
                   isEnabled={isFormEnabled}
                   selectedRecord={selectedRecord}
+                  onUpdate={handlePropertyInfoUpdate}
                 />
                 <PropertyBoundariesSection
                   isEnabled={isFormEnabled}
                   selectedRecord={selectedRecord}
+                  onUpdate={handlePropertyInfoUpdate}
                 />
               </>
             )}
@@ -1292,6 +1349,7 @@ const RealPropertyDataEntry: React.FC = () => {
               <ReferenceSection 
                 selectedRecord={selectedRecord} 
                 isEnabled={isFormEnabled} 
+                onUpdate={handlePropertyInfoUpdate}
               />
             )}
             
@@ -1300,6 +1358,7 @@ const RealPropertyDataEntry: React.FC = () => {
                 selectedRecord={selectedRecord} 
                 isEnabled={isFormEnabled} 
                 onEditModeChange={setIsSubComponentEditing}
+                onUpdate={handlePropertyInfoUpdate}
               />
             )}
             
