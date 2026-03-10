@@ -7,6 +7,9 @@ interface PropertyRecord {
   tdn: string;
   arp: string;
   pin: string;
+  TDN?: string;
+  ARP?: string;
+  PIN?: string;
   ownerNo: string;
   owner: string;
   // Added fields for mapping
@@ -296,6 +299,9 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
             TDN: newData.tdNo,
             ARP: newData.arpNo,
             PIN: newData.propertyIndexNo,
+            tdn: newData.tdNo,
+            arp: newData.arpNo,
+            pin: newData.propertyIndexNo,
             IMP_NO: newData.improvementNo,
             BLDGNAME: newData.buildingName,
             BLDGUNIT: newData.buildingUnit,

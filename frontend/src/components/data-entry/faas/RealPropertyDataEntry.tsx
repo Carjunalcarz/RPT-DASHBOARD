@@ -35,6 +35,9 @@ interface PropertyRecord {
   tdn: string;
   arp: string;
   pin: string;
+  TDN?: string;
+  ARP?: string;
+  PIN?: string;
   ownerNo: string;
   owner: string;
   barangay: string;
@@ -112,7 +115,6 @@ interface PropertyRecord {
   ASS_LOT_NO?: string;
   BLOCK_NO?: string;
   LOTE_NO?: string;
-  pOldTdn?: string;
 } // Add new field for display
 
 
@@ -541,12 +543,19 @@ const RealPropertyDataEntry: React.FC = () => {
   // This callback is passed down to children (AssessmentSection -> LandAssessment)
   // When they save locally, we trigger a save to backend
   const handleAutoSave = async (updatedAssessmentRecords: any[]) => {
+    if (!selectedRecord) return;
+    
     // Update local state first
     setAssessmentRecords(updatedAssessmentRecords);
     
     // Construct the full record payload
+    // Clean lowercase keys and ensure TDN/ARP sync
+    const { id: _, tdn, pin, arp, ...recordData } = selectedRecord as any;
     const dataToSave = {
-      ...selectedRecord,
+      ...recordData,
+      TDN: selectedRecord.TDN || selectedRecord.tdn,
+      ARP: selectedRecord.TDN || selectedRecord.tdn, // Ensure ARP = TDN
+      PIN: selectedRecord.PIN || selectedRecord.pin,
       assessments: updatedAssessmentRecords,
       status: 'draft'
     };
@@ -671,9 +680,10 @@ const RealPropertyDataEntry: React.FC = () => {
 
   const handleSaveDraft = async () => {
     if (!selectedRecord) return;
+    const currentRecord = selectedRecord;
 
     // Check duplicates
-    const errorMsg = await checkDuplicatePinTdn(selectedRecord.pin, selectedRecord.tdn);
+    const errorMsg = await checkDuplicatePinTdn(currentRecord.pin, currentRecord.tdn);
     if (errorMsg) {
       // Use a persistent toast for validation errors so the user has time to read it
       toast.error('Validation Error', {
@@ -696,18 +706,20 @@ const RealPropertyDataEntry: React.FC = () => {
 
       // Prepare data for saving
       // If ID is temporary (starts with TRANS or DUMMY), remove it so backend creates a new record
-      const isTempId = selectedRecord.id && (selectedRecord.id.startsWith('TRANS') || selectedRecord.id.startsWith('DUMMY') || selectedRecord.id.includes('DUMMY'));
+      const isTempId = currentRecord.id && (currentRecord.id.startsWith('TRANS') || currentRecord.id.startsWith('DUMMY') || currentRecord.id.includes('DUMMY'));
       
-      const { id, ...recordData } = selectedRecord;
+      // Clean lowercase keys and ensure TDN/ARP sync
+      const { id, tdn, pin, arp, ...recordData } = currentRecord as any;
       const dataToSave = {
         ...recordData,
-        // Only include ID if it's a real persistent ID
-        ...(isTempId ? {} : { id: selectedRecord.id }),
+        TDN: currentRecord.TDN || currentRecord.tdn,
+        ARP: currentRecord.TDN || currentRecord.tdn, // Ensure ARP = TDN
+        PIN: currentRecord.PIN || currentRecord.pin,
         assessments: assessmentRecords,
         status: 'draft'
       };
 
-      const savedRecord = await saveDraft(dataToSave, isTempId ? undefined : selectedRecord.id, idempotencyKey);
+      const savedRecord = await saveDraft(dataToSave, isTempId ? undefined : currentRecord.id, idempotencyKey);
       
       refreshKey(); // New key for next action
       toast.dismiss(toastId);
@@ -715,8 +727,8 @@ const RealPropertyDataEntry: React.FC = () => {
       
       // Update local state with the saved record (capture the new backend ID)
       setSelectedRecord({
-        ...selectedRecord,
-        id: savedRecord.id || selectedRecord.id, // Ensure we capture the backend ID
+        ...currentRecord,
+        id: savedRecord.id || currentRecord.id, // Ensure we capture the backend ID
         status: 'draft'
       });
       
@@ -743,9 +755,10 @@ const RealPropertyDataEntry: React.FC = () => {
 
   const handleSubmit = async () => {
     if (!selectedRecord) return;
+    const currentRecord = selectedRecord;
 
     // Check duplicates
-    const errorMsg = await checkDuplicatePinTdn(selectedRecord.pin, selectedRecord.tdn);
+    const errorMsg = await checkDuplicatePinTdn(currentRecord.pin, currentRecord.tdn);
     if (errorMsg) {
       toast.error('Validation Error', {
         description: errorMsg,
@@ -767,17 +780,20 @@ const RealPropertyDataEntry: React.FC = () => {
 
       // First ensure it's saved
       // Similar logic to saveDraft
-      const isTempId = selectedRecord.id && (selectedRecord.id.startsWith('TRANS') || selectedRecord.id.startsWith('DUMMY') || selectedRecord.id.includes('DUMMY'));
+      const isTempId = currentRecord.id && (currentRecord.id.startsWith('TRANS') || currentRecord.id.startsWith('DUMMY') || currentRecord.id.includes('DUMMY'));
       
-      const { id, ...recordData } = selectedRecord;
+      // Clean lowercase keys and ensure TDN/ARP sync
+      const { id, tdn, pin, arp, ...recordData } = currentRecord as any;
       const dataToSave = {
         ...recordData,
-        ...(isTempId ? {} : { id: selectedRecord.id }),
+        TDN: currentRecord.TDN || currentRecord.tdn,
+        ARP: currentRecord.TDN || currentRecord.tdn, // Ensure ARP = TDN
+        PIN: currentRecord.PIN || currentRecord.pin,
         assessments: assessmentRecords,
         status: 'for-review' // Optimistically set status
       };
       
-      let recordId = selectedRecord.id;
+      let recordId = currentRecord.id;
       
       // If it's a new/temp record, we MUST save it first to get an ID
       if (isTempId) {
@@ -805,7 +821,7 @@ const RealPropertyDataEntry: React.FC = () => {
       toast.dismiss(toastId);
       toast.success('Record submitted for review');
       setSelectedRecord({
-        ...selectedRecord,
+        ...currentRecord,
         id: recordId,
         status: 'for-review'
       });
@@ -1136,10 +1152,10 @@ const RealPropertyDataEntry: React.FC = () => {
                     }`}
                     data-testid={`record-row-${record.id}`}
                   >
-                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.tdn}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.TDN || record.tdn}</td>
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.pOldTdn || ''}</td>
-                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.tdn}</td>
-                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.pin}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.ARP || record.tdn}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.PIN || record.pin}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
                         record.status === 'approved' 
