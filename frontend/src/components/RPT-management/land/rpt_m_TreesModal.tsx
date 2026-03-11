@@ -23,7 +23,7 @@ interface TreesModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave?: (trees: TreePlant[]) => void;
-  initialTrees?: TreePlant[];
+  initialTrees?: TreePlant[] | RptTreeRecord[];
   tdn?: string;
   readOnly?: boolean;
 }
@@ -32,11 +32,11 @@ const TreesModal: React.FC<TreesModalProps> = ({
   open,
   onOpenChange,
   onSave,
-  initialTrees = [],
+  initialTrees,
   tdn,
   readOnly = false,
 }) => {
-  const [trees, setTrees] = useState<TreePlant[]>(initialTrees);
+  const [trees, setTrees] = useState<TreePlant[]>([]); // Initialize as empty, effect will populate
   const [treeLibrary, setTreeLibrary] = useState<TreeLibraryRecord[]>([]);
   const [formData, setFormData] = useState({
     code: '',
@@ -67,56 +67,77 @@ const TreesModal: React.FC<TreesModalProps> = ({
     return `${found.Description} (${formattedDate})`;
   };
 
+  // Helper to map RptTreeRecord[] to TreePlant[]
+  const mapRptTreeRecords = (records: RptTreeRecord[]): TreePlant[] => {
+    const mappedTrees: TreePlant[] = [];
+    records.forEach((record, index) => {
+       // Add Fruit Bearing Trees if quantity > 0
+       if (record.Tot_FB > 0) { // Using Tot_FB as main quantity for FB
+          mappedTrees.push({
+           id: `${record.TDN}-${record.Prod_Code}-FB-${index}`,
+           name: getTreeDescription(record.Prod_Code),
+           class: '', // Class is often part of description or separate, not in API response explicitly besides Prod_Code
+           unitPrice: record.Unit_Price,
+           quantity: record.Tot_FB,
+           totalValue: record.Market_Value, // Usually Market_Value covers both? Or just FB? Assuming FB if NFB is 0
+           type: 'FB'
+         });
+       }
+
+       // Add Non-Fruit Bearing Trees if quantity > 0
+       if (record.Non_FB > 0) {
+         mappedTrees.push({
+           id: `${record.TDN}-${record.Prod_Code}-NFB-${index}`,
+           name: getTreeDescription(record.Prod_Code),
+           class: '',
+           unitPrice: record.NFB_UnitPrice,
+           quantity: record.Non_FB,
+           totalValue: record.Non_FB * record.NFB_UnitPrice, // Calculate NFB value separately
+           type: 'NFB'
+         });
+       }
+     });
+     return mappedTrees;
+  };
+
   useEffect(() => {
-    // If we have initial trees, always use them first
-    if (initialTrees && initialTrees.length > 0) {
-      setTrees(initialTrees);
+    // Wait for tree library to load before processing raw records to ensure descriptions are correct
+    if (treeLibrary.length === 0 && (initialTrees?.some(t => 'Prod_Code' in t) || (tdn && !initialTrees))) {
+        // If we have raw data or need to fetch, we need library first.
+        // If we have TreePlant[] (already mapped), we don't strictly need library for display immediately, but good to have.
+        return; 
+    }
+
+    // If initialTrees is provided
+    if (initialTrees !== undefined) {
+      if (initialTrees.length > 0) {
+          // Check if it's RptTreeRecord[] (Raw API data) or TreePlant[] (Mapped/Saved data)
+          const firstItem = initialTrees[0];
+          if ('Prod_Code' in firstItem) {
+              // It is RptTreeRecord[], map it
+              const mapped = mapRptTreeRecords(initialTrees as RptTreeRecord[]);
+              setTrees(mapped);
+          } else {
+              // It is TreePlant[], use as is
+              setTrees(initialTrees as TreePlant[]);
+          }
+      } else {
+          setTrees([]);
+      }
     } 
     // Otherwise, if TDN is provided and we haven't loaded anything yet, fetch from API
     else if (open && tdn) {
       getTreesByTdn(tdn).then((data: RptTreeRecord[]) => {
         if (data && data.length > 0) {
-          const mappedTrees: TreePlant[] = [];
-          
-          data.forEach((record, index) => {
-            // Add Fruit Bearing Trees if quantity > 0
-            if (record.Tot_FB > 0) { // Using Tot_FB as main quantity for FB
-               mappedTrees.push({
-                id: `${record.TDN}-${record.Prod_Code}-FB-${index}`,
-                name: getTreeDescription(record.Prod_Code),
-                class: '', // Class is often part of description or separate, not in API response explicitly besides Prod_Code
-                unitPrice: record.Unit_Price,
-                quantity: record.Tot_FB,
-                totalValue: record.Market_Value, // Usually Market_Value covers both? Or just FB? Assuming FB if NFB is 0
-                type: 'FB'
-              });
-            }
-
-            // Add Non-Fruit Bearing Trees if quantity > 0
-            if (record.Non_FB > 0) {
-              mappedTrees.push({
-                id: `${record.TDN}-${record.Prod_Code}-NFB-${index}`,
-                name: getTreeDescription(record.Prod_Code),
-                class: '',
-                unitPrice: record.NFB_UnitPrice,
-                quantity: record.Non_FB,
-                totalValue: record.Non_FB * record.NFB_UnitPrice, // Calculate NFB value separately
-                type: 'NFB'
-              });
-            }
-          });
-          
-          setTrees(mappedTrees);
+          const mapped = mapRptTreeRecords(data);
+          setTrees(mapped);
         } else {
-           // If API returns nothing, keep whatever state we had or empty
            setTrees([]); 
         }
       });
     } else {
       // If no TDN and no initial trees, just reset
-      if (!initialTrees || initialTrees.length === 0) {
-         setTrees([]);
-      }
+      setTrees([]);
     }
   }, [open, tdn, initialTrees, treeLibrary]); // Re-run when library loads to update descriptions
 

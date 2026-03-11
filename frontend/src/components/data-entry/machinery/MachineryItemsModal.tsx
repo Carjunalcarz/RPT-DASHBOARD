@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Plus, Edit2, Trash2, Save, X, RefreshCw, Calculator } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
+import { useAlert } from '@/context/AlertContext';
 import { RptMachRecord, getMachineryByTdn } from '@/services/rptMachService';
 
 interface MachineryItemsModalProps {
@@ -66,6 +67,7 @@ const MachineryItemsModal: React.FC<MachineryItemsModalProps> = ({
   onUpdate,
 }) => {
   const { headerColor, headerColorDark } = useThemeColor();
+  const { showConfirm } = useAlert();
   const [records, setRecords] = useState<RptMachRecord[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<RptMachRecord | null>(null);
   const [formData, setFormData] = useState<Partial<RptMachRecord>>(defaultFormData);
@@ -117,9 +119,17 @@ const MachineryItemsModal: React.FC<MachineryItemsModalProps> = ({
     setIsAdding(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedRecord) return;
-    if (window.confirm('Delete this machinery record?')) {
+    const isConfirmed = await showConfirm({
+      title: 'Delete Machinery Record',
+      message: 'Delete this machinery record?',
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'Cancel',
+      variant: 'destructive'
+    });
+
+    if (isConfirmed) {
       // TODO: Call delete API
       console.log('Deleting', selectedRecord);
       setRecords(prev => prev.filter(r => r !== selectedRecord));

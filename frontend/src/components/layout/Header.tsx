@@ -66,7 +66,7 @@ const Header: React.FC = () => {
           
           {/* Logo */}
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">RP</span>
             </div>
             <span className="font-semibold text-slate-800 dark:text-slate-100 text-sm hidden sm:block">
@@ -188,7 +188,7 @@ const Header: React.FC = () => {
             >
               <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
                 <span className="text-white text-sm font-medium">
-                  {user?.name.charAt(0) || 'A'}
+                  {user?.name?.charAt(0) || 'A'}
                 </span>
               </div>
             </button>

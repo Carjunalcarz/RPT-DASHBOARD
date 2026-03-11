@@ -14,7 +14,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   
   // Hide breadcrumb on Data Entry page (it's integrated in the page header)
-  const hideBreadcrumb = location.pathname === '/data-entry';
+  const hideBreadcrumb = location.pathname === '/data-entry' || location.pathname === '/rpt-management';
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">

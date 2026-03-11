@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, FileText } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
+import { useAlert } from '@/context/AlertContext';
 
 interface ReferenceRecord {
   id: string;
@@ -58,6 +59,7 @@ interface ReferenceSectionProps {
 
 const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: initialRecord, isEnabled = true, onUpdate }) => {
   const { headerColor, headerColorDark } = useThemeColor();
+  const { showConfirm } = useAlert();
   const [records, setRecords] = useState<ReferenceRecord[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<ReferenceRecord | null>(null);
   const [formData, setFormData] = useState<ReferenceFormData>(defaultFormData);
@@ -131,9 +133,17 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
     setIsEditing(true);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedRecord) return;
-    if (window.confirm('Are you sure you want to delete this reference?')) {
+    const isConfirmed = await showConfirm({
+      title: 'Delete Reference Record',
+      message: 'Are you sure you want to delete this reference?',
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'Cancel',
+      variant: 'destructive'
+    });
+
+    if (isConfirmed) {
       setRecords(prev => prev.filter(r => r.id !== selectedRecord.id));
       setSelectedRecord(null);
       setFormData(defaultFormData);
@@ -222,7 +232,7 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
       </div>
 
       {/* Toolbar */}
-      <div className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-3 py-2">
+      <div className="bg-transparent border-b border-slate-200 dark:border-slate-700 px-3 py-2">
         <div className="flex flex-wrap gap-1">
           <button
             onClick={handleAdd}

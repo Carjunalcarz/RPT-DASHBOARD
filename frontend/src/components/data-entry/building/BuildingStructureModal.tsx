@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
+import { useAlert } from '@/context/AlertContext';
 import { BldgStrucRecord, createBldgStruc, updateBldgStruc, deleteBldgStruc } from '@/services/bldgStrucService';
 import { getBuildingTypes, getBuildingAppraisals, BuildingType, BuildingAppraisal } from '@/services/buildingService';
 import { getBldgUnitCosts, BldgUnitCostRecord } from '@/services/bldgUnitCostService';
@@ -44,6 +45,7 @@ const BuildingStructureModal: React.FC<BuildingStructureModalProps> = ({
   parentUnitValue
 }) => {
   const { headerColor, headerColorDark } = useThemeColor();
+  const { showConfirm } = useAlert();
   // Ensure records is initialized as an array, even if initialStructures is undefined
   const [records, setRecords] = useState<BldgStrucRecord[]>(initialStructures || []);
   
@@ -420,7 +422,15 @@ const BuildingStructureModal: React.FC<BuildingStructureModalProps> = ({
     if (!selectedRecord) {
       return;
     }
-    if (window.confirm('Delete this structure record?')) {
+    const isConfirmed = await showConfirm({
+      title: 'Delete Structure',
+      message: 'Are you sure you want to delete this structure record?',
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'Cancel',
+      variant: 'destructive'
+    });
+
+    if (isConfirmed) {
       try {
         const success = await deleteBldgStruc(buildingId, selectedRecord.FloorOrd);
         if (success) {

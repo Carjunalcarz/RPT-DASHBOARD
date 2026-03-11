@@ -10,16 +10,31 @@ interface AssessmentSectionProps {
   assessmentRecords?: RptAssRecord[];
   isLoading?: boolean;
   onUpdate?: (records: any[]) => void;
+  trees?: any[]; // Array of tree records from parent
 }
 
 type AssessmentType = 'land' | 'building' | 'machinery';
 
-const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assessmentRecords = [], isLoading = false, onUpdate }) => {
+const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assessmentRecords = [], isLoading = false, onUpdate, trees = [] }) => {
   const [activeType, setActiveType] = useState<AssessmentType>('land'); // Default to land as it's often the base
 
   // Filter records by type
   // KIND: 'L'/'Land' = Land, 'B'/'Building' = Building, 'M'/'Machinery' = Machinery
-  const landRecords = assessmentRecords.filter(r => r.KIND === 'L' || r.KIND === 'Land');
+  const landRecords = assessmentRecords
+    .filter(r => r.KIND === 'L' || r.KIND === 'Land')
+    .map(land => {
+      // Attach trees that match the land's TDN
+      // If trees are already attached to the land record, keep them. 
+      // Otherwise, try to find them in the global trees list.
+      if (land.trees && land.trees.length > 0) return land;
+      
+      const matchingTrees = trees.filter(t => t.TDN === land.TDN);
+      return {
+        ...land,
+        trees: matchingTrees.length > 0 ? matchingTrees : []
+      };
+    });
+
   const buildingRecords = assessmentRecords.filter(r => r.KIND === 'B' || r.KIND === 'Building');
   const machineryRecords = assessmentRecords.filter(r => r.KIND === 'M' || r.KIND === 'Machinery');
 
@@ -109,7 +124,7 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assess
   return (
     <div className="space-y-4">
       {/* Assessment Type Selector */}
-      <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-2 flex gap-2">
+      <div className="bg-transparent rounded-lg p-2 flex gap-2">
         <button
           onClick={() => setActiveType('land')}
           className={`flex-1 px-4 py-2.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-2 ${

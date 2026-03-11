@@ -79,6 +79,16 @@ export const cancelFaasTransaction = async (id: string): Promise<void> => {
   }
 };
 
+export const updateFaasStatus = async (id: string, status: 'draft' | 'for-review' | 'approved' | 'rejected', remarks?: string): Promise<FaasRecord> => {
+  try {
+    const response = await api.put(`/faas/${id}/status`, { status, remarks });
+    return response.data.data;
+  } catch (error) {
+    console.error('Error updating FAAS status:', error);
+    throw error;
+  }
+};
+
 export const listFaasRecords = async (params?: { status?: string; page?: number; limit?: number; searchField?: string; filterValue?: string }): Promise<any> => {
   try {
     const response = await api.get('/faas', { params });

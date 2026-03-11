@@ -5,6 +5,7 @@ import {
   Building2, ArrowUpDown, Loader2
 } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
+import { useAlert } from '@/context/AlertContext';
 import { 
   getBuildingAppraisals, 
   createBuildingAppraisal, 
@@ -23,6 +24,7 @@ import {
 
 const BuildingAppraisalDataEntry: React.FC = () => {
   const { headerColor, headerColorDark } = useThemeColor();
+  const { showConfirm } = useAlert();
   const [records, setRecords] = useState<BuildingAppraisal[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<BuildingAppraisal | null>(null);
@@ -105,7 +107,15 @@ const BuildingAppraisalDataEntry: React.FC = () => {
 
   const handleDelete = async () => {
     if (!selectedRecord) return;
-    if (window.confirm('Are you sure you want to delete this appraisal?')) {
+    const isConfirmed = await showConfirm({
+      title: 'Delete Appraisal',
+      message: 'Are you sure you want to delete this appraisal?',
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'Cancel',
+      variant: 'destructive'
+    });
+
+    if (isConfirmed) {
       try {
         const success = await deleteBuildingAppraisal(selectedRecord.id);
         if (success) {

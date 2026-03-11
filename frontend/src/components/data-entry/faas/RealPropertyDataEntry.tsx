@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { dummyPropertyRecord, dummyAssessmentRecords } from './dummyData';
 import { useThemeColor } from '@/context/ThemeColorContext';
+import { useAlert } from '@/context/AlertContext';
 import { getRptMastDataDirect, RptMastRecord, getMastExtn } from '@/services/rptMastService';
 import { getRptAssByTdn, RptAssRecord } from '@/services/rptAssService';
 import PropertyInformationSection from './PropertyInformationSection';
@@ -120,6 +121,7 @@ interface PropertyRecord {
 
 const RealPropertyDataEntry: React.FC = () => {
   const { headerColor, headerColorDark } = useThemeColor();
+  const { showConfirm } = useAlert();
   
   // Records state
   const [records, setRecords] = useState<PropertyRecord[]>([]);
@@ -527,7 +529,18 @@ const RealPropertyDataEntry: React.FC = () => {
     refreshKey();
     setIsAdding(true);
     setIsEditing(false);
-    setSelectedRecord(null);
+    setSelectedRecord({
+        id: `TRANS-NEW-${Date.now()}`,
+        tdn: '',
+        arp: '',
+        pin: '',
+        owner: '',
+        ownerNo: '',
+        barangay: '',
+        barangayCode: '',
+        cityCode: '',
+        status: 'draft'
+    } as PropertyRecord);
     setAssessmentRecords([]); // Clear assessment records
   };
 
@@ -561,15 +574,38 @@ const RealPropertyDataEntry: React.FC = () => {
     };
 
     try {
+      // Determine if we should update an existing record or create new
+      // Check if we have a real ID (not temp/dummy)
+      const isTempId = !selectedRecord.id || selectedRecord.id.includes('DUMMY') || selectedRecord.id.startsWith('TRANS');
+      let targetId = isTempId ? undefined : selectedRecord.id;
+
+      // If it's a temp ID, check if there's an existing draft with the same TDN we can take over
+      if (isTempId && dataToSave.TDN) {
+          try {
+            const existingDrafts = await listFaasRecords({
+                searchField: 'TDN',
+                filterValue: dataToSave.TDN,
+                limit: 1
+            });
+            const match = existingDrafts.data?.find((r: any) => r.status === 'draft');
+            if (match) {
+                targetId = match.id;
+            }
+          } catch (err) {
+            console.warn('Failed to check for existing drafts', err);
+          }
+      }
+
       // Sync to Supabase
-      const savedRecord = await saveDraft(dataToSave);
+      const savedRecord = await saveDraft(dataToSave, targetId);
       toast.success('Changes synced to server');
       
-      // Update local ID if it was a new record
-      if (selectedRecord && (!selectedRecord.id || selectedRecord.id.includes('DUMMY'))) {
+      // Update local ID if we got a new one or took over an existing one
+      const newId = savedRecord.id || targetId;
+      if (newId && selectedRecord.id !== newId) {
           setSelectedRecord({
               ...selectedRecord,
-              id: savedRecord.id || selectedRecord.id, // Fallback to existing if undefined
+              id: newId,
               status: 'draft'
           });
       }
@@ -580,94 +616,59 @@ const RealPropertyDataEntry: React.FC = () => {
   };
 
   const checkDuplicatePinTdn = async (pin: string, tdn: string): Promise<string | null> => {
-    // Skip check if values are empty (validation should handle required fields separately if needed)
+    // Skip check if values are empty
     if (!pin && !tdn) return null;
 
     try {
-      // 1. Check Supabase (New System) - This is the primary check for duplicates in the new system
-      // We check for conflicts in Drafts/For-Review/Approved records in Supabase
+      // Parallelize checks to reduce latency
+      const checks = [];
       
-      // Check PIN in Supabase
       if (pin) {
-        const pinResult = await listFaasRecords({
-          searchField: 'PIN',
-          filterValue: pin,
-          limit: 1 // We only need to know if at least one exists
-        });
+        checks.push(
+          listFaasRecords({ searchField: 'PIN', filterValue: pin, limit: 1 })
+            .then(res => ({ type: 'PIN', data: res.data }))
+        );
+      }
+      
+      if (tdn) {
+        checks.push(
+          listFaasRecords({ searchField: 'TDN', filterValue: tdn, limit: 1 })
+            .then(res => ({ type: 'TDN', data: res.data }))
+        );
+      }
 
-        // Filter out the current record if we are editing
-        const duplicatePin = pinResult.data?.find((r: any) => {
-            // If editing an existing Supabase record, ID matches
+      const results = await Promise.all(checks);
+
+      for (const result of results) {
+        const duplicates = result.data;
+        const conflict = duplicates?.find((r: any) => {
+            // Ignore self if editing
             if (selectedRecord?.id && r.id === selectedRecord.id) return false;
-            // If editing a new transaction (TRANS-...), no Supabase record should match
-            return true;
+            
+            // Allow duplicate if the conflicting record is a draft, 
+            // because we will overwrite/update it in the save/submit process
+            if (r.status === 'draft') return false;
+
+            return true; 
         });
 
-        if (duplicatePin) {
-            const duplicateTdn = duplicatePin.tdn || duplicatePin.data?.tdn || duplicatePin.data?.TDN;
-
-            // Allow if the PIN belongs to the parent record (General Revision / Update)
-            if (selectedRecord?.pOldTdn && duplicateTdn === selectedRecord.pOldTdn) {
-                 // Valid continuity
-            } else {
-                 const tdn = duplicateTdn || 'Unknown TDN';
-                 return `PIN ${pin} already exists in a pending/approved record (TDN: ${tdn}, Status: ${duplicatePin.status})`;
+        if (conflict) {
+            if (result.type === 'PIN') {
+                const duplicateTdn = conflict.tdn || conflict.data?.tdn || conflict.data?.TDN;
+                // Allow if the PIN belongs to the parent record (General Revision / Update)
+                if (selectedRecord?.pOldTdn && duplicateTdn === selectedRecord.pOldTdn) {
+                     continue; // Valid continuity
+                }
+                const tdn = duplicateTdn || 'Unknown TDN';
+                return `PIN ${pin} already exists in a pending/approved record (TDN: ${tdn}, Status: ${conflict.status})`;
+            }
+            
+            if (result.type === 'TDN') {
+                const ownerName = conflict.data?.owner || conflict.data?.owner_name || conflict.data?.OWNER_NAME || 'Unknown Owner';
+                return `TDN ${tdn} already exists in the records under the name: ${ownerName}.`;
             }
         }
       }
-
-      // Check TDN in Supabase
-      if (tdn) {
-        const tdnResult = await listFaasRecords({
-          searchField: 'TDN',
-          filterValue: tdn,
-          limit: 1
-        });
-
-        const duplicateTdn = tdnResult.data?.find((r: any) => {
-            if (selectedRecord?.id && r.id === selectedRecord.id) return false;
-            return true;
-        });
-
-        if (duplicateTdn) {
-            const ownerName = duplicateTdn.data?.owner || duplicateTdn.data?.owner_name || duplicateTdn.data?.OWNER_NAME || 'Unknown Owner';
-            return `TDN already exists in the records under the name: ${ownerName}. Please use a new TDN.`;
-        }
-      }
-
-      // 2. Legacy Check (RPTMAST) - Optional / Warning Only
-      // We perform this check to inform the user if they are duplicating a Legacy record,
-      // but we do NOT block them if they intend to migrate/encode it.
-      // However, for strict "New Discovery", this might be relevant.
-      // Given the user feedback "still validating... but no data in supabase", we will relax this check.
-      
-      /* 
-      // Legacy Check Logic (Commented out to unblock migration/encoding workflow)
-      // If we want to re-enable this, we should add a confirmation dialog or "Force Save" option.
-      
-      if (pin) {
-        const pinResult = await getRptMastDataDirect({ page: 1, limit: 1, searchField: 'PIN', filterValue: pin });
-        const duplicatePin = pinResult.data.find(r => r.PIN === pin);
-        if (duplicatePin) {
-           // Allow if it's the parent of the current transaction
-           if (duplicatePin.TDN !== selectedRecord?.tdn && duplicatePin.TDN !== selectedRecord?.pOldTdn) {
-             console.warn(`Legacy Conflict: PIN ${pin} exists in RPTMAST (TDN: ${duplicatePin.TDN})`);
-             // return `PIN ${pin} already exists in Legacy System (Used by TDN: ${duplicatePin.TDN})`;
-           }
-        }
-      }
-      
-      if (tdn) {
-        const tdnResult = await getRptMastDataDirect({ page: 1, limit: 1, searchField: 'TDN', filterValue: tdn });
-        const duplicateTdn = tdnResult.data.find(r => r.TDN === tdn);
-        if (duplicateTdn) {
-           // ... (Complex logic for editing vs new)
-           // For now, just log warning
-           console.warn(`Legacy Conflict: TDN ${tdn} exists in RPTMAST`);
-           // return `TDN ${tdn} already exists in Legacy System`;
-        }
-      }
-      */
 
     } catch (error: any) {
       console.error('Validation check failed:', error);
@@ -701,9 +702,6 @@ const RealPropertyDataEntry: React.FC = () => {
     const toastId = toast.loading('Saving draft...');
 
     try {
-      // Artificial delay to show spinner
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
       // Prepare data for saving
       // If ID is temporary (starts with TRANS or DUMMY), remove it so backend creates a new record
       const isTempId = currentRecord.id && (currentRecord.id.startsWith('TRANS') || currentRecord.id.startsWith('DUMMY') || currentRecord.id.includes('DUMMY'));
@@ -719,16 +717,36 @@ const RealPropertyDataEntry: React.FC = () => {
         status: 'draft'
       };
 
-      const savedRecord = await saveDraft(dataToSave, isTempId ? undefined : currentRecord.id, idempotencyKey);
+      let targetId = isTempId ? undefined : currentRecord.id;
+
+      // Check if there is an existing draft with this TDN to overwrite (to prevent duplicates)
+      if (isTempId && dataToSave.TDN) {
+          try {
+            const existingDrafts = await listFaasRecords({
+                searchField: 'TDN',
+                filterValue: dataToSave.TDN,
+                limit: 1
+            });
+            const match = existingDrafts.data?.find((r: any) => r.status === 'draft');
+            if (match) {
+                targetId = match.id;
+            }
+          } catch (err) {
+            console.warn('Failed to check for existing drafts', err);
+          }
+      }
+
+      const savedRecord = await saveDraft(dataToSave, targetId, idempotencyKey);
       
       refreshKey(); // New key for next action
       toast.dismiss(toastId);
       toast.success('Draft saved successfully');
       
       // Update local state with the saved record (capture the new backend ID)
+      const newId = savedRecord.id || targetId || currentRecord.id;
       setSelectedRecord({
         ...currentRecord,
-        id: savedRecord.id || currentRecord.id, // Ensure we capture the backend ID
+        id: newId,
         status: 'draft'
       });
       
@@ -775,9 +793,6 @@ const RealPropertyDataEntry: React.FC = () => {
     const toastId = toast.loading('Submitting record...');
 
     try {
-      // Artificial delay to show spinner
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
       // First ensure it's saved
       // Similar logic to saveDraft
       const isTempId = currentRecord.id && (currentRecord.id.startsWith('TRANS') || currentRecord.id.startsWith('DUMMY') || currentRecord.id.includes('DUMMY'));
@@ -797,7 +812,16 @@ const RealPropertyDataEntry: React.FC = () => {
       
       // If it's a new/temp record, we MUST save it first to get an ID
       if (isTempId) {
-         const saved = await saveDraft(dataToSave, undefined, idempotencyKey);
+         let targetId = undefined;
+         if (dataToSave.TDN) {
+             try {
+                const existingDrafts = await listFaasRecords({ searchField: 'TDN', filterValue: dataToSave.TDN, limit: 1 });
+                const match = existingDrafts.data?.find((r: any) => r.status === 'draft');
+                if (match) targetId = match.id;
+             } catch (e) { console.warn(e); }
+         }
+
+         const saved = await saveDraft(dataToSave, targetId, idempotencyKey);
          recordId = saved.id || ''; 
          // refreshKey(); // No need to refresh yet, let's use a fresh key for submit
       } else {
@@ -850,9 +874,17 @@ const RealPropertyDataEntry: React.FC = () => {
     setIsAdding(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedRecord) return;
-    if (window.confirm('Are you sure you want to delete this record?')) {
+    const isConfirmed = await showConfirm({
+      title: 'Delete Record',
+      message: 'Are you sure you want to delete this record?',
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'Cancel',
+      variant: 'destructive'
+    });
+
+    if (isConfirmed) {
       setRecords(prev => prev.filter(r => r.id !== selectedRecord.id));
       setSelectedRecord(null);
     }
@@ -908,7 +940,7 @@ const RealPropertyDataEntry: React.FC = () => {
   return (
     <div className="h-full flex flex-col" data-testid="real-property-data-entry">
       {/* Main Toolbar */}
-      <div className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-3 py-2">
+      <div className="bg-transparent border-b border-slate-200 dark:border-slate-700 px-3 py-2">
         <div className="flex flex-wrap items-center gap-1">
           {/* FAAS/TDN Button */}
           <button className="px-3 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 font-medium">

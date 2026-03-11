@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, TreePine, ArrowDownUp, Trees, Loader2, Sparkles } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
+import { useAlert } from '@/context/AlertContext';
 import { RptAssRecord } from '@/services/rptAssService';
 import { getLandClassifications, getLandMarketValues, getMunicipalities, getAgriculturalTypes, LandClassification, LandMarketValue, Municipality } from '@/services/landTaxService';
 import LandAdjustmentModal, { LandAdjustment } from './LandAdjustmentModal';
@@ -71,6 +72,7 @@ const defaultFormData: FormData = {
 
 const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, isEnabled, onUpdate }) => {
   const { headerColor, headerColorDark } = useThemeColor();
+  const { showConfirm } = useAlert();
   const [records, setRecords] = useState<LandRecord[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<LandRecord | null>(null);
   const [selectedTdn, setSelectedTdn] = useState<string>(''); // Store TDN for trees modal
@@ -328,9 +330,17 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
   };
 
   // Handle Delete
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedRecord) return;
-    if (window.confirm('Are you sure you want to delete this record?')) {
+    const isConfirmed = await showConfirm({
+      title: 'Delete Land Record',
+      message: 'Are you sure you want to delete this record?',
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'Cancel',
+      variant: 'destructive'
+    });
+
+    if (isConfirmed) {
       setRecords(prev => prev.filter(r => r.id !== selectedRecord.id));
       setSelectedRecord(null);
       setFormData(defaultFormData);

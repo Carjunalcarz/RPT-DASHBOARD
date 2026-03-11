@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, Settings, ArrowDownUp, Sparkles, Loader2 } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
+import { useAlert } from '@/context/AlertContext';
 import { RptAssRecord } from '@/services/rptAssService';
 import { getClassifications, getActualUses, getSubClasses, Classification, ActualUse, SubClass } from '@/services/classificationService';
 import MachineryItemsModal from './MachineryItemsModal';
@@ -57,6 +58,7 @@ const defaultFormData: FormData = {
 
 const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiRecords, isEnabled }) => {
   const { headerColor, headerColorDark } = useThemeColor();
+  const { showConfirm } = useAlert();
   const [records, setRecords] = useState<MachineryRecord[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<MachineryRecord | null>(null);
   const [formData, setFormData] = useState<FormData>(defaultFormData);
@@ -206,9 +208,17 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
     setIsAdding(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedRecord) return;
-    if (window.confirm('Are you sure you want to delete this record?')) {
+    const isConfirmed = await showConfirm({
+      title: 'Delete Machinery Record',
+      message: 'Are you sure you want to delete this record?',
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'Cancel',
+      variant: 'destructive'
+    });
+
+    if (isConfirmed) {
       setRecords(prev => prev.filter(r => r.id !== selectedRecord.id));
       setSelectedRecord(null);
       setFormData(defaultFormData);

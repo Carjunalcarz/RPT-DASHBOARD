@@ -92,3 +92,25 @@ exports.listRecords = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.updateStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status, remarks } = req.body;
+    const userEmail = req.user ? req.user.email : 'anonymous';
+    const userId = req.user ? req.user.id : null;
+
+    if (!['draft', 'for-review', 'pending-municipal', 'pending-provincial', 'approved', 'rejected', 'rejected-municipal', 'rejected-provincial'].includes(status)) {
+        throw new AppError('Invalid status value', 400);
+    }
+
+    const record = await faasService.updateStatus(id, status, remarks, userEmail, userId);
+
+    res.status(200).json({
+      success: true,
+      data: record
+    });
+  } catch (error) {
+    next(error);
+  }
+};

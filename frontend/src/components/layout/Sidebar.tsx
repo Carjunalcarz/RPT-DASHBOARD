@@ -16,7 +16,8 @@ import {
   CheckSquare,
   Package,
   UserCog,
-  Database
+  Database,
+  CheckCircle
 } from 'lucide-react';
 
 interface MenuItem {
@@ -34,6 +35,7 @@ const menuItems: MenuItem[] = [
   { path: '/reports', label: 'Reports', icon: BarChart3 },
   { path: '/data-entry', label: 'Data Entry (Legacy)', icon: ClipboardEdit },
   { path: '/rpt-management', label: 'RPT Management', icon: Database },
+  { path: '/approvals', label: 'Approvals', icon: CheckCircle },
   { path: '/items', label: 'Items', icon: Package },
   { path: '/tasks', label: 'Tasks', icon: CheckSquare },
   { path: '/audit-trail', label: 'Audit Trail', icon: FileClock },

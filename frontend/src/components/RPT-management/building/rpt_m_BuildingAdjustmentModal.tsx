@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
+import { useAlert } from '@/context/AlertContext';
 import { BldgAdjRecord, createBldgAdj, updateBldgAdj, deleteBldgAdj } from '@/services/bldgAdjService';
 import { BldgStrucRecord } from '@/services/bldgStrucService';
 
@@ -31,6 +32,7 @@ const BuildingAdjustmentModal: React.FC<BuildingAdjustmentModalProps> = ({
   onUpdate
 }) => {
   const { headerColor, headerColorDark } = useThemeColor();
+  const { showConfirm } = useAlert();
   const [records, setRecords] = useState<BldgAdjRecord[]>(initialAdjustments);
 
   useEffect(() => {
@@ -106,7 +108,15 @@ const BuildingAdjustmentModal: React.FC<BuildingAdjustmentModalProps> = ({
     if (!selectedRecord) {
       return;
     }
-    if (window.confirm('Delete this adjustment record?')) {
+    const isConfirmed = await showConfirm({
+      title: 'Delete Adjustment',
+      message: 'Delete this adjustment record?',
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'Cancel',
+      variant: 'destructive'
+    });
+
+    if (isConfirmed) {
       try {
         const success = await deleteBldgAdj(buildingId, selectedRecord.SeqNo);
         if (success) {

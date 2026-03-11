@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, Building2, ArrowDownUp, Hammer, ChevronDown, Sparkles } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
+import { useAlert } from '@/context/AlertContext';
 import { RptAssRecord } from '@/services/rptAssService';
 import { getBldgAdjByTdn, BldgAdjRecord } from '@/services/bldgAdjService';
 import { getBldgStrucByTdn, BldgStrucRecord } from '@/services/bldgStrucService';
@@ -61,6 +62,7 @@ const defaultFormData: FormData = {
 const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRecords, isEnabled = true }) => {
   // State for records table
   const [records, setRecords] = useState<BuildingRecord[]>([]);
+  const { showConfirm } = useAlert();
 
   useEffect(() => {
     if (apiRecords) {
@@ -324,9 +326,17 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
   };
 
   // Handle Delete
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedRecord) return;
-    if (window.confirm('Are you sure you want to delete this record?')) {
+    const isConfirmed = await showConfirm({
+      title: 'Delete Building Record',
+      message: 'Are you sure you want to delete this record?',
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'Cancel',
+      variant: 'destructive'
+    });
+
+    if (isConfirmed) {
       // In a real app, this would call an API
       setRecords(prev => prev.filter(r => r.uniqueId !== selectedRecord.uniqueId));
       setSelectedRecord(null);

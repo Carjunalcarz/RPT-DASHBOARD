@@ -7,17 +7,10 @@ import {
 import { dummyPropertyRecord, dummyAssessmentRecords } from '@/components/data-entry/faas/dummyData';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { useAuth } from '@/context/AuthContext';
+import { useAlert } from '@/context/AlertContext';
 import { getRptMastDataDirect, RptMastRecord, getMastExtn } from '@/services/rptMastService';
 import { getRptAssByTdn, RptAssRecord } from '@/services/rptAssService';
-import PropertyInformationSection from './rpt_m_PropertyInformationSection';
-import PropertyOwnerSection from './rpt_m_PropertyOwnerSection';
-import PropertyBoundariesSection from './rpt_m_PropertyBoundariesSection';
-import AssessmentSection from './rpt_m_AssessmentSection';
-import ReferenceSection from './rpt_m_ReferenceSection';
-import SignatoriesSection from './rpt_m_SignatoriesSection';
-import PreviousTDNsSection from './rpt_m_PreviousTDNsSection';
-import TaxDecSheetSection from './rpt_m_TaxDecSheetSection';
-import OtherPropertyTab from '../rpt_m_OtherPropertyTab';
+import PropertyDetailsView from './rpt_m_PropertyDetailsView';
 import { toast } from 'sonner';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import useSWR from 'swr';
@@ -28,77 +21,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { saveDraft, submitForReview, listFaasRecords, getFaasRecord, deleteFaasRecord, cancelFaasTransaction } from '@/services/faasService';
-
-// Types
-interface PropertyRecord {
-  id: string;
-  TDN: string;
-  ARP: string;
-  PIN: string;
-  OWNER_NO: string;
-  owner: string;
-  barangay: string;
-  barangayCode: string;
-  cityCode: string;
-  // Reference Fields
-  pNewTdn?: string;
-  pOldTdn?: string;
-  pPin?: string;
-  pMarketValue?: number;
-  pAssessedValue?: number;
-  pOwnerCode?: string;
-  pOwnerNo?: string;
-  canArp?: string;
-  pArea?: number;
-  pAreaM?: boolean;
-  pEffDate?: string;
-  pOwner?: string;
-
-  // Signatory Fields
-  appraisedBy?: string;
-  appraisedPos?: string;
-  appraisedDate?: string;
-  assessor?: string;
-  assessorPos?: string;
-  assessorDate?: string;
-  recApproval?: string;
-  recApprovalPos?: string;
-  recAppDate?: string;
-  approved?: string;
-  approvedPos?: string;
-  approvedDate?: string;
-  provAssessor?: string;
-  provAssessorPos?: string;
-  provAssessorDate?: string;
-  cityAssessor?: string;
-  cityAssessorPos?: string;
-  cityAssessorDate?: string;
-  deputy?: string;
-  deputyPos?: string;
-  deputyDate?: string;
-  sgdAppraised?: boolean;
-  sgdRecommend?: boolean;
-  sgdApproved?: boolean;
-  sgdAssessed?: boolean;
-  sgdProv?: boolean;
-  sgdCity?: boolean;
-  sgdDeputy?: boolean;
-  tpdAppraised?: boolean;
-  tpdRecommend?: boolean;
-  tpdApproved?: boolean;
-  tpdAssessed?: boolean;
-  tpdProv?: boolean;
-  tpdCity?: boolean;
-  tpdDeputy?: boolean;
-  status?: string;
-  assessments?: any[];
-  TRANS_CD?: string; // Transaction Code
-} // Add new field for display
-
+import { PropertyRecord } from './types';
 
 const RealPropertyDataEntry: React.FC = () => {
   const { headerColor, headerColorDark } = useThemeColor();
   const { user } = useAuth();
+  const { showConfirm } = useAlert();
   
   // Records state
   const [records, setRecords] = useState<PropertyRecord[]>([]);
@@ -486,7 +414,15 @@ const RealPropertyDataEntry: React.FC = () => {
   const handleTransactionCancel = async () => {
     if (!selectedRecord) return;
     
-    if (window.confirm('Are you sure you want to cancel this transaction? This action cannot be undone.')) {
+    const isConfirmed = await showConfirm({
+      title: 'Cancel Transaction',
+      message: 'Are you sure you want to cancel this transaction? This action cannot be undone.',
+      confirmLabel: 'Yes, Cancel Transaction',
+      cancelLabel: 'No, Keep It',
+      variant: 'destructive'
+    });
+
+    if (isConfirmed) {
         try {
             // Check if it's actually a transaction
             const isTransaction = selectedRecord.id && selectedRecord.id.startsWith('TRANS');
@@ -545,7 +481,15 @@ const RealPropertyDataEntry: React.FC = () => {
       return;
     }
 
-    if (window.confirm('Are you sure you want to delete this record?')) {
+    const isConfirmed = await showConfirm({
+      title: 'Delete Record',
+      message: 'Are you sure you want to delete this record? This action cannot be undone.',
+      confirmLabel: 'Yes, Delete',
+      cancelLabel: 'Cancel',
+      variant: 'destructive'
+    });
+
+    if (isConfirmed) {
       try {
         // Only attempt to delete from backend if it's a real record (not dummy/temp)
         const isRealRecord = selectedRecord.id && 
@@ -598,20 +542,39 @@ const RealPropertyDataEntry: React.FC = () => {
       const isUpdate = selectedRecord.id && 
                        !selectedRecord.id.includes('DUMMY') && 
                        !selectedRecord.id.startsWith('TRANS');
+
+      let targetId = isUpdate ? selectedRecord.id : undefined;
+
+      // If it's a new record (not update), check if there's an existing draft with the same TDN we can take over
+      if (!isUpdate && dataToSave.TDN) {
+          try {
+            const existingDrafts = await listFaasRecords({
+                searchField: 'TDN',
+                filterValue: dataToSave.TDN,
+                limit: 1
+            });
+            const match = existingDrafts.data?.find((r: any) => r.status === 'draft');
+            if (match) {
+                targetId = match.id;
+            }
+          } catch (err) {
+            console.warn('Failed to check for existing drafts', err);
+          }
+      }
                        
-      const savedRecord = await saveDraft(dataToSave, isUpdate ? selectedRecord.id : undefined);
+      const savedRecord = await saveDraft(dataToSave, targetId);
       toast.success('Changes synced to server');
       
-      const savedId = savedRecord.id || selectedRecord?.id;
+      const savedId = savedRecord.id || targetId || selectedRecord?.id;
       if (savedId) {
           localStorage.setItem('currentDraftId', savedId);
       }
       
-      // Update local ID if it was a new record
-      if (selectedRecord && (!selectedRecord.id || selectedRecord.id.includes('DUMMY'))) {
+      // Update local ID if we got a new one or took over an existing one
+      if (selectedRecord && savedId && selectedRecord.id !== savedId) {
           setSelectedRecord({
               ...selectedRecord,
-              id: savedId || '', // Fallback to empty string if undefined, though it should exist
+              id: savedId, 
               status: 'draft'
           });
       }
@@ -668,6 +631,8 @@ const RealPropertyDataEntry: React.FC = () => {
 
         const duplicateTdn = tdnResult.data?.find((r: any) => {
              if (selectedRecord?.id && r.id === selectedRecord.id) return false;
+             // Allow updates if the existing record is a draft
+             if (r.status === 'draft') return false;
              return true;
          });
  
@@ -690,7 +655,7 @@ const RealPropertyDataEntry: React.FC = () => {
 
   const handleSave = async () => {
     if (!selectedRecord) return;
-
+    
     // Check duplicates
     const errorMsg = await checkDuplicatePinTdn(selectedRecord.PIN, selectedRecord.TDN);
     if (errorMsg) {
@@ -727,12 +692,31 @@ const RealPropertyDataEntry: React.FC = () => {
       };
 
       // Pass ID if it's an update to existing record (not a new temp one)
-      const savedRecord = await saveDraft(dataToSave, isTempId ? undefined : selectedRecord.id);
+      let targetId = isTempId ? undefined : selectedRecord.id;
+
+      // Check if there is an existing draft with this TDN to overwrite (to prevent duplicates)
+      if (isTempId && dataToSave.TDN) {
+          try {
+            const existingDrafts = await listFaasRecords({
+                searchField: 'TDN',
+                filterValue: dataToSave.TDN,
+                limit: 1
+            });
+            const match = existingDrafts.data?.find((r: any) => r.status === 'draft');
+            if (match) {
+                targetId = match.id;
+            }
+          } catch (err) {
+            console.warn('Failed to check for existing drafts', err);
+          }
+      }
+
+      const savedRecord = await saveDraft(dataToSave, targetId);
       
       toast.dismiss(toastId);
       toast.success('Draft saved successfully');
       
-      const savedId = savedRecord.id || selectedRecord.id;
+      const savedId = savedRecord.id || targetId || selectedRecord.id;
       localStorage.setItem('currentDraftId', savedId);
 
       const updatedRecord = {
@@ -787,9 +771,6 @@ const RealPropertyDataEntry: React.FC = () => {
     const toastId = toast.loading('Submitting record...');
 
     try {
-      // Artificial delay to show spinner
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
       // First ensure it's saved
       const isTempId = selectedRecord.id && (selectedRecord.id.startsWith('TRANS') || selectedRecord.id.startsWith('DUMMY') || selectedRecord.id.includes('DUMMY'));
       
@@ -807,7 +788,16 @@ const RealPropertyDataEntry: React.FC = () => {
       let recordId = selectedRecord.id;
       
       if (isTempId) {
-         const saved = await saveDraft(dataToSave);
+         let targetId = undefined;
+         if (dataToSave.TDN) {
+             try {
+                const existingDrafts = await listFaasRecords({ searchField: 'TDN', filterValue: dataToSave.TDN, limit: 1 });
+                const match = existingDrafts.data?.find((r: any) => r.status === 'draft');
+                if (match) targetId = match.id;
+             } catch (e) { console.warn(e); }
+         }
+
+         const saved = await saveDraft(dataToSave, targetId);
          recordId = saved.id || ''; 
       } else {
          const saved = await saveDraft(dataToSave, recordId);
@@ -870,20 +860,10 @@ const RealPropertyDataEntry: React.FC = () => {
 
   const isFormEnabled = isEditing || isAdding;
 
-  const tabs = [
-    { id: 'property-info', label: 'Property Information', icon: Building2 },
-    { id: 'assessment', label: 'Assessment', icon: DollarSign },
-    { id: 'reference', label: 'Reference', icon: FileText },
-    { id: 'signatories', label: 'Signatories / Memorandum', icon: User },
-    { id: 'other-info', label: 'Other Property Information', icon: Info },
-    { id: 'previous-tdns', label: 'Previous TDNs', icon: FileText },
-    { id: 'tax-dec', label: 'Tax Dec. Sheet', icon: FileText },
-  ];
-
   return (
     <div className="h-full flex flex-col" data-testid="real-property-data-entry">
       {/* Main Toolbar */}
-      <div className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-3 py-2">
+      <div className="bg-transparent border-b border-slate-200 dark:border-slate-700 px-3 py-2">
         <div className="flex flex-wrap items-center gap-1">
           {/* FAAS/TDN Button */}
           <button className="px-3 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 font-medium">
@@ -950,11 +930,23 @@ const RealPropertyDataEntry: React.FC = () => {
           <button
             onClick={handleSave}
             disabled={!isFormEnabled || isSubComponentEditing || isSaving}
-            className="px-3 py-2 text-xs bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="btn-save"
+            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-blue-700 dark:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="btn-save-draft"
+            title="Save as Draft"
           >
             {isSaving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
-            {isSaving ? 'Saving...' : 'Save'}
+            {isSaving ? 'Saving...' : 'Save Draft'}
+          </button>
+
+          <button
+            onClick={handleSubmit}
+            disabled={!isFormEnabled || isSubComponentEditing || isSaving}
+            className="px-3 py-2 text-xs bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="btn-submit"
+            title="Submit for Review"
+          >
+            {isSaving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+            {isSaving ? 'Submitting...' : 'Submit'}
           </button>
           
           {selectedRecord && selectedRecord.id && selectedRecord.id.startsWith('TRANS') ? (
@@ -1031,6 +1023,7 @@ const RealPropertyDataEntry: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 overflow-auto p-4 space-y-4">
         {/* Records Grid */}
+        {!isFormEnabled && (
         <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col">
           <div 
             className="overflow-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600"
@@ -1140,8 +1133,10 @@ const RealPropertyDataEntry: React.FC = () => {
              />
           </div>
         </div>
+        )}
 
           {/* Search and Filter Section */}
+          {!isFormEnabled && (
           <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-4">
             <div className="flex flex-wrap items-center gap-4">
               {/* Search Field */}
@@ -1234,100 +1229,23 @@ const RealPropertyDataEntry: React.FC = () => {
               </div>
             </div>
           </div>
+          )}
 
-        {/* Tabs Navigation */}
-        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
-          <div className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-2 pt-2">
-            <div className="flex flex-wrap gap-1">
-              {tabs.map((tab) => {
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`px-4 py-2.5 text-xs font-medium rounded-t-lg transition-all flex items-center gap-2 ${
-                      activeTab === tab.id
-                        ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border-t-2 border-t-blue-500 shadow-sm'
-                        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-slate-600'
-                    }`}
-                    data-testid={`tab-${tab.id}`}
-                  >
-                    <Icon size={14} />
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Tab Content */}
-          <div className="p-4 space-y-4">
-            {activeTab === 'property-info' && (
-              <>
-                <PropertyInformationSection
-                  isEnabled={isFormEnabled}
-                  selectedRecord={selectedRecord}
-                  onUpdate={handleRecordUpdate}
-                  isAdding={isAdding}
-                />
-                <PropertyOwnerSection
-                  isEnabled={isFormEnabled}
-                  selectedRecord={selectedRecord}
-                  onUpdate={handleRecordUpdate}
-                />
-                <PropertyBoundariesSection
-                  isEnabled={isFormEnabled}
-                  selectedRecord={selectedRecord}
-                  onUpdate={handleRecordUpdate}
-                />
-              </>
-            )}
-
-            {activeTab === 'assessment' && (
-              <AssessmentSection
-                isEnabled={isFormEnabled}
-                assessmentRecords={assessmentRecords}
-                isLoading={isAssessmentLoading}
-                onUpdate={handleAutoSave}
-              />
-            )}
-            
-            {activeTab === 'reference' && (
-              <ReferenceSection 
-                selectedRecord={selectedRecord} 
-                isEnabled={isFormEnabled} 
-                onUpdate={handleRecordUpdate}
-              />
-            )}
-            
-            {activeTab === 'signatories' && (
-              <SignatoriesSection 
-                selectedRecord={selectedRecord} 
-                isEnabled={isFormEnabled} 
-                onEditModeChange={setIsSubComponentEditing}
-                onUpdate={handleRecordUpdate}
-              />
-            )}
-            
-            {activeTab === 'other-info' && (
-              <OtherPropertyTab
-                isEditing={isFormEnabled}
-                onEnterEdit={() => {}}
-                onSave={handleSave}
-                onCancel={handleCancel}
-                onDataChange={() => {}}
-              />
-            )}
-            
-            {activeTab === 'previous-tdns' && (
-              <PreviousTDNsSection />
-            )}
-            
-            {activeTab === 'tax-dec' && (
-              <TaxDecSheetSection />
-            )}
-          </div>
-        </div>
+        {/* Property Details View */}
+        <PropertyDetailsView 
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isFormEnabled={isFormEnabled}
+          selectedRecord={selectedRecord}
+          assessmentRecords={assessmentRecords}
+          isAssessmentLoading={isAssessmentLoading}
+          onRecordUpdate={handleRecordUpdate}
+          onAssessmentUpdate={handleAutoSave}
+          onEditModeChange={setIsSubComponentEditing}
+          isAdding={isAdding}
+          onSave={handleSave}
+          onCancel={handleCancel}
+        />
       </div>
       {/* Transaction Modal */}
       <Dialog open={showTransactionModal} onOpenChange={setShowTransactionModal}>

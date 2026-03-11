@@ -1,8 +1,10 @@
 import React from 'react';
 import { RealPropertyDataEntry } from '@/components/data-entry/faas';
-import { Building2, Home, ChevronRight } from 'lucide-react';
+import { Building2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useThemeColor } from '@/context/ThemeColorContext';
+
+import RptBreadcrumb from '@/components/RPT-management/rpt_m_Breadcrumb';
 
 const DataEntry: React.FC = () => {
   const { headerColor, headerColorDark } = useThemeColor();
@@ -43,16 +45,10 @@ const DataEntry: React.FC = () => {
           }
         `}</style>
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-sm mb-3" aria-label="Breadcrumb">
-          <Link
-            to="/"
-            className="flex items-center gap-1 text-blue-100 hover:text-white transition-colors"
-          >
-            <Home size={16} />
-          </Link>
-          <ChevronRight size={16} className="text-blue-300" />
-          <span className="text-white font-medium">Data Entry</span>
-        </nav>
+        <RptBreadcrumb 
+          items={[{ label: 'Data Entry' }]} 
+          className="mb-3"
+        />
 
         {/* Header Content */}
         <div className="flex items-center justify-between">

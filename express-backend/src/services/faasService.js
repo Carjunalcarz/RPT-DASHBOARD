@@ -236,7 +236,7 @@ class FaasService {
       const record = await supabasePrisma.faasRecord.update({
         where: { id },
         data: {
-          status: 'for-review',
+          status: 'pending-municipal', // Default to first tier
           updatedAt: new Date()
         }
       });
@@ -310,6 +310,110 @@ class FaasService {
     } catch (error) {
       logger.error('Error in FaasService.deleteRecord:', error);
       throw new AppError(error.message, 500);
+    }
+  }
+
+  /**
+   * Update FAAS record status
+   * @param {string} id 
+   * @param {string} status 
+   * @param {string} remarks 
+   * @param {string} userEmail 
+   * @param {string} userId 
+   */
+  async updateStatus(id, status, remarks, userEmail, userId) {
+    try {
+        // 1. Get current record
+        const currentRecord = await this.getRecord(id);
+        if (!currentRecord) throw new AppError('Record not found', 404);
+
+        const currentStatus = currentRecord.status;
+
+        // 2. Validate Sequential Workflow
+        if (status === 'pending-provincial') {
+            // Can only move to provincial if currently pending municipal (approval action)
+            // Or if it was rejected-provincial and being resubmitted (edge case, but let's stick to happy path)
+            if (currentStatus !== 'pending-municipal' && currentStatus !== 'for-review') {
+                 throw new AppError('Cannot move to Provincial Approval. Municipal Approval required first.', 400);
+            }
+        }
+
+        if (status === 'approved') {
+            // Can only move to final approved if currently pending provincial
+            if (currentStatus !== 'pending-provincial') {
+                 throw new AppError('Cannot approve. Provincial Approval required.', 400);
+            }
+        }
+
+        // 3. Prepare update data
+        const updateData = {
+            status: status,
+            updatedAt: new Date()
+        };
+
+        const currentData = currentRecord.data || {};
+        let auditDetails = { status, remarks };
+
+        // 4. Update Audit/Signatory Info in JSON Data
+        if (status === 'pending-provincial') {
+            // This is the "Municipal Approval" action
+            updateData.data = {
+                ...currentData,
+                REM: remarks || currentData.REM,
+                municipal_approver: userEmail,
+                municipal_approval_date: new Date().toISOString(),
+                Rec_Approval: userEmail, // Legacy mapping
+                Rec_AppDate: new Date().toISOString()
+            };
+            auditDetails.stage = 'Municipal Approval';
+        } else if (status === 'approved') {
+            // This is the "Provincial Approval" action
+            updateData.data = {
+                ...currentData,
+                REM: remarks || currentData.REM,
+                provincial_approver: userEmail,
+                provincial_approval_date: new Date().toISOString(),
+                Approved: userEmail, // Legacy mapping
+                ApprovedDate: new Date().toISOString(),
+                SGD_APPROVED: true
+            };
+            auditDetails.stage = 'Provincial Approval';
+        } else if (status.includes('rejected')) {
+             updateData.data = {
+                ...currentData,
+                REM: remarks
+            };
+        } else if (remarks) {
+             updateData.data = {
+                ...currentData,
+                REM: remarks
+            };
+        }
+
+        // 5. Update record
+        const record = await supabasePrisma.faasRecord.update({
+            where: { id },
+            data: updateData
+        });
+
+        // 6. Audit Log
+        await this.logAudit('UPDATE_STATUS', id, auditDetails, userEmail, userId);
+        
+        // 7. Mock Notification (Log)
+        if (status === 'pending-municipal') {
+            logger.info(`[NOTIFICATION] Alerting Municipal Assessors: New record ${currentRecord.tdn || id} pending review.`);
+        } else if (status === 'pending-provincial') {
+            logger.info(`[NOTIFICATION] Alerting Provincial Assessors: Record ${currentRecord.tdn || id} approved by Municipal, pending Provincial review.`);
+        } else if (status === 'approved') {
+            logger.info(`[NOTIFICATION] Alerting Owner/Municipal: Record ${currentRecord.tdn || id} fully APPROVED.`);
+        } else if (status.includes('rejected')) {
+            logger.info(`[NOTIFICATION] Alerting Submitter: Record ${currentRecord.tdn || id} REJECTED.`);
+        }
+
+        return record;
+    } catch (error) {
+        logger.error('Error in FaasService.updateStatus:', error);
+        throw new AppError(error.message, error.statusCode || 500);
     }
   }
 

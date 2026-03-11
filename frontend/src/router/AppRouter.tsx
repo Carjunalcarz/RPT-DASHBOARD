@@ -15,6 +15,8 @@ import AuditTrail from '@/pages/AuditTrail';
 import Items from '@/pages/Items';
 import Tasks from '@/pages/Tasks';
 import UserManagement from '@/pages/admin/UserManagement';
+import PropertyApproval from '@/pages/PropertyApproval';
+import PendingApprovals from '@/pages/PendingApprovals';
 import RouteRestorer from '@/components/layout/RouteRestorer';
 
 interface ProtectedRouteProps {
@@ -188,6 +190,26 @@ const AppRouter: React.FC = () => {
             <ProtectedRoute>
               <Layout>
                 <Tasks />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/approvals"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <PendingApprovals />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/property-approval/:id"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <PropertyApproval />
               </Layout>
             </ProtectedRoute>
           }

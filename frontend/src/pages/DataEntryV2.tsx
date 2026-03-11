@@ -1,8 +1,10 @@
 import React from 'react';
 import RealPropertyDataEntry from '@/components/RPT-management/faas/rpt_m_RealPropertyDataEntry';
-import { Building2, Home, ChevronRight } from 'lucide-react';
+import { Building2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useThemeColor } from '@/context/ThemeColorContext';
+
+import RptBreadcrumb from '@/components/RPT-management/rpt_m_Breadcrumb';
 
 const DataEntryV2: React.FC = () => {
   const { headerColor, headerColorDark } = useThemeColor();
@@ -24,10 +26,10 @@ const DataEntryV2: React.FC = () => {
   const darkerColorDark = `rgb(${Math.max(0, rgbDark.r - 40)}, ${Math.max(0, rgbDark.g - 40)}, ${Math.max(0, rgbDark.b - 40)})`;
   
   return (
-    <div data-testid="data-entry-page-v2" className="h-[calc(100vh-64px)] overflow-hidden flex flex-col">
+    <div data-testid="data-entry-page-v2" className="h-[calc(100vh-64px)] flex flex-col">
        {/* Dynamic Color Header with Breadcrumb */}
        <div
-        className="px-4 py-3 shadow-md z-10"
+        className="px-4 py-3 -mx-6 -mt-6 mb-6"
         style={{
           background: `linear-gradient(to right, ${darkerColor}, ${headerColor})`,
         }}
@@ -41,23 +43,13 @@ const DataEntryV2: React.FC = () => {
         `}</style>
         
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-xs text-blue-100 mb-1" aria-label="Breadcrumb">
-          <Link
-            to="/"
-            className="flex items-center gap-1 hover:text-white transition-colors"
-          >
-            <Home size={12} />
-            <span>Home</span>
-          </Link>
-          <ChevronRight size={12} className="text-blue-300" />
-          <span className="text-white font-medium">RPT Management</span>
-        </nav>
+        <RptBreadcrumb items={[{ label: 'RPT Management' }]} className="mb-3" />
 
         {/* Header Content */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur-sm">
-              <Building2 size={18} className="text-white" />
+            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+              <Building2 size={24} className="text-white" />
             </div>
             <div>
               <h1 className="text-lg font-bold text-white leading-tight">REAL PROPERTY DATA ENTRY</h1>

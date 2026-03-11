@@ -6,6 +6,7 @@ const protect = require('../middleware/auth'); // Import protect directly
 // Restrict editing operations to Admin
 const restrictToAdmin = protect.restrictTo('admin', 'Administrator');
 
+router.put('/:id/status', protect, restrictToAdmin, faasController.updateStatus);
 router.post('/draft', protect, restrictToAdmin, faasController.saveDraft);
 router.put('/:id', protect, restrictToAdmin, faasController.saveDraft); // Use saveDraft for PUT as well (upsert logic)
 router.patch('/:id', protect, restrictToAdmin, faasController.saveDraft); // Use saveDraft for PATCH as well

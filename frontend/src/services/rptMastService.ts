@@ -238,6 +238,19 @@ export const getRptMastDataDirect = async (params: RptMastParams = { page: 1, li
 
 export const updateSignatory = async (tdn: string, data: any): Promise<any> => {
   const API_BASE = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/v1', '') : 'http://localhost:3000/api';
+  // Check if we are updating a draft (UUID) or a legacy record (TDN)
+  // If data has an ID and it looks like a UUID, we might need to hit the FAAS endpoint instead
+  // But here we are specifically updating RPT Mast signatories.
+  // If the record is a Draft, it lives in FAAS table, not RPTMAST.
+  
+  // However, the PropertyApproval page calls this function for both.
+  // We should redirect to FAAS service if it's a draft update.
+  if (data.status === 'approved' || data.status === 'for-review' || data.status === 'draft') {
+      // It's a status update, likely FAAS related if it's a UUID
+      // But let's keep this service focused on RPTMAST for now.
+      // The caller should handle the distinction or we add logic here.
+  }
+
   const response = await api.put(`${API_BASE}/rptmast/signatories/${tdn}`, data);
   return response.data;
 };

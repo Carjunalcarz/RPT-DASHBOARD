@@ -3,6 +3,8 @@ import { AuthProvider } from '@/context/AuthContext';
 import { SidebarProvider } from '@/context/SidebarContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { ThemeColorProvider } from '@/context/ThemeColorContext';
+import { AlertProvider } from '@/context/AlertContext';
+import CustomAlert from '@/components/common/CustomAlert';
 import AppRouter from '@/router/AppRouter';
 import { Toaster } from 'sonner';
 import '@/App.css';
@@ -12,12 +14,15 @@ function App() {
   return (
     <ThemeProvider>
       <ThemeColorProvider>
-        <AuthProvider>
-          <SidebarProvider>
-            <AppRouter />
-            <Toaster position="top-right" richColors expand={true} closeButton />
-          </SidebarProvider>
-        </AuthProvider>
+        <AlertProvider>
+          <CustomAlert />
+          <AuthProvider>
+            <SidebarProvider>
+              <AppRouter />
+              <Toaster position="top-right" richColors expand={true} closeButton />
+            </SidebarProvider>
+          </AuthProvider>
+        </AlertProvider>
       </ThemeColorProvider>
     </ThemeProvider>
   );

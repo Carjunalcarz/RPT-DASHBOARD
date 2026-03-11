@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import useSWR from 'swr';
 import { Plus, Trash2, Edit2, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { useAlert } from '@/context/AlertContext';
 import {
   Table,
   TableBody,
@@ -36,6 +37,7 @@ import { getTasks, createTask, updateTask, deleteTask } from '@/services/dataSer
 import { Task } from '@/types/data';
 
 const Tasks: React.FC = () => {
+  const { showConfirm } = useAlert();
   const [source, setSource] = useState<string>('supabase');
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -109,7 +111,16 @@ const Tasks: React.FC = () => {
     }
   };
   const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this task?')) return;
+    const isConfirmed = await showConfirm({
+      title: 'Delete Task',
+      message: 'Are you sure you want to delete this task?',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'destructive'
+    });
+    
+    if (!isConfirmed) return;
+    
     try {
       await deleteTask(id, source);
       mutate();

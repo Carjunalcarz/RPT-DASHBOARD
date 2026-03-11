@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import useSWR from 'swr';
 import { Plus, Trash2, RefreshCw, Database, Edit2 } from 'lucide-react';
+import { useAlert } from '@/context/AlertContext';
 import {
   Table,
   TableBody,
@@ -37,6 +38,7 @@ import { Item } from '@/types/data';
 import { format } from 'date-fns';
 
 const Items: React.FC = () => {
+  const { showConfirm } = useAlert();
   const [source, setSource] = useState<string>('supabase');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -103,7 +105,16 @@ const Items: React.FC = () => {
   };
 
   const handleDelete = async (id: number | string) => {
-    if (!confirm('Are you sure you want to delete this item?')) return;
+    const isConfirmed = await showConfirm({
+      title: 'Delete Item',
+      message: 'Are you sure you want to delete this item?',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      variant: 'destructive'
+    });
+    
+    if (!isConfirmed) return;
+    
     try {
       await deleteItem(id, source);
       mutate();

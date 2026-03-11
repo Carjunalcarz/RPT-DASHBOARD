@@ -5,6 +5,7 @@ import EditableCell from './EditableCell';
 import PrintDocument from './PrintDocument';
 import SelectionModal from './SelectionModal';
 import { useSelectionModal } from './useSelectionModal';
+import { useAlert } from '@/context/AlertContext';
 import '@/styles/print.css';
 
 const AssessmentTable: React.FC = () => {
@@ -12,6 +13,7 @@ const AssessmentTable: React.FC = () => {
   const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [originalRowBackup, setOriginalRowBackup] = useState<AssessmentRow | null>(null);
+  const { showAlert } = useAlert();
 
   // Selection modal hook
   const {
@@ -45,9 +47,9 @@ const AssessmentTable: React.FC = () => {
   };
 
   // Handler: Add new row
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (editingRowId) {
-      alert('Please save or cancel the current edit before adding a new row.');
+      await showAlert('Please save or cancel the current edit before adding a new row.');
       return;
     }
 
@@ -73,11 +75,11 @@ const AssessmentTable: React.FC = () => {
   };
 
   // Handler: Edit selected row
-  const handleEdit = () => {
+  const handleEdit = async () => {
     if (!selectedRowId) return;
 
     if (editingRowId) {
-      alert('Please save or cancel the current edit before editing another row.');
+      await showAlert('Please save or cancel the current edit before editing another row.');
       return;
     }
 
@@ -89,11 +91,11 @@ const AssessmentTable: React.FC = () => {
   };
 
   // Handler: Delete selected row
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!selectedRowId) return;
 
     if (editingRowId === selectedRowId) {
-      alert('Cannot delete a row that is being edited. Please save or cancel first.');
+      await showAlert('Cannot delete a row that is being edited. Please save or cancel first.');
       return;
     }
 
@@ -150,9 +152,9 @@ const AssessmentTable: React.FC = () => {
   };
 
   // Handler: Row selection
-  const handleRowSelect = (rowId: string) => {
+  const handleRowSelect = async (rowId: string) => {
     if (editingRowId && editingRowId !== rowId) {
-      alert('Please save or cancel the current edit before selecting another row.');
+      await showAlert('Please save or cancel the current edit before selecting another row.');
       return;
     }
     setSelectedRowId(rowId);
