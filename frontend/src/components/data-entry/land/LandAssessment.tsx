@@ -13,6 +13,7 @@ interface LandAssessmentProps {
   records?: RptAssRecord[];
   isEnabled?: boolean;
   onUpdate?: (updatedRecords: any[]) => void;
+  onPrint?: () => void;
 }
 
 interface LandRecord {
@@ -70,7 +71,7 @@ const defaultFormData: FormData = {
   idleLand: false,
 };
 
-const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, isEnabled, onUpdate }) => {
+const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, isEnabled, onUpdate, onPrint }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const { showConfirm } = useAlert();
   const [records, setRecords] = useState<LandRecord[]>([]);
@@ -466,7 +467,11 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
 
   // Handle Print
   const handlePrint = () => {
-    window.print();
+    if (onPrint) {
+      onPrint();
+    } else {
+      window.print();
+    }
   };
 
   // Format currency

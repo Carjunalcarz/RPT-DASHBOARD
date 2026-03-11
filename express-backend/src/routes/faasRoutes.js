@@ -7,6 +7,7 @@ const protect = require('../middleware/auth'); // Import protect directly
 const restrictToAdmin = protect.restrictTo('admin', 'Administrator');
 
 router.put('/:id/status', protect, restrictToAdmin, faasController.updateStatus);
+router.post('/batch-status', protect, restrictToAdmin, faasController.batchUpdateStatus); // New batch endpoint
 router.post('/draft', protect, restrictToAdmin, faasController.saveDraft);
 router.put('/:id', protect, restrictToAdmin, faasController.saveDraft); // Use saveDraft for PUT as well (upsert logic)
 router.patch('/:id', protect, restrictToAdmin, faasController.saveDraft); // Use saveDraft for PATCH as well

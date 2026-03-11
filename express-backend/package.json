@@ -23,6 +23,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@babel/preset-env": "^7.29.0",
+    "@babel/preset-react": "^7.28.5",
+    "@babel/register": "^7.28.6",
+    "@react-pdf/renderer": "^4.3.2",
     "@supabase/supabase-js": "^2.98.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
@@ -35,12 +39,15 @@
     "jwks-rsa": "^3.2.2",
     "mssql": "^10.0.4",
     "pg": "^8.19.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "supabase": "^2.76.12",
     "swagger-jsdoc": "^6.2.0",
     "swagger-ui-express": "^5.0.0",
     "uuid": "^13.0.0",
     "winston": "^3.11.0",
-    "winston-daily-rotate-file": "^5.0.0"
+    "winston-daily-rotate-file": "^5.0.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@prisma/client": "5.10.0",

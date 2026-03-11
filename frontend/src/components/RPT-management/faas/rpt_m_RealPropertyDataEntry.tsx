@@ -1,9 +1,10 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Plus, Edit2, Trash2, Save, X, RefreshCw, Printer,
   FileText, CreditCard, Search, ChevronDown, Building2,
   User, MapPin, Info, DollarSign, GripHorizontal, Sparkles, Code
 } from 'lucide-react';
+import { useReactToPrint } from 'react-to-print';
 import { dummyPropertyRecord, dummyAssessmentRecords } from '@/components/data-entry/faas/dummyData';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { useAuth } from '@/context/AuthContext';
@@ -11,6 +12,7 @@ import { useAlert } from '@/context/AlertContext';
 import { getRptMastDataDirect, RptMastRecord, getMastExtn } from '@/services/rptMastService';
 import { getRptAssByTdn, RptAssRecord } from '@/services/rptAssService';
 import PropertyDetailsView from './rpt_m_PropertyDetailsView';
+import PrintDocument from '../rpt_m_PrintDocument';
 import { toast } from 'sonner';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import useSWR from 'swr';
@@ -854,9 +856,11 @@ const RealPropertyDataEntry: React.FC = () => {
     setPagination(prev => ({ ...prev, page: 1, limit: newSize }));
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const printRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: `FAAS_${selectedRecord?.TDN || 'Record'}`,
+  });
 
   const isFormEnabled = isEditing || isAdding;
 
@@ -985,8 +989,10 @@ const RealPropertyDataEntry: React.FC = () => {
           </button>
           <button
             onClick={handlePrint}
-            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
+            disabled={!selectedRecord || selectedRecord.status !== 'approved'}
+            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="btn-print"
+            title={selectedRecord && selectedRecord.status !== 'approved' ? "Only approved records can be printed" : "Print Record"}
           >
             <Printer size={14} />
             Print
@@ -1367,7 +1373,147 @@ const RealPropertyDataEntry: React.FC = () => {
               }, null, 2)}
             </pre>
           </div>
-        </DialogContent></Dialog>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hidden Print Document */}
+      <div style={{ display: 'none' }}>
+        <div ref={printRef}>
+          {selectedRecord && (
+            <PrintDocument
+              propertyInfo={{
+                ownerName: selectedRecord.owner || '',
+                ownerAddress: selectedRecord.Owner_Address || '',
+                ownerTin: selectedRecord.Owner_TIN || '',
+                ownerTel: selectedRecord.Owner_Tel_no || '',
+                adminName: selectedRecord.ADMIN_NO || '',
+                adminAddress: selectedRecord.ADMIN_ADDRESS || '',
+                adminTin: selectedRecord.ADMIN_TIN || '',
+                adminTel: selectedRecord.ADMIN_TEL || '',
+                pin: selectedRecord.PIN || selectedRecord.pPin || '',
+                tdNo: selectedRecord.TDN || selectedRecord.pNewTdn || '',
+                arpNo: selectedRecord.ARP || '',
+                transactionCode: selectedRecord.TRANS_CD || 'GR',
+                octTctNo: selectedRecord.CER_TIT_NO || '',
+                octTctDate: selectedRecord.TCT_DATE || '',
+                cadLotNo: selectedRecord.CAD_LOT_NO || '',
+                lotNo: selectedRecord.LOTE_NO || '',
+                cloaCscNo: selectedRecord.CLOA_NO || '',
+                cloaDate: selectedRecord.CLOA_DATE || '',
+                surveyNo: selectedRecord.ASS_LOT_NO || '',
+                blockNo: selectedRecord.BLOCK_NO || '',
+                location: {
+                  street: selectedRecord.STREET || '',
+                  barangay: selectedRecord.barangay || '',
+                  municipality: selectedRecord.cityCode === '053' ? 'Tubay' : selectedRecord.cityCode || 'Tubay',
+                  province: 'Agusan del Norte',
+                },
+                boundaries: {
+                  north: selectedRecord.NORTH || '',
+                  east: selectedRecord.EAST || '',
+                  south: selectedRecord.SOUTH || '',
+                  west: selectedRecord.WEST || '',
+                },
+                backPart: {
+                  taxable: selectedRecord.taxable || false,
+                  exempt: selectedRecord.exempt || false,
+                  effQtr: selectedRecord.effQtr || '',
+                  effYear: selectedRecord.effYear || '',
+                  memoranda: selectedRecord.memoranda || selectedRecord.REM || '',
+                  superseded: {
+                    pin: selectedRecord.pPin || '',
+                    tdNo: selectedRecord.pOldTdn || '',
+                    landValue: selectedRecord.pAssValueLand || 0,
+                    impvtValue: selectedRecord.pAssValueImpvt || 0,
+                    totalValue: selectedRecord.pAssValueTotal || 0,
+                    previousOwner: selectedRecord.pOwner || '',
+                    effectivity: selectedRecord.pEffDate || '',
+                    arPageNo: selectedRecord.pArPageNo || '',
+                    recordingPersonnel: selectedRecord.pRecordingPersonnel || '',
+                  },
+                  signatories: {
+                    appraiser: selectedRecord.appraisedBy || '',
+                    appraiserDate: selectedRecord.appraisedDate || '',
+                    recommending: selectedRecord.recApproval || '',
+                    recommendingDate: selectedRecord.recAppDate || '',
+                    approver: selectedRecord.approved || '',
+                    approverDate: selectedRecord.approvedDate || '',
+                  },
+                },
+                effectivityDate: selectedRecord.pEffDate || '',
+                declarationDate: selectedRecord.approvedDate || '',
+              }}
+              assessmentRows={assessmentRecords.map(ass => ({
+                id: ass.uniqueId || ass.TDN || Math.random().toString(),
+                kind: ass.KIND || '',
+                class: ass.CLASSIFICATION || '',
+                actualUse: ass.ACTUAL_USE || '',
+                subClass: ass.SUB_CLASS || '',
+                area: (ass.AREA || 0).toString(),
+                unitValue: (ass.UNIT_VALUE || 0).toString(),
+                baseMarketValue: (ass.MARKET_VAL || 0).toString(),
+                adjustedMarketValue: (ass.MARKET_VAL || 0).toString(),
+                assessmentLevel: (ass.ASS_LEVEL || 0).toString(),
+                assessedValue: (ass.ASS_VALUE || 0).toString(),
+                taxability: ass.TAXABILITY || 'Taxable',
+              }))}
+              improvementRows={[
+                ...(selectedRecord.trees || []),
+                ...assessmentRecords.flatMap(ass => ass.trees || [])
+              ].map((tree: any, idx) => {
+                // Map from either internal UI format or raw database format
+                const kind = tree.name || tree.Prod_Code || '';
+                const subClass = tree.class || '';
+                const unitValue = tree.unitPrice || tree.Unit_Price || 0;
+                const baseMarketValue = tree.totalValue || tree.Market_Value || 0;
+                
+                let nfb = '0';
+                let fb = '0';
+                
+                if (tree.type === 'NFB') {
+                  nfb = (tree.quantity || 0).toString();
+                } else if (tree.type === 'FB') {
+                  fb = (tree.quantity || 0).toString();
+                } else {
+                  // Fallback to raw database fields
+                  if (tree.Non_FB > 0) nfb = tree.Non_FB.toString();
+                  if (tree.Tot_FB > 0) fb = (tree.Tot_FB || tree.FB || 0).toString();
+                }
+
+                return {
+                  id: tree.id || `tree-${idx}-${Math.random()}`,
+                  kind,
+                  subClass,
+                  nonFruitBearing: nfb,
+                  fruitBearing: fb,
+                  unitValue: unitValue.toString(),
+                  baseMarketValue: baseMarketValue.toString(),
+                };
+              })}
+              valueAdjustmentRows={assessmentRecords.filter(ass => (ass as any).ADJ_FACTOR).map(ass => ({
+                id: `adj-${ass.uniqueId || ass.TDN || Math.random()}`,
+                baseMarketValue: ass.MARKET_VAL || 0,
+                adjustmentFactor: (ass as any).ADJ_FACTOR || '',
+                percentAdjustment: (ass as any).PERC_ADJ || '0%',
+                valueAdjustment: (ass as any).VAL_ADJ || 0,
+                marketValue: (ass as any).ADJ_MARKET_VAL || ass.MARKET_VAL || 0,
+              }))}
+              propertyAssessmentRows={assessmentRecords.map(ass => ({
+                id: `ass-${ass.uniqueId || ass.TDN || Math.random()}`,
+                actualUse: ass.ACTUAL_USE || '',
+                adjustedMarketValue: (ass as any).ADJ_MARKET_VAL || ass.MARKET_VAL || 0,
+                assessmentLevel: (ass.ASS_LEVEL || 0).toString() + '%',
+                assessedValue: ass.ASS_VALUE || 0,
+              }))}
+              summary={{
+                totalArea: assessmentRecords.reduce((acc, curr) => acc + (curr.AREA || 0), 0),
+                totalAdjustedMarketValue: assessmentRecords.reduce((acc, curr) => acc + ((curr as any).ADJ_MARKET_VAL || curr.MARKET_VAL || 0), 0),
+                totalAssessedValue: assessmentRecords.reduce((acc, curr) => acc + (curr.ASS_VALUE || 0), 0),
+              }}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 };

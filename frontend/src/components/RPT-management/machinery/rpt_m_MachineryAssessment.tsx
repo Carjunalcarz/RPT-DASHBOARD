@@ -10,6 +10,7 @@ interface MachineryAssessmentProps {
   records?: RptAssRecord[];
   isEnabled?: boolean;
   onUpdate?: (records: any[]) => void;
+  status?: string;
 }
 
 interface MachineryRecord {
@@ -55,7 +56,7 @@ const defaultFormData: FormData = {
   idleLand: false,
 };
 
-const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiRecords, isEnabled, onUpdate }) => {
+const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiRecords, isEnabled, onUpdate, status }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const { showConfirm } = useAlert();
   const [records, setRecords] = useState<MachineryRecord[]>([]);
@@ -332,7 +333,12 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
           <button onClick={() => setIsAdjustmentOpen(true)} disabled={!selectedRecord} className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 border rounded shadow-sm flex items-center gap-1.5 text-orange-600 disabled:opacity-50">
             <ArrowDownUp size={14} /> Adjustment
           </button>
-          <button onClick={handlePrint} className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 border rounded shadow-sm flex items-center gap-1.5">
+          <button
+            onClick={handlePrint}
+            disabled={status !== 'approved'}
+            className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 border rounded shadow-sm flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={status !== 'approved' ? "Only approved records can be printed" : "Print Record"}
+          >
             <Printer size={14} /> Print
           </button>
         </div>

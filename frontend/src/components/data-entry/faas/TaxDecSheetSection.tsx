@@ -2,7 +2,11 @@ import React, { useState } from 'react';
 import { Printer, FileText } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 
-const TaxDecSheetSection: React.FC = () => {
+interface TaxDecSheetSectionProps {
+  onPrint?: () => void;
+}
+
+const TaxDecSheetSection: React.FC<TaxDecSheetSectionProps> = ({ onPrint }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const [printingType, setPrintingType] = useState<'individual' | 'batch'>('individual');
   const [options, setOptions] = useState({
@@ -20,7 +24,11 @@ const TaxDecSheetSection: React.FC = () => {
 
   const handlePrint = () => {
     console.log('Printing with options:', options);
-    // Print logic here
+    if (onPrint) {
+      onPrint();
+    } else {
+      window.print();
+    }
   };
 
   const handleCancel = () => {

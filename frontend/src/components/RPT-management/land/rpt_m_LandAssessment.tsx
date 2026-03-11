@@ -11,6 +11,7 @@ interface LandAssessmentProps {
   records?: RptAssRecord[];
   isEnabled?: boolean;
   onUpdate?: (records: any[]) => void;
+  status?: string;
 }
 
 interface LandRecord {
@@ -68,7 +69,7 @@ const defaultFormData: FormData = {
   idleLand: false,
 };
 
-const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, isEnabled, onUpdate }) => {
+const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, isEnabled, onUpdate, status }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const { showConfirm } = useAlert();
   const [records, setRecords] = useState<LandRecord[]>([]);
@@ -516,8 +517,10 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
           </button>
           <button
             onClick={handlePrint}
-            className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5"
+            disabled={status !== 'approved'}
+            className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="print-land-btn"
+            title={status !== 'approved' ? "Only approved records can be printed" : "Print Record"}
           >
             <Printer size={14} />
             Print

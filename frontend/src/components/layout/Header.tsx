@@ -26,29 +26,41 @@ const Header: React.FC = () => {
   const [provincialCount, setProvincialCount] = useState(0);
   const previousCountRef = useRef(0);
 
-  // Check if user is admin (case-insensitive)
-  const isAdmin = user?.role && ['admin', 'administrator'].includes(user.role.toLowerCase());
+  // Check if user is admin (case-insensitive and robust)
+  const isAdmin = React.useMemo(() => {
+    if (!user) return false;
+    const role = (user.role || '').trim().toLowerCase();
+    const position = (user.position || '').trim().toLowerCase();
+    const adminTerms = ['admin', 'administrator', 'superadmin'];
+    return adminTerms.includes(role) || adminTerms.includes(position);
+  }, [user]);
 
   useEffect(() => {
-    // console.log('Header Debug: User Role:', user?.role);
-    // console.log('Header Debug: Is Admin:', isAdmin);
+    //  if (user) {
+    //    console.log('Header Debug: User loaded', { role: user.role, position: user.position, isAdmin });
+    //  }
   }, [user, isAdmin]);
 
   const fetchPendingApprovals = async (silent = false) => {
     if (!isAdmin) {
+        // console.log('Header Debug: Skipping fetch, user is not admin');
         return;
     }
     
     try {
+      // console.log('Header Debug: Fetching pending approvals...');
       // Fetch Municipal
       const muniResponse = await listFaasRecords({ status: 'pending-municipal', limit: 1 });
+      // console.log('Header Debug: Muni Response:', muniResponse);
       const muniTotal = muniResponse?.pagination?.total || 0;
 
       // Fetch Provincial
       const provResponse = await listFaasRecords({ status: 'pending-provincial', limit: 1 });
+      // console.log('Header Debug: Prov Response:', provResponse);
       const provTotal = provResponse?.pagination?.total || 0;
       
       const total = muniTotal + provTotal;
+      // console.log('Header Debug: Total Pending:', total);
       
       setPendingCount(total);
       setMunicipalCount(muniTotal);

@@ -33,6 +33,7 @@ interface BuildingAssessmentProps {
   records?: RptAssRecord[];
   isEnabled?: boolean;
   onUpdate?: (records: any[]) => void;
+  status?: string;
 }
 
 interface FormData {
@@ -59,7 +60,7 @@ const defaultFormData: FormData = {
   idleLand: false,
 };
 
-const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRecords, isEnabled = true, onUpdate }) => {
+const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRecords, isEnabled = true, onUpdate, status }) => {
   // State for records table
   const [records, setRecords] = useState<BuildingRecord[]>([]);
   const { showConfirm } = useAlert();
@@ -507,8 +508,10 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
           </button>
           <button
             onClick={handlePrint}
-            className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5"
+            disabled={status !== 'approved'}
+            className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="print-building-btn"
+            title={status !== 'approved' ? "Only approved records can be printed" : "Print Record"}
           >
             <Printer size={14} />
             Print

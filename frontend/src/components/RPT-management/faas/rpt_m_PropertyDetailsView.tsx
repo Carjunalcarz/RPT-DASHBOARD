@@ -106,6 +106,7 @@ const PropertyDetailsView: React.FC<PropertyDetailsViewProps> = ({
             isLoading={isAssessmentLoading}
             onUpdate={onAssessmentUpdate}
             trees={selectedRecord?.trees || []}
+            status={selectedRecord?.status}
           />
         )}
         

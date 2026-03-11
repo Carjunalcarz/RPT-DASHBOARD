@@ -33,6 +33,7 @@ interface BuildingRecord {
 interface BuildingAssessmentProps {
   records?: RptAssRecord[];
   isEnabled?: boolean;
+  onPrint?: () => void;
 }
 
 interface FormData {
@@ -59,7 +60,7 @@ const defaultFormData: FormData = {
   idleLand: false,
 };
 
-const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRecords, isEnabled = true }) => {
+const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRecords, isEnabled = true, onPrint }) => {
   // State for records table
   const [records, setRecords] = useState<BuildingRecord[]>([]);
   const { showConfirm } = useAlert();
@@ -406,7 +407,11 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
 
   // Handle Print
   const handlePrint = () => {
-    window.print();
+    if (onPrint) {
+      onPrint();
+    } else {
+      window.print();
+    }
   };
 
   // Format currency

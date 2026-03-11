@@ -8,6 +8,7 @@ interface PropertyInfo {
   arpNo: string;
   municipality: string;
   barangay: string;
+  province: string;
   effectivityDate: string;
   declarationDate: string;
 }
@@ -42,6 +43,21 @@ const PrintDocument: React.FC<PrintDocumentProps> = ({
     }).format(value);
   };
 
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return 'N/A';
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return dateStr;
+      return date.toLocaleDateString('en-PH', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
   const getCurrentDateTime = () => {
     return new Date().toLocaleString('en-PH', {
       year: 'numeric',
@@ -67,20 +83,18 @@ const PrintDocument: React.FC<PrintDocumentProps> = ({
       {/* Header Section */}
       <div className="print-header">
         <div className="print-header-content">
-          <div className="print-logo">
-            <div className="print-logo-box">
-              <span className="print-logo-text">RP</span>
-            </div>
+          <div className="print-logo-box">
+            <span className="print-logo-text">RP</span>
           </div>
           <div className="print-title-section">
-            <h1 className="print-main-title">REPUBLIC OF THE PHILIPPINES</h1>
-            <h2 className="print-province">PROVINCE OF AGUSAN DEL NORTE</h2>
-            <h2 className="print-municipality">MUNICIPALITY OF TUBAY</h2>
-            <h3 className="print-office">Office of the Municipal Assessor</h3>
+            <p className="print-main-title">REPUBLIC OF THE PHILIPPINES</p>
+            <p className="print-province">PROVINCE OF AGUSAN DEL NORTE</p>
+            <p className="print-municipality">MUNICIPALITY OF TUBAY</p>
+            <p className="print-office">Office of the Municipal Assessor</p>
           </div>
         </div>
         <div className="print-divider"></div>
-        <h2 className="print-document-title">REAL PROPERTY TAX DECLARATION</h2>
+        <h1 className="print-document-title">REAL PROPERTY TAX DECLARATION</h1>
         <p className="print-document-subtitle">FAAS / TDN Record</p>
       </div>
 
@@ -124,11 +138,11 @@ const PrintDocument: React.FC<PrintDocumentProps> = ({
           </div>
           <div className="print-info-item">
             <span className="print-label">Effectivity Date:</span>
-            <span className="print-value">{propertyInfo.effectivityDate || 'N/A'}</span>
+            <span className="print-value">{formatDate(propertyInfo.effectivityDate)}</span>
           </div>
           <div className="print-info-item">
             <span className="print-label">Declaration Date:</span>
-            <span className="print-value">{propertyInfo.declarationDate || 'N/A'}</span>
+            <span className="print-value">{formatDate(propertyInfo.declarationDate)}</span>
           </div>
         </div>
       </div>

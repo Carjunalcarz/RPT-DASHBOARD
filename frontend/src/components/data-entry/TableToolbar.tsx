@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer } from 'lucide-react';
 
@@ -11,6 +12,7 @@ interface TableToolbarProps {
   onPrint: () => void;
   isEditing: boolean;
   hasSelection: boolean;
+  printButton?: React.ReactNode;
 }
 
 const TableToolbar: React.FC<TableToolbarProps> = ({
@@ -23,6 +25,7 @@ const TableToolbar: React.FC<TableToolbarProps> = ({
   onPrint,
   isEditing,
   hasSelection,
+  printButton,
 }) => {
   return (
     <div className="bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800 p-3">
@@ -80,14 +83,18 @@ const TableToolbar: React.FC<TableToolbarProps> = ({
           <RefreshCw size={14} />
           Refresh
         </button>
-        <button
-          onClick={onPrint}
-          className="px-3 py-2 text-xs bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600 text-white rounded-lg transition-colors flex items-center gap-2 font-medium"
-          data-testid="print-button"
-        >
-          <Printer size={14} />
-          Print
-        </button>
+        {printButton ? (
+          printButton
+        ) : (
+          <button
+            onClick={onPrint}
+            className="px-3 py-2 text-xs bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600 text-white rounded-lg transition-colors flex items-center gap-2 font-medium"
+            data-testid="print-button"
+          >
+            <Printer size={14} />
+            Print
+          </button>
+        )}
       </div>
     </div>
   );

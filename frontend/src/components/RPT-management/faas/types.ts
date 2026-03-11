@@ -63,4 +63,42 @@ export interface PropertyRecord {
   trees?: any[]; // Tree/Plant Assessments
   TRANS_CD?: string; // Transaction Code
   REM?: string; // Remarks
+
+  // Official Form Fields
+  CER_TIT_NO?: string;
+  TCT_DATE?: string;
+  CAD_LOT_NO?: string;
+  LOTE_NO?: string;
+  CLOA_NO?: string;
+  CLOA_DATE?: string;
+  ASS_LOT_NO?: string;
+  BLOCK_NO?: string;
+  STREET?: string;
+  NORTH?: string;
+  EAST?: string;
+  SOUTH?: string;
+  WEST?: string;
+
+  // Enriched Fields (mapped in print document)
+  Owner_Address?: string;
+  Owner_TIN?: string;
+  Owner_Tel_no?: string;
+  ADMIN_NO?: string;
+  ADMIN_ADDRESS?: string;
+  ADMIN_TIN?: string;
+  ADMIN_TEL?: string;
+
+  // Back Part Fields
+  taxable?: boolean;
+  exempt?: boolean;
+  effQtr?: string;
+  effYear?: string;
+  memoranda?: string;
+  
+  // Superseded Assessment
+  pAssValueLand?: number;
+  pAssValueImpvt?: number;
+  pAssValueTotal?: number;
+  pArPageNo?: string;
+  pRecordingPersonnel?: string;
 }

@@ -418,6 +418,68 @@ class FaasService {
   }
 
   /**
+   * Batch update FAAS record status
+   * @param {string[]} ids 
+   * @param {string} status 
+   * @param {string} remarks 
+   * @param {string} userEmail 
+   * @param {string} userId 
+   */
+  async batchUpdateStatus(ids, status, remarks, userEmail, userId) {
+    try {
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            throw new AppError('No IDs provided for batch update', 400);
+        }
+
+        const results = {
+            success: [],
+            failed: []
+        };
+
+        // Validate Sequential Workflow for the whole batch first?
+        // Or process one by one and track failures.
+        // Processing in a transaction would be better but if one fails due to status mismatch, 
+        // we might want others to succeed.
+        // Let's use Promise.allSettled to process in parallel but capture individual errors.
+        // Note: For very large batches, we might want to chunk this.
+        
+        // However, Prisma `updateMany` doesn't return the updated records or allow individual logic easily.
+        // And we have complex logic in `updateStatus` (audit logs, data JSON updates).
+        // So we should reuse `updateStatus` logic.
+        
+        const updates = ids.map(id => 
+            this.updateStatus(id, status, remarks, userEmail, userId)
+                .then(() => ({ status: 'fulfilled', id }))
+                .catch(error => ({ status: 'rejected', id, error: error.message }))
+        );
+
+        const outcomes = await Promise.allSettled(updates);
+
+        outcomes.forEach(outcome => {
+            // Promise.allSettled wraps the result of our map's promises.
+            // Our map returns objects like { status: 'fulfilled', id }
+            
+            if (outcome.status === 'fulfilled') {
+                const result = outcome.value;
+                if (result.status === 'fulfilled') {
+                    results.success.push(result.id);
+                } else {
+                    results.failed.push({ id: result.id, error: result.error });
+                }
+            } else {
+                // This shouldn't happen as we catch errors in the map
+                 results.failed.push({ id: 'unknown', error: outcome.reason });
+            }
+        });
+
+        return results;
+    } catch (error) {
+        logger.error('Error in FaasService.batchUpdateStatus:', error);
+        throw new AppError(error.message, error.statusCode || 500);
+    }
+  }
+
+  /**
    * Helper to create audit log
    */
   async logAudit(action, recordId, details, userEmail, userId) {

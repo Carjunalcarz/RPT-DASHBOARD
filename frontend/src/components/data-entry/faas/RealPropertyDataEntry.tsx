@@ -1,9 +1,10 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   Plus, Edit2, Trash2, Save, X, RefreshCw, Printer,
   FileText, CreditCard, Search, ChevronDown, Building2,
   User, MapPin, Info, DollarSign, GripHorizontal, Sparkles, Code, Loader2
 } from 'lucide-react';
+import { useReactToPrint } from 'react-to-print';
 import { dummyPropertyRecord, dummyAssessmentRecords } from './dummyData';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { useAlert } from '@/context/AlertContext';
@@ -18,6 +19,7 @@ import SignatoriesSection from './SignatoriesSection';
 import PreviousTDNsSection from './PreviousTDNsSection';
 import TaxDecSheetSection from './TaxDecSheetSection';
 import OtherPropertyTab from '../OtherPropertyTab';
+import PrintDocument from '../PrintDocument';
 import { toast } from 'sonner';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import useSWR from 'swr';
@@ -921,9 +923,11 @@ const RealPropertyDataEntry: React.FC = () => {
     setPagination(prev => ({ ...prev, page: 1, limit: newSize }));
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const printRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: `FAAS_${selectedRecord?.tdn || 'Record'}`,
+  });
 
   const isFormEnabled = isEditing || isAdding;
 
@@ -1364,6 +1368,7 @@ const RealPropertyDataEntry: React.FC = () => {
                 assessmentRecords={assessmentRecords}
                 isLoading={isAssessmentLoading}
                 onUpdate={handleAutoSave}
+                onPrint={handlePrint}
               />
             )}
             
@@ -1399,7 +1404,7 @@ const RealPropertyDataEntry: React.FC = () => {
             )}
             
             {activeTab === 'tax-dec' && (
-              <TaxDecSheetSection />
+              <TaxDecSheetSection onPrint={handlePrint} />
             )}
           </div>
         </div>
@@ -1534,6 +1539,46 @@ const RealPropertyDataEntry: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Hidden Print Document */}
+      <div style={{ display: 'none' }}>
+        <div ref={printRef}>
+          {selectedRecord && (
+            <PrintDocument
+              propertyInfo={{
+                ownerName: selectedRecord.owner || '',
+                pin: selectedRecord.pin || selectedRecord.PIN || '',
+                tdNo: selectedRecord.tdn || selectedRecord.TDN || '',
+                arpNo: selectedRecord.arp || selectedRecord.ARP || '',
+                municipality: selectedRecord.cityCode === '053' ? 'Tubay' : selectedRecord.cityCode || 'Tubay',
+                barangay: selectedRecord.barangay || '',
+                province: 'Agusan del Norte',
+                effectivityDate: selectedRecord.pEffDate || selectedRecord.EFF_DATE || '',
+                declarationDate: selectedRecord.DEC_DATE || '',
+              }}
+              assessmentRows={assessmentRecords.map(ass => ({
+                id: ass.uniqueId || ass.TDN || Math.random().toString(),
+                kind: ass.KIND || '',
+                class: ass.CLASSIFICATION || '',
+                actualUse: ass.ACTUAL_USE || '',
+                subClass: ass.SUB_CLASS || '',
+                area: (ass.AREA || 0).toString(),
+                unitValue: (ass.UNIT_VALUE || 0).toString(),
+                baseMarketValue: (ass.MARKET_VAL || 0).toString(),
+                adjustedMarketValue: (ass.MARKET_VAL || 0).toString(),
+                assessmentLevel: (ass.ASS_LEVEL || 0).toString(),
+                assessedValue: (ass.ASS_VALUE || 0).toString(),
+                taxability: ass.TAXABILITY || 'Taxable',
+              }))}
+              summary={{
+                totalArea: assessmentRecords.reduce((acc, curr) => acc + (curr.AREA || 0), 0),
+                totalAdjustedMarketValue: assessmentRecords.reduce((acc, curr) => acc + (curr.MARKET_VAL || 0), 0),
+                totalAssessedValue: assessmentRecords.reduce((acc, curr) => acc + (curr.ASS_VALUE || 0), 0),
+              }}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 };

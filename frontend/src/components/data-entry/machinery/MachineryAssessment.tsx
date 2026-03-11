@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 interface MachineryAssessmentProps {
   records?: RptAssRecord[];
   isEnabled?: boolean;
+  onPrint?: () => void;
 }
 
 interface MachineryRecord {
@@ -56,7 +57,7 @@ const defaultFormData: FormData = {
   idleLand: false,
 };
 
-const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiRecords, isEnabled }) => {
+const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiRecords, isEnabled, onPrint }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const { showConfirm } = useAlert();
   const [records, setRecords] = useState<MachineryRecord[]>([]);
@@ -283,7 +284,11 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
   };
 
   const handlePrint = () => {
-    window.print();
+    if (onPrint) {
+      onPrint();
+    } else {
+      window.print();
+    }
   };
 
   const formatCurrency = (value: number) => {

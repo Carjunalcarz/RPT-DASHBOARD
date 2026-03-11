@@ -41,6 +41,7 @@ const landTaxRoutes = require('./routes/landTaxRoutes');
 const buildingRoutes = require('./routes/buildingRoutes');
 const buildingAppraisalRoutes = require('./routes/buildingAppraisalRoutes');
 const faasRoutes = require('./routes/faasRoutes');
+const pdfRoutes = require('./routes/pdfRoutes');
 
 const app = express();
 
@@ -166,6 +167,7 @@ app.use('/api/v1/trees', treesRoutes);
 app.use('/api/v1/buildings', buildingRoutes);
 app.use('/api/v1/building-appraisals', buildingAppraisalRoutes);
 app.use('/api/v1/faas', faasRoutes);
+app.use('/api/v1/pdf', pdfRoutes);
 // Legacy routes support if needed
 app.use('/api/classifications', classificationRoutes);
 app.use('/api/actual-uses', actualUseRoutes);

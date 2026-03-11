@@ -141,27 +141,40 @@ const PendingApprovals: React.FC = () => {
         }
       }
 
+      // Optimistic UI Update: immediately remove selected items from view
+      mutate(
+        (currentData: any) => {
+          if (!currentData) return currentData;
+          return {
+            ...currentData,
+            data: currentData.data.filter((record: any) => !selectedIds.has(record.id)),
+            pagination: {
+              ...currentData.pagination,
+              total: Math.max(0, currentData.pagination.total - selectedIds.size)
+            }
+          };
+        },
+        false // Do not revalidate immediately, wait for actual response
+      );
+
       const result = await batchUpdateFaasStatus(Array.from(selectedIds), nextStatus as any, 'Bulk Action');
 
       if (result.failed.length === 0) {
         toast.success(`Successfully approved ${result.success.length} items.`, { id: toastId });
       } else if (result.success.length > 0) {
         toast.warning(`Approved ${result.success.length} items, but ${result.failed.length} failed.`, { id: toastId });
+        // If some failed, we should revalidate to show them back
+        mutate(); 
       } else {
         toast.error(`Failed to approve selected items.`, { id: toastId });
+        mutate(); // Revert optimistic update on total failure
       }
 
-      // Refresh data
+      // Refresh data (final consistency check)
       setSelectedIds(new Set());
-      // Trigger SWR revalidation
-      // We can use mutate from useSWRConfig or just wait for auto-revalidation if focus happens.
-      // But better to force it. Since we don't have mutate bound here easily without prop drilling or global mutate,
-      // we can rely on SWR's automatic revalidation if we just change something or invalidating cache.
-      // Or we can just grab mutate from the useSWR call above.
-      // Wait, 'mutate' is available from the useSWR hook call in this component!
-      // I need to move this handler inside the component scope where 'mutate' is defined.
-      // It IS inside. Good.
-      mutate();
+      if (result.failed.length === 0) {
+          mutate(); 
+      }
 
     } catch (error) {
       console.error('Bulk approval error:', error);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { AssessmentRow, AssessmentSummary } from './types';
 import TableToolbar from './TableToolbar';
 import EditableCell from './EditableCell';
@@ -6,6 +6,7 @@ import PrintDocument from './PrintDocument';
 import SelectionModal from './SelectionModal';
 import { useSelectionModal } from './useSelectionModal';
 import { useAlert } from '@/context/AlertContext';
+import { PdfPrintButton } from '../common/PdfPrintButton';
 import '@/styles/print.css';
 
 const AssessmentTable: React.FC = () => {
@@ -14,6 +15,7 @@ const AssessmentTable: React.FC = () => {
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [originalRowBackup, setOriginalRowBackup] = useState<AssessmentRow | null>(null);
   const { showAlert } = useAlert();
+  const printRef = useRef<HTMLDivElement>(null);
 
   // Selection modal hook
   const {
@@ -217,6 +219,7 @@ const AssessmentTable: React.FC = () => {
     arpNo: 'ARP-2024-001',
     municipality: 'Tubay',
     barangay: 'Poblacion',
+    province: 'Agusan del Norte',
     effectivityDate: '2024-01-01',
     declarationDate: '2024-01-15',
   };
@@ -234,6 +237,43 @@ const AssessmentTable: React.FC = () => {
         onPrint={handlePrint}
         isEditing={!!editingRowId}
         hasSelection={!!selectedRowId}
+        printButton={
+          <PdfPrintButton
+            contentRef={printRef}
+            documentTitle="Assessment Sheet"
+            pdfEndpoint="http://localhost:3000/api/v1/pdf/generate-pdf"
+            pdfData={{
+              tdNo: propertyInfo.tdNo,
+              arpNo: propertyInfo.arpNo,
+              pin: propertyInfo.pin,
+              owner: propertyInfo.ownerName,
+              address: `${propertyInfo.barangay}, ${propertyInfo.municipality}, ${propertyInfo.province}`,
+              propertyLocation: {
+                barangay: propertyInfo.barangay,
+                municipality: propertyInfo.municipality,
+                province: propertyInfo.province
+              },
+              landAppraisal: rows.map(r => ({
+                classification: r.kind,
+                subClass: r.subClass,
+                area: r.area,
+                unitValue: r.unitValue,
+                baseMarketValue: r.baseMarketValue
+              })),
+              propertyAssessment: rows.map(r => ({
+                actualUse: r.actualUse,
+                adjustedMarketValue: r.adjustedMarketValue,
+                assessmentLevel: r.assessmentLevel,
+                assessedValue: r.assessedValue
+              })),
+              totals: {
+                landTotal: summary.totalAdjustedMarketValue,
+                marketValueTotal: summary.totalAdjustedMarketValue,
+                assessedValueTotal: summary.totalAssessedValue
+              }
+            }}
+          />
+        }
       />
 
       {/* Assessment Entry Table */}
@@ -418,11 +458,15 @@ const AssessmentTable: React.FC = () => {
       </div>
 
       {/* Hidden Print Document */}
-      <PrintDocument
-        propertyInfo={propertyInfo}
-        assessmentRows={rows}
-        summary={summary}
-      />
+      <div style={{ display: 'none' }}>
+        <div ref={printRef}>
+          <PrintDocument
+            propertyInfo={propertyInfo}
+            assessmentRows={rows}
+            summary={summary}
+          />
+        </div>
+      </div>
 
       {/* Selection Modal */}
       <SelectionModal

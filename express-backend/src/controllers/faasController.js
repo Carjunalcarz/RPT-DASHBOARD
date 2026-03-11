@@ -114,3 +114,28 @@ exports.updateStatus = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.batchUpdateStatus = async (req, res, next) => {
+  try {
+    const { ids, status, remarks } = req.body;
+    const userEmail = req.user ? req.user.email : 'anonymous';
+    const userId = req.user ? req.user.id : null;
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      throw new AppError('No IDs provided', 400);
+    }
+
+    if (!['draft', 'for-review', 'pending-municipal', 'pending-provincial', 'approved', 'rejected', 'rejected-municipal', 'rejected-provincial'].includes(status)) {
+        throw new AppError('Invalid status value', 400);
+    }
+
+    const results = await faasService.batchUpdateStatus(ids, status, remarks, userEmail, userId);
+
+    res.status(200).json({
+      success: true,
+      data: results
+    });
+  } catch (error) {
+    next(error);
+  }
+};

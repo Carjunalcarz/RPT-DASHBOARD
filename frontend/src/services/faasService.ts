@@ -90,48 +90,13 @@ export const updateFaasStatus = async (id: string, status: 'draft' | 'for-review
 };
 
 export const batchUpdateFaasStatus = async (ids: string[], status: 'draft' | 'for-review' | 'approved' | 'rejected' | 'pending-municipal' | 'pending-provincial', remarks?: string): Promise<{ success: string[], failed: { id: string, error: any }[] }> => {
-  const results = {
-    success: [] as string[],
-    failed: [] as { id: string, error: any }[]
-  };
-
-  // Process in chunks to avoid overwhelming the server (if we were doing parallel)
-  // For now, we'll do simple parallel with Promise.allSettled
-  const promises = ids.map(id => 
-    updateFaasStatus(id, status, remarks)
-      .then(() => ({ status: 'fulfilled', id }))
-      .catch((error) => ({ status: 'rejected', id, error }))
-  );
-
-  const outcomes = await Promise.allSettled(promises);
-
-  outcomes.forEach((outcome, index) => {
-    // Promise.allSettled returns objects with 'status' and 'value'/'reason'
-    // But our map returns promises that resolve to objects with 'status', 'id', 'error'
-    // Wait, Promise.allSettled wraps the result.
-    if (outcome.status === 'fulfilled') {
-      // outcome.value is the result of the promise
-      // The promise resolves to { status: 'fulfilled' | 'rejected', id, error? }
-      // This double wrapping is confusing. Let's simplify.
-      
-      // Actually, updateFaasStatus throws on error.
-      // So the .then() block is success, .catch() is failure.
-      // outcome.value will be the return of .then or .catch
-      
-      const result = outcome.value as any;
-      if (result.status === 'fulfilled') {
-        results.success.push(result.id);
-      } else {
-        results.failed.push({ id: result.id, error: result.error });
-      }
-    } else {
-      // This strictly shouldn't happen because we catch everything in the map
-      // But just in case of catastrophic failure in the map function itself
-      results.failed.push({ id: ids[index], error: outcome.reason });
-    }
-  });
-
-  return results;
+  try {
+    const response = await api.post('/faas/batch-status', { ids, status, remarks });
+    return response.data.data;
+  } catch (error) {
+    console.error('Error in batch update:', error);
+    throw error;
+  }
 };
 
 export const listFaasRecords = async (params?: { status?: string; page?: number; limit?: number; searchField?: string; filterValue?: string }): Promise<any> => {

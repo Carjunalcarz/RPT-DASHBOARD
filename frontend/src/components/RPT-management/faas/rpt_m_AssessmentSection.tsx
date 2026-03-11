@@ -11,11 +11,12 @@ interface AssessmentSectionProps {
   isLoading?: boolean;
   onUpdate?: (records: any[]) => void;
   trees?: any[]; // Array of tree records from parent
+  status?: string;
 }
 
 type AssessmentType = 'land' | 'building' | 'machinery';
 
-const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assessmentRecords = [], isLoading = false, onUpdate, trees = [] }) => {
+const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assessmentRecords = [], isLoading = false, onUpdate, trees = [], status }) => {
   const [activeType, setActiveType] = useState<AssessmentType>('land'); // Default to land as it's often the base
 
   // Filter records by type
@@ -170,6 +171,7 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assess
             records={landRecords}
             isEnabled={isEnabled}
             onUpdate={(records) => handleUpdate('land', records)}
+            status={status}
           />
         )}
 
@@ -178,6 +180,7 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assess
             records={buildingRecords}
             isEnabled={isEnabled}
             onUpdate={(records) => handleUpdate('building', records)}
+            status={status}
           />
         )}
 
@@ -186,6 +189,7 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assess
             records={machineryRecords}
             isEnabled={isEnabled}
             onUpdate={(records) => handleUpdate('machinery', records)}
+            status={status}
           />
         )}
       </div>

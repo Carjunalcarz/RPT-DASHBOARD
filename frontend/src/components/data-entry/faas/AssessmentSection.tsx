@@ -10,11 +10,12 @@ interface AssessmentSectionProps {
   assessmentRecords?: RptAssRecord[];
   isLoading?: boolean;
   onUpdate?: (updatedRecords: RptAssRecord[]) => void;
+  onPrint?: () => void;
 }
 
 type AssessmentType = 'land' | 'building' | 'machinery';
 
-const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assessmentRecords = [], isLoading = false, onUpdate }) => {
+const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assessmentRecords = [], isLoading = false, onUpdate, onPrint }) => {
   const [activeType, setActiveType] = useState<AssessmentType>('land'); // Default to land as it's often the base
 
   // Filter records by type
@@ -113,6 +114,7 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assess
             records={landRecords}
             isEnabled={isEnabled}
             onUpdate={handleLandUpdate}
+            onPrint={onPrint}
           />
         )}
 
@@ -120,6 +122,7 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assess
           <BuildingAssessment 
             records={buildingRecords}
             isEnabled={isEnabled}
+            onPrint={onPrint}
           />
         )}
 
@@ -127,6 +130,7 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assess
           <MachineryAssessment
             records={machineryRecords}
             isEnabled={isEnabled}
+            onPrint={onPrint}
           />
         )}
       </div>
