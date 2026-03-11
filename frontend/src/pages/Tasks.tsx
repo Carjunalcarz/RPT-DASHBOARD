@@ -25,7 +25,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
+import { Label } from '../components/ui/label';
 import {
   Select,
   SelectContent,

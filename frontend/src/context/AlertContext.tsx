@@ -17,7 +17,7 @@ export interface ConfirmOptions {
 export interface AlertContextType {
   showAlert: (options: AlertOptions | string) => Promise<void>;
   showConfirm: (options: ConfirmOptions | string) => Promise<boolean>;
-  closeAlert: () => void;
+  closeAlert: (result?: boolean) => void;
   isOpen: boolean;
   alertType: 'alert' | 'confirm';
   alertOptions: AlertOptions;

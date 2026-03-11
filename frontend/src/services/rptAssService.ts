@@ -51,6 +51,7 @@ export interface RptAssRecord {
   // UI-specific fields (optional)
   id?: string;
   uniqueId?: string;
+  trees?: any[];
 }
 
 export interface RptAssResponse {

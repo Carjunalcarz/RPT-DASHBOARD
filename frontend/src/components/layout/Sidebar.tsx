@@ -63,7 +63,12 @@ const Sidebar: React.FC = () => {
       <div className="flex flex-col h-full">
         {/* Navigation Menu */}
         <nav className="flex-1 px-2 py-4 overflow-y-auto">
-          {menuItems.filter(item => !item.adminOnly || user?.role === 'admin').map((item) => {
+          {menuItems.filter(item => {
+            if (item.adminOnly) {
+              return user?.role && ['admin', 'administrator'].includes(user.role.toLowerCase());
+            }
+            return true;
+          }).map((item) => {
             const Icon = item.icon;
             return (
               <NavLink

@@ -6,7 +6,7 @@ import { ThemeColorProvider } from '@/context/ThemeColorContext';
 import { AlertProvider } from '@/context/AlertContext';
 import CustomAlert from '@/components/common/CustomAlert';
 import AppRouter from '@/router/AppRouter';
-import { Toaster } from 'sonner';
+import { Toaster } from '@/components/ui/sonner';
 import '@/App.css';
 import '@/styles/print.css';
 
@@ -19,7 +19,7 @@ function App() {
           <AuthProvider>
             <SidebarProvider>
               <AppRouter />
-              <Toaster position="top-right" richColors expand={true} closeButton />
+              <Toaster position="top-right" richColors expand={true} closeButton offset={90} />
             </SidebarProvider>
           </AuthProvider>
         </AlertProvider>

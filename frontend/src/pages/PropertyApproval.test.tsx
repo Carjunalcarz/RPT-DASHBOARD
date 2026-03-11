@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import PropertyApproval from '../PropertyApproval';
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
+import PropertyApproval from './PropertyApproval';
 import { useAuth } from '@/context/AuthContext';
 import { useAlert } from '@/context/AlertContext';
 import { getRptMastDataDirect, updateSignatory } from '@/services/rptMastService';
@@ -8,18 +9,18 @@ import { getRptAssByTdn } from '@/services/rptAssService';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 // Mock hooks
-jest.mock('@/context/AuthContext');
-jest.mock('@/context/AlertContext');
-jest.mock('@/context/ThemeColorContext', () => ({
+vi.mock('@/context/AuthContext');
+vi.mock('@/context/AlertContext');
+vi.mock('@/context/ThemeColorContext', () => ({
   useThemeColor: () => ({ headerColor: '#ffffff' }),
 }));
 
 // Mock services
-jest.mock('@/services/rptMastService');
-jest.mock('@/services/rptAssService');
+vi.mock('@/services/rptMastService');
+vi.mock('@/services/rptAssService');
 
 // Mock child components to avoid deep rendering issues
-jest.mock('@/components/RPT-management/faas/rpt_m_PropertyDetailsView', () => {
+vi.mock('@/components/RPT-management/faas/rpt_m_PropertyDetailsView', () => {
   return function DummyPropertyDetailsView() {
     return <div data-testid="property-details-view">Property Details</div>;
   };
@@ -39,17 +40,17 @@ describe('PropertyApproval Page', () => {
   };
 
   beforeEach(() => {
-    (useAuth as jest.Mock).mockReturnValue({ user: mockUser });
-    (useAlert as jest.Mock).mockReturnValue({ showConfirm: jest.fn().mockResolvedValue(true) });
-    (getRptMastDataDirect as jest.Mock).mockResolvedValue({
+    (useAuth as Mock).mockReturnValue({ user: mockUser });
+    (useAlert as Mock).mockReturnValue({ showConfirm: vi.fn().mockResolvedValue(true) });
+    (getRptMastDataDirect as Mock).mockResolvedValue({
       data: [{ id: '1', tdn: '123-456', status: 'for-review', data: mockRecord.data }]
     });
-    (getRptAssByTdn as jest.Mock).mockResolvedValue([]);
-    (updateSignatory as jest.Mock).mockResolvedValue({ success: true });
+    (getRptAssByTdn as Mock).mockResolvedValue([]);
+    (updateSignatory as Mock).mockResolvedValue({ success: true });
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   const renderComponent = () => {

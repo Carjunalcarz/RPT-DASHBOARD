@@ -381,7 +381,7 @@ const RealPropertyDataEntry: React.FC = () => {
   }, [isResizing, resize, stopResizing]);
 
   // SWR Data Fetching
-  const { data: apiData, error, isLoading: isSwrLoading, mutate } = useSWR(
+  const { data: apiData, error, isLoading: isSwrLoading, isValidating, mutate } = useSWR(
     ['rpt-mast', pagination.page, pagination.limit, appliedFilter.field, appliedFilter.value],
     ([_, page, limit, searchField, filterValue]) => getRptMastDataDirect({ page, limit, searchField, filterValue }),
     {
@@ -906,8 +906,8 @@ const RealPropertyDataEntry: React.FC = () => {
     setIsAdding(false);
   };
 
-  const handleRefresh = () => {
-    mutate();
+  const handleRefresh = async () => {
+    await mutate();
     toast.success('Data refreshed');
   };
 
@@ -972,67 +972,15 @@ const RealPropertyDataEntry: React.FC = () => {
             </button>
           )}
 
-          {/* Save/Cancel - Main Record Control */}
-          {/* Note: 'Save' here is redundant if we have 'Save Draft' and 'Submit'. 
-              However, 'Save' might be intended for local edit finalization before syncing?
-              Actually, the original design had Edit -> Save/Cancel.
-              With the new Draft/Submit workflow, the 'Save' button is confusing.
-              
-              Let's Hide/Remove the old 'Save' button if we are in the new workflow.
-              OR rename it to 'Apply Changes' if it's just exiting edit mode.
-              But 'Save Draft' does the persistence.
-              
-              Let's clean up the toolbar to be logical:
-              1. Add (Starts new record)
-              2. Edit (Enables form)
-              3. Delete (Removes record)
-              ---
-              4. Save Draft (Persists to Server as Draft)
-              5. Submit (Persists to Server as For-Review)
-              
-              The old 'Save' button logic was:
-              setIsEditing(false);
-              setIsAdding(false);
-              toast.success('Record saved successfully');
-              
-              It didn't actually call an API in the original dummy version.
-              Now 'Save Draft' calls the API.
-              
-              Decision: Remove the old green 'Save' button and rely on 'Save Draft' / 'Submit'.
-              BUT, we need a way to exit "Edit Mode" (unlock the UI).
-              'Save Draft' can optionally exit edit mode, or we keep a 'Done Editing' button.
-              
-              Let's consolidate:
-              - 'Save Draft': Saves to DB, keeps you in edit mode or exits? Usually keeps you there.
-              - 'Submit': Saves and exits edit mode + locks.
-              
-              If the user clicks 'Edit', the form unlocks.
-              If they click 'Save Draft', it saves but stays unlocked?
-              
-              Let's hide the old confusing 'Save' button and make 'Save Draft' the primary way to save work in progress.
-          */}
-          
           <button
-            onClick={handleSaveDraft}
-            disabled={!selectedRecord || selectedRecord.status === 'for-review' || selectedRecord.status === 'approved' || isSaving}
-            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-blue-700 dark:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Save as Draft (Work in Progress)"
+            onClick={() => setShowJson(true)}
+            disabled={!selectedRecord}
+            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-orange-700 dark:text-orange-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Show JSON Data"
           >
-            {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            {isSaving ? 'Saving...' : 'Save Draft'}
+            <Code size={14} />
+            JSON
           </button>
-
-          <button
-            onClick={handleSubmit}
-            disabled={!selectedRecord || selectedRecord.status === 'for-review' || selectedRecord.status === 'approved' || isSaving}
-            className="px-3 py-2 text-xs bg-green-600 hover:bg-green-700 text-white border border-transparent rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Submit for Review (Finalize)"
-          >
-            {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            {isSaving ? 'Submitting...' : 'Submit'}
-          </button>
-
-          <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1" />
 
           {/* Edit/Delete Controls */}
           <button
@@ -1054,16 +1002,51 @@ const RealPropertyDataEntry: React.FC = () => {
             <Trash2 size={14} />
             Delete
           </button>
+
+          <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1" />
+
+          {/* Save/Cancel - Main Record Control */}
+          <button
+            onClick={handleSaveDraft}
+            disabled={!selectedRecord || selectedRecord.status === 'for-review' || selectedRecord.status === 'approved' || isSaving}
+            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-blue-700 dark:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Save as Draft (Work in Progress)"
+          >
+            {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {isSaving ? 'Saving...' : 'Save Draft'}
+          </button>
+
+          <button
+            onClick={handleSubmit}
+            disabled={!isFormEnabled || isSubComponentEditing || isSaving}
+            className="px-3 py-2 text-xs bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="btn-submit"
+            title="Submit for Review"
+          >
+            {isSaving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+            {isSaving ? 'Submitting...' : 'Submit'}
+          </button>
           
           {/* Cancel Changes */}
-          {isFormEnabled && (
+          {selectedRecord && selectedRecord.id && selectedRecord.id.startsWith('TRANS') ? (
             <button
-              onClick={handleCancel}
-              className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
-              data-testid="btn-cancel"
+                onClick={handleCancel}
+                disabled={!selectedRecord}
+                className="px-3 py-2 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Cancel Transaction"
             >
-              <X size={14} />
-              Cancel Transaction
+                <X size={14} />
+                Cancel Transaction
+            </button>
+          ) : (
+            <button
+                onClick={handleCancel}
+                disabled={!isFormEnabled}
+                className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="btn-cancel"
+            >
+                <X size={14} />
+                Cancel
             </button>
           )}
 
@@ -1071,22 +1054,13 @@ const RealPropertyDataEntry: React.FC = () => {
           
           {/* Utility Buttons */}
           <button
-            onClick={() => setShowJson(true)}
-            disabled={!selectedRecord}
-            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-orange-700 dark:text-orange-400 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Show JSON Data"
-          >
-            <Code size={14} />
-            JSON
-          </button>
-
-          <button
             onClick={handleRefresh}
-            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
+            disabled={isValidating}
+            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-70"
             data-testid="btn-refresh"
           >
-            <RefreshCw size={14} />
-            Refresh
+            <RefreshCw size={14} className={isValidating ? "animate-spin" : ""} />
+            {isValidating ? 'Refreshing...' : 'Refresh'}
           </button>
           <button
             onClick={handlePrint}
@@ -1107,10 +1081,10 @@ const RealPropertyDataEntry: React.FC = () => {
           <button 
             onClick={handleTransactionClick}
             disabled={!selectedRecord}
-            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all transform active:scale-95 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none ring-2 ring-blue-500/20"
           >
-            <FileText size={14} />
-            Transaction
+            <FileText size={16} strokeWidth={2.5} />
+            TRANSACTION
           </button>
           <button className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-purple-700 dark:text-purple-400">
             <DollarSign size={14} />
@@ -1165,7 +1139,7 @@ const RealPropertyDataEntry: React.FC = () => {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, index) => (
                     <tr key={index}>
-                      <td colSpan={8} className="px-4 py-3">
+                      <td colSpan={9} className="px-4 py-3">
                          <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
                       </td>
                     </tr>

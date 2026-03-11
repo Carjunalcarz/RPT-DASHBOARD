@@ -1060,7 +1060,7 @@ const RealPropertyDataEntry: React.FC = () => {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, index) => (
                     <tr key={index}>
-                      <td colSpan={8} className="px-4 py-3">
+                      <td colSpan={9} className="px-4 py-3">
                          <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
                       </td>
                     </tr>
