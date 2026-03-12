@@ -13,6 +13,9 @@ import { getRptMastDataDirect, RptMastRecord, getMastExtn } from '@/services/rpt
 import { getRptAssByTdn, RptAssRecord } from '@/services/rptAssService';
 import PropertyDetailsView from './rpt_m_PropertyDetailsView';
 import PrintDocument from '../rpt_m_PrintDocument';
+import PrintBuildingDocument from '../rpt_m_PrintBuildingDocument';
+import { getBldgStrucByTdn, BldgStrucRecord } from '@/services/bldgStrucService';
+import { getBldgAdjByTdn, BldgAdjRecord } from '@/services/bldgAdjService';
 import { toast } from 'sonner';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import useSWR from 'swr';
@@ -38,6 +41,8 @@ const RealPropertyDataEntry: React.FC = () => {
   const [pagination, setPagination] = useState({ page: 1, limit: 100, totalPages: 1 });
   const [assessmentRecords, setAssessmentRecords] = useState<RptAssRecord[]>([]);
   const [isAssessmentLoading, setIsAssessmentLoading] = useState(false);
+  const [bldgStruc, setBldgStruc] = useState<BldgStrucRecord[]>([]);
+  const [bldgAdj, setBldgAdj] = useState<BldgAdjRecord[]>([]);
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
@@ -100,6 +105,30 @@ const RealPropertyDataEntry: React.FC = () => {
       localStorage.removeItem(PERSISTENCE_KEY);
     }
   }, [selectedRecord, assessmentRecords, isEditing, isAdding, isRestored]);
+
+  // Fetch building details if needed
+  useEffect(() => {
+    const fetchBuildingData = async () => {
+      if (selectedRecord && selectedRecord.TDN) {
+        // Check if any assessment record is a building
+        const isBuilding = assessmentRecords.some(ass => ass.KIND === 'B' || ass.KIND === 'Building');
+        if (isBuilding) {
+          try {
+            const struc = await getBldgStrucByTdn(selectedRecord.TDN);
+            setBldgStruc(struc);
+            const adj = await getBldgAdjByTdn(selectedRecord.TDN);
+            setBldgAdj(adj);
+          } catch (e) {
+            console.error('Error fetching building details', e);
+          }
+        } else {
+            setBldgStruc([]);
+            setBldgAdj([]);
+        }
+      }
+    };
+    fetchBuildingData();
+  }, [selectedRecord?.TDN, assessmentRecords]);
 
   const handleTransactionClick = () => {
     setShowTransactionModal(true);
@@ -1380,13 +1409,14 @@ const RealPropertyDataEntry: React.FC = () => {
       <div style={{ display: 'none' }}>
         <div ref={printRef}>
           {selectedRecord && (
-            <PrintDocument
-              propertyInfo={{
-                ownerName: selectedRecord.owner || '',
-                ownerAddress: selectedRecord.Owner_Address || '',
-                ownerTin: selectedRecord.Owner_TIN || '',
-                ownerTel: selectedRecord.Owner_Tel_no || '',
-                adminName: selectedRecord.ADMIN_NO || '',
+            assessmentRecords.some(ass => ass.KIND === 'B' || ass.KIND === 'Building') ? (
+              <PrintBuildingDocument
+                propertyInfo={{
+                  ownerName: selectedRecord.owner || '',
+                  ownerAddress: selectedRecord.Owner_Address || '',
+                  ownerTin: selectedRecord.Owner_TIN || '',
+                  ownerTel: selectedRecord.Owner_Tel_no || '',
+                  adminName: (selectedRecord as any).ADMIN_NAME || selectedRecord.ADMIN_NO || '',
                 adminAddress: selectedRecord.ADMIN_ADDRESS || '',
                 adminTin: selectedRecord.ADMIN_TIN || '',
                 adminTel: selectedRecord.ADMIN_TEL || '',
@@ -1405,8 +1435,88 @@ const RealPropertyDataEntry: React.FC = () => {
                 location: {
                   street: selectedRecord.STREET || '',
                   barangay: selectedRecord.barangay || '',
-                  municipality: selectedRecord.cityCode === '053' ? 'Tubay' : selectedRecord.cityCode || 'Tubay',
-                  province: 'Agusan del Norte',
+                  municipality: (selectedRecord as any).CITY || (selectedRecord.cityCode === '053' ? 'Tubay' : selectedRecord.cityCode) || 'Tubay',
+                  province: (selectedRecord as any).PROV || 'Agusan del Norte',
+                },
+                  backPart: {
+                    taxable: selectedRecord.taxable || false,
+                    exempt: selectedRecord.exempt || false,
+                    effQtr: selectedRecord.effQtr || '',
+                    effYear: selectedRecord.effYear || '',
+                    memoranda: selectedRecord.memoranda || selectedRecord.REM || '',
+                    superseded: {
+                      pin: selectedRecord.pPin || '',
+                      tdNo: selectedRecord.pOldTdn || '',
+                      landValue: selectedRecord.pAssValueLand || 0,
+                      impvtValue: selectedRecord.pAssValueImpvt || 0,
+                      totalValue: selectedRecord.pAssValueTotal || 0,
+                      previousOwner: selectedRecord.pOwner || '',
+                      effectivity: selectedRecord.pEffDate || '',
+                      arPageNo: selectedRecord.pArPageNo || '',
+                      recordingPersonnel: selectedRecord.pRecordingPersonnel || '',
+                    },
+                    signatories: {
+                      appraiser: selectedRecord.appraisedBy || '',
+                      appraiserDate: selectedRecord.appraisedDate || '',
+                      recommending: selectedRecord.recApproval || '',
+                      recommendingDate: selectedRecord.recAppDate || '',
+                      approver: selectedRecord.approved || '',
+                      approverDate: selectedRecord.approvedDate || '',
+                    },
+                  },
+                  effectivityDate: selectedRecord.pEffDate || '',
+                  declarationDate: selectedRecord.approvedDate || '',
+                }}
+                bldgStruc={bldgStruc}
+                bldgAdj={bldgAdj}
+                assessmentRows={assessmentRecords.map(ass => ({
+                  id: ass.uniqueId || ass.TDN || Math.random().toString(),
+                  kind: ass.KIND || '',
+                  class: ass.CLASSIFICATION || '',
+                  actualUse: ass.ACTUAL_USE || '',
+                  subClass: ass.SUB_CLASS || '',
+                  area: (ass.AREA || 0).toString(),
+                  unitValue: (ass.UNIT_VALUE || 0).toString(),
+                  baseMarketValue: (ass.MARKET_VAL || 0).toString(),
+                  adjustedMarketValue: (ass.MARKET_VAL || 0).toString(),
+                  assessmentLevel: (ass.ASS_LEVEL || 0).toString(),
+                  assessedValue: (ass.ASS_VALUE || 0).toString(),
+                  taxability: ass.TAXABILITY || 'Taxable',
+                }))}
+                summary={{
+                  totalArea: assessmentRecords.reduce((acc, curr) => acc + (curr.AREA || 0), 0),
+                  totalAdjustedMarketValue: assessmentRecords.reduce((acc, curr) => acc + ((curr as any).ADJ_MARKET_VAL || curr.MARKET_VAL || 0), 0),
+                  totalAssessedValue: assessmentRecords.reduce((acc, curr) => acc + (curr.ASS_VALUE || 0), 0),
+                }}
+              />
+            ) : (
+            <PrintDocument
+              propertyInfo={{
+                ownerName: selectedRecord.owner || '',
+                ownerAddress: selectedRecord.Owner_Address || '',
+                ownerTin: selectedRecord.Owner_TIN || '',
+                ownerTel: selectedRecord.Owner_Tel_no || '',
+                adminName: (selectedRecord as any).ADMIN_NAME || selectedRecord.ADMIN_NO || '',
+                adminAddress: selectedRecord.ADMIN_ADDRESS || '',
+                adminTin: selectedRecord.ADMIN_TIN || '',
+                adminTel: selectedRecord.ADMIN_TEL || '',
+                pin: selectedRecord.PIN || selectedRecord.pPin || '',
+                tdNo: selectedRecord.TDN || selectedRecord.pNewTdn || '',
+                arpNo: selectedRecord.ARP || '',
+                transactionCode: selectedRecord.TRANS_CD || 'GR',
+                octTctNo: selectedRecord.CER_TIT_NO || '',
+                octTctDate: selectedRecord.TCT_DATE || '',
+                cadLotNo: selectedRecord.CAD_LOT_NO || '',
+                lotNo: selectedRecord.LOTE_NO || '',
+                cloaCscNo: selectedRecord.CLOA_NO || '',
+                cloaDate: selectedRecord.CLOA_DATE || '',
+                surveyNo: selectedRecord.ASS_LOT_NO || '',
+                blockNo: selectedRecord.BLOCK_NO || '',
+                location: {
+                  street: selectedRecord.STREET || '',
+                  barangay: selectedRecord.barangay || '',
+                  municipality: (selectedRecord as any).CITY || (selectedRecord.cityCode === '053' ? 'Tubay' : selectedRecord.cityCode) || 'Tubay',
+                  province: (selectedRecord as any).PROV || 'Agusan del Norte',
                 },
                 boundaries: {
                   north: selectedRecord.NORTH || '',
@@ -1511,7 +1621,7 @@ const RealPropertyDataEntry: React.FC = () => {
                 totalAssessedValue: assessmentRecords.reduce((acc, curr) => acc + (curr.ASS_VALUE || 0), 0),
               }}
             />
-          )}
+          ))}
         </div>
       </div>
     </div>
