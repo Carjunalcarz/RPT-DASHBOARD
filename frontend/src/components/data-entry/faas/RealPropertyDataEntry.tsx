@@ -944,7 +944,7 @@ const RealPropertyDataEntry: React.FC = () => {
   return (
     <div className="h-full flex flex-col" data-testid="real-property-data-entry">
       {/* Main Toolbar */}
-      <div className="bg-transparent border-b border-slate-200 dark:border-slate-700 px-3 py-2">
+      <div className="bg-transparent  dark:border-slate-700 px-3 py-2">
         <div className="flex flex-wrap items-center gap-1">
           {/* FAAS/TDN Button */}
           <button className="px-3 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 font-medium">

@@ -406,10 +406,6 @@ const PrintBuildingDocument: React.FC<PrintBuildingDocumentProps> = ({
                       <span className="whitespace-nowrap mr-1">Others (Specify)</span>
                       <div className="border-b border-black flex-grow flex justify-between items-center px-1">
                          <span>{!['Steel', 'Reinforced Concrete', 'Plain Concrete'].includes(mainStruc.Foundation || '') ? mainStruc.Foundation : ''}</span>
-                         <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M12 19l7-7 3 3-7 7-3-3zM18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
-                            <path d="M2 2l7.5 8.6L13 18l5-5" />
-                         </svg>
                       </div>
                    </div>
                 </div>
@@ -437,9 +433,6 @@ const PrintBuildingDocument: React.FC<PrintBuildingDocumentProps> = ({
                       <span className="whitespace-nowrap mr-1">Others (Specify)</span>
                       <div className="border-b border-black flex-grow flex justify-between items-center px-1">
                          <span>{!['Steel', 'Reinforced Concrete', 'Wood'].includes(mainStruc.Posts || '') ? mainStruc.Posts : ''}</span>
-                         <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M12 19l7-7 3 3-7 7-3-3zM18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
-                         </svg>
                       </div>
                    </div>
                 </div>
@@ -467,9 +460,6 @@ const PrintBuildingDocument: React.FC<PrintBuildingDocumentProps> = ({
                       <span className="whitespace-nowrap mr-1">Others (Specify)</span>
                       <div className="border-b border-black flex-grow flex justify-between items-center px-1">
                          <span>{!['Steel', 'Reinforced Concrete', 'Wood'].includes(mainStruc.Beams || '') ? mainStruc.Beams : ''}</span>
-                         <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M12 19l7-7 3 3-7 7-3-3zM18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
-                         </svg>
                       </div>
                    </div>
                 </div>
@@ -495,9 +485,6 @@ const PrintBuildingDocument: React.FC<PrintBuildingDocumentProps> = ({
                       <span className="whitespace-nowrap mr-1">Others (Specify)</span>
                       <div className="border-b border-black flex-grow flex justify-between items-center px-1">
                          <span>{mainStruc.Truss_Framing !== 'Wood' ? mainStruc.Truss_Framing : ''}</span>
-                         <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M12 19l7-7 3 3-7 7-3-3zM18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
-                         </svg>
                       </div>
                    </div>
                 </div>
@@ -533,9 +520,6 @@ const PrintBuildingDocument: React.FC<PrintBuildingDocumentProps> = ({
                       <span className="whitespace-nowrap mr-1">Others (Specify)</span>
                       <div className="border-b border-black flex-grow flex justify-between items-center px-1">
                          <span></span>
-                         <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M12 19l7-7 3 3-7 7-3-3zM18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
-                         </svg>
                       </div>
                    </div>
                 </div>
@@ -577,9 +561,6 @@ const PrintBuildingDocument: React.FC<PrintBuildingDocumentProps> = ({
                       <div className="flex-1 px-1 flex items-end">
                          <span className="whitespace-nowrap mr-1 text-[6pt]">Others (Specify)</span>
                          <div className="border-b border-black w-8 flex items-center">
-                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                               <path d="M12 19l7-7 3 3-7 7-3-3zM18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
-                            </svg>
                          </div>
                       </div>
                       <div className="flex gap-1 pr-1">
@@ -629,9 +610,6 @@ const PrintBuildingDocument: React.FC<PrintBuildingDocumentProps> = ({
                       <div className="flex-1 px-1 flex items-end">
                          <span className="whitespace-nowrap mr-1 text-[6pt]">Others (Specify)</span>
                          <div className="border-b border-black flex-grow flex items-center justify-end px-1">
-                             <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                               <path d="M12 19l7-7 3 3-7 7-3-3zM18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
-                            </svg>
                          </div>
                       </div>
                       <div className="flex gap-1 pr-1">
@@ -739,7 +717,7 @@ const PrintBuildingDocument: React.FC<PrintBuildingDocumentProps> = ({
             </tbody>
           </table>
 
-          <div className="faas-row border-b bg-slate-50">
+          <div className="faas-row border-b">
             <div className="faas-col faas-col-3 border-r">
                <span className="faas-label">Taxable:</span>
                <span className="faas-value font-bold">{propertyInfo.backPart.taxable ? 'YES' : 'NO'}</span>
@@ -758,51 +736,67 @@ const PrintBuildingDocument: React.FC<PrintBuildingDocumentProps> = ({
             </div>
           </div>
 
-          {/* Signatories at the top of the section per image */}
-          <div className="faas-row py-4 border-b">
-             <div className="faas-col faas-col-4">
-                <div className="text-[7pt] font-bold mb-4 uppercase">Appraised/Assessed By:</div>
-                <div className="w-40 border-b border-black text-center pt-2">
-                   <span className="italic text-[7pt]">{propertyInfo.backPart.signatories.appraiser || ''}</span>
+          {/* Signatories exactly as per image */}
+          <div className="py-2 border-b space-y-4 px-4">
+             {/* First Row: Appraised and Recommending */}
+             <div className="flex justify-between items-start">
+                <div className="flex-1 max-w-[45%]">
+                   <div className="text-[7pt] font-bold mb-2 uppercase text-left">APPRAISED/ASSESSED BY:</div>
+                   <div className="flex gap-4 items-end pr-4">
+                      <div className="flex-1 border-b border-black text-center min-h-[16px]">
+                         <span className="text-[8pt] font-medium">{propertyInfo.backPart.signatories.appraiser || ''}</span>
+                      </div>
+                      <div className="w-24 border-b border-black text-center min-h-[16px]">
+                         <span className="text-[8pt]">{formatDate(propertyInfo.backPart.signatories.appraiserDate)}</span>
+                      </div>
+                   </div>
+                   <div className="flex gap-4 text-[7pt] mt-1 pr-4">
+                      <div className="flex-1"></div>
+                      <div className="w-24 text-center">Date</div>
+                   </div>
                 </div>
-                <div className="flex justify-between w-40 text-[6pt] mt-1">
-                   <span></span>
-                   <span className="border-t border-black px-4">Date</span>
+
+                <div className="flex-1 max-w-[45%]">
+                   <div className="text-[7pt] font-bold mb-2 uppercase text-left">RECOMMENDING APPROVAL:</div>
+                   <div className="flex gap-4 items-end pl-4">
+                      <div className="flex-1 border-b border-black text-center min-h-[16px]">
+                         <span className="text-[8pt] font-bold uppercase">{propertyInfo.backPart.signatories.recommending || 'FELIX S. BALANSAG, JR.'}</span>
+                      </div>
+                      <div className="w-24 border-b border-black text-center min-h-[16px]">
+                         <span className="text-[8pt]"></span>
+                      </div>
+                   </div>
+                   <div className="flex gap-4 text-[7pt] mt-1 pl-4">
+                      <div className="flex-1 text-center italic text-slate-700">MUNICIPAL ASSESSOR</div>
+                      <div className="w-24 text-center">Date</div>
+                   </div>
                 </div>
              </div>
 
-             <div className="faas-col faas-col-4">
-                <div className="text-[7pt] font-bold mb-4 uppercase">Recommending Approval:</div>
-                <div className="w-40 border-b border-black text-center pt-2">
-                   <span className="font-bold text-[7pt] uppercase">{propertyInfo.backPart.signatories.recommending || ''}</span>
+             {/* Second Row: Approved By */}
+             <div className="max-w-[60%]">
+                <div className="text-[7pt] font-bold mb-2 uppercase text-left">APPROVED BY:</div>
+                <div className="flex gap-4 items-end ml-16 pr-4">
+                   <div className="flex-1 border-b border-black text-center min-h-[16px]">
+                      <span className="text-[8pt] font-bold uppercase whitespace-nowrap">{propertyInfo.backPart.signatories.approver || 'JUNIE P. VINATERO, REA'}</span>
+                   </div>
+                   <div className="w-24 border-b border-black text-center min-h-[16px]">
+                      <span className="text-[8pt]">{propertyInfo.backPart.signatories.approverDate !== 'N/A' ? formatDate(propertyInfo.backPart.signatories.approverDate) : ''}</span>
+                   </div>
                 </div>
-                <div className="flex justify-between w-40 text-[6pt] mt-1">
-                   <span className="text-center flex-1">MUNICIPAL ASSESSOR</span>
-                   <span className="border-t border-black px-4">{formatDate(propertyInfo.backPart.signatories.recommendingDate)}</span>
-                </div>
-             </div>
-
-             <div className="faas-col faas-col-4">
-                <div className="text-[7pt] font-bold mb-4 uppercase">Approved By:</div>
-                <div className="w-40 border-b border-black text-center pt-2">
-                   <span className="font-bold text-[7pt] uppercase">{propertyInfo.backPart.signatories.approver || ''}</span>
-                </div>
-                <div className="flex justify-between w-40 text-[6pt] mt-1">
-                   <span className="text-center flex-1">Provincial Assessor</span>
-                   <span className="border-t border-black px-4">{formatDate(propertyInfo.backPart.signatories.approverDate)}</span>
+                <div className="flex gap-4 text-[7pt] mt-1 ml-16 pr-4">
+                   <div className="flex-1 text-center italic font-bold">Provincial Assessor</div>
+                   <div className="w-24 text-center">Date</div>
                 </div>
              </div>
           </div>
 
           {/* Memoranda Section */}
-          <div className="p-2 border-b">
+          <div className="p-2 border-b min-h-[60px]">
             <div className="text-[7pt] font-bold mb-1">MEMORANDA:</div>
-            <div className="text-[7pt] leading-tight min-h-[40px]">
+            <div className="text-[7pt] leading-tight">
                {propertyInfo.backPart.memoranda || ''}
             </div>
-            <div className="text-[7pt] font-bold underline mt-2"></div>
-            <div className="border-b border-slate-300 w-full mt-4"></div>
-            <div className="text-[6pt] italic mt-1">(continue at the back)</div>
           </div>
 
           <div className="faas-row p-2 border-b">
@@ -811,7 +805,7 @@ const PrintBuildingDocument: React.FC<PrintBuildingDocumentProps> = ({
              </div>
              <div className="faas-col faas-col-6">
                 <div className="flex justify-end gap-4 mt-4">
-                   <div className="w-32 border-b border-black"></div>
+                   <div className="w-32 border-b border-black text-center text-[8pt]">{propertyInfo.backPart.superseded.effectivity}</div>
                    <div className="text-[7pt]">Date</div>
                 </div>
              </div>

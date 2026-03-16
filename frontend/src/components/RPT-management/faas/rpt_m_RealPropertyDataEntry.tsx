@@ -14,6 +14,7 @@ import { getRptAssByTdn, RptAssRecord } from '@/services/rptAssService';
 import PropertyDetailsView from './rpt_m_PropertyDetailsView';
 import PrintDocument from '../rpt_m_PrintDocument';
 import PrintBuildingDocument from '../rpt_m_PrintBuildingDocument';
+import PrintEmptyFormsDropdown from '../rpt_m_PrintEmptyFormsDropdown';
 import { getBldgStrucByTdn, BldgStrucRecord } from '@/services/bldgStrucService';
 import { getBldgAdjByTdn, BldgAdjRecord } from '@/services/bldgAdjService';
 import { toast } from 'sonner';
@@ -891,12 +892,30 @@ const RealPropertyDataEntry: React.FC = () => {
     documentTitle: `FAAS_${selectedRecord?.TDN || 'Record'}`,
   });
 
+  const emptyPrintRef = useRef<HTMLDivElement>(null);
+  const handleEmptyPrint = useReactToPrint({
+    contentRef: emptyPrintRef,
+    documentTitle: 'Empty_Building_FAAS',
+  });
+
+  const emptyLandPrintRef = useRef<HTMLDivElement>(null);
+  const handleEmptyLandPrint = useReactToPrint({
+    contentRef: emptyLandPrintRef,
+    documentTitle: 'Empty_Land_FAAS',
+  });
+
+  const emptyMachineryPrintRef = useRef<HTMLDivElement>(null);
+  const handleEmptyMachineryPrint = useReactToPrint({
+    contentRef: emptyMachineryPrintRef,
+    documentTitle: 'Empty_Machinery_FAAS',
+  });
+
   const isFormEnabled = isEditing || isAdding;
 
   return (
     <div className="h-full flex flex-col" data-testid="real-property-data-entry">
       {/* Main Toolbar */}
-      <div className="bg-transparent border-b border-slate-200 dark:border-slate-700 px-3 py-2">
+      <div className="bg-transparent  dark:border-slate-700 px-3 py-2">
         <div className="flex flex-wrap items-center gap-1">
           {/* FAAS/TDN Button */}
           <button className="px-3 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 font-medium">
@@ -1026,6 +1045,12 @@ const RealPropertyDataEntry: React.FC = () => {
             <Printer size={14} />
             Print
           </button>
+          
+          <PrintEmptyFormsDropdown 
+            onPrintBuilding={handleEmptyPrint} 
+            onPrintLand={handleEmptyLandPrint}
+            onPrintMachinery={handleEmptyMachineryPrint}
+          />
           
           <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1" />
           
@@ -1622,6 +1647,226 @@ const RealPropertyDataEntry: React.FC = () => {
               }}
             />
           ))}
+        </div>
+
+        {/* Empty Building Document for "Empty Bldg" print */}
+        <div ref={emptyPrintRef}>
+          <PrintBuildingDocument
+            propertyInfo={{
+              ownerName: '',
+              ownerAddress: '',
+              ownerTin: '',
+              ownerTel: '',
+              adminName: '',
+              adminAddress: '',
+              adminTin: '',
+              adminTel: '',
+              pin: '',
+              tdNo: '',
+              arpNo: '',
+              transactionCode: '',
+              octTctNo: '',
+              octTctDate: '',
+              cadLotNo: '',
+              lotNo: '',
+              cloaCscNo: '',
+              cloaDate: '',
+              surveyNo: '',
+              blockNo: '',
+              location: {
+                street: '',
+                barangay: '',
+                municipality: '',
+                province: '',
+              },
+              backPart: {
+                taxable: false,
+                exempt: false,
+                effQtr: '',
+                effYear: '',
+                memoranda: '',
+                superseded: {
+                  pin: '',
+                  tdNo: '',
+                  landValue: 0,
+                  impvtValue: 0,
+                  totalValue: 0,
+                  previousOwner: '',
+                  effectivity: '',
+                  arPageNo: '',
+                  recordingPersonnel: '',
+                },
+                signatories: {
+                  appraiser: '',
+                  appraiserDate: '',
+                  recommending: 'FELIX S. BALANSAG, JR.',
+                  recommendingDate: '',
+                  approver: 'JUNIE P. VINATERO, REA',
+                  approverDate: '',
+                },
+              },
+              effectivityDate: '',
+              declarationDate: '',
+            }}
+            bldgStruc={[]}
+            bldgAdj={[]}
+            assessmentRows={[]}
+            summary={{
+              totalArea: 0,
+              totalAdjustedMarketValue: 0,
+              totalAssessedValue: 0,
+            }}
+          />
+        </div>
+
+        {/* Empty Land Document */}
+        <div ref={emptyLandPrintRef}>
+          <PrintDocument
+            propertyInfo={{
+              ownerName: '',
+              ownerAddress: '',
+              ownerTin: '',
+              ownerTel: '',
+              adminName: '',
+              adminAddress: '',
+              adminTin: '',
+              adminTel: '',
+              pin: '',
+              tdNo: '',
+              arpNo: '',
+              transactionCode: '',
+              octTctNo: '',
+              octTctDate: '',
+              cadLotNo: '',
+              lotNo: '',
+              cloaCscNo: '',
+              cloaDate: '',
+              surveyNo: '',
+              blockNo: '',
+              location: {
+                street: '',
+                barangay: '',
+                municipality: '',
+                province: '',
+              },
+              boundaries: {
+                north: '',
+                east: '',
+                south: '',
+                west: '',
+              },
+              backPart: {
+                taxable: false,
+                exempt: false,
+                effQtr: '',
+                effYear: '',
+                memoranda: '',
+                superseded: {
+                  pin: '',
+                  tdNo: '',
+                  landValue: 0,
+                  impvtValue: 0,
+                  totalValue: 0,
+                  previousOwner: '',
+                  effectivity: '',
+                  arPageNo: '',
+                  recordingPersonnel: '',
+                },
+                signatories: {
+                  appraiser: '',
+                  appraiserDate: '',
+                  recommending: 'FELIX S. BALANSAG, JR.',
+                  recommendingDate: '',
+                  approver: 'JUNIE P. VINATERO, REA',
+                  approverDate: '',
+                },
+              },
+              effectivityDate: '',
+              declarationDate: '',
+            }}
+            assessmentRows={[]}
+            summary={{
+              totalArea: 0,
+              totalAdjustedMarketValue: 0,
+              totalAssessedValue: 0,
+            }}
+            reportTitle="LAND & OTHER IMPROVEMENTS"
+          />
+        </div>
+
+        {/* Empty Machinery Document */}
+        <div ref={emptyMachineryPrintRef}>
+          <PrintDocument
+            propertyInfo={{
+              ownerName: '',
+              ownerAddress: '',
+              ownerTin: '',
+              ownerTel: '',
+              adminName: '',
+              adminAddress: '',
+              adminTin: '',
+              adminTel: '',
+              pin: '',
+              tdNo: '',
+              arpNo: '',
+              transactionCode: '',
+              octTctNo: '',
+              octTctDate: '',
+              cadLotNo: '',
+              lotNo: '',
+              cloaCscNo: '',
+              cloaDate: '',
+              surveyNo: '',
+              blockNo: '',
+              location: {
+                street: '',
+                barangay: '',
+                municipality: '',
+                province: '',
+              },
+              boundaries: {
+                north: '',
+                east: '',
+                south: '',
+                west: '',
+              },
+              backPart: {
+                taxable: false,
+                exempt: false,
+                effQtr: '',
+                effYear: '',
+                memoranda: '',
+                superseded: {
+                  pin: '',
+                  tdNo: '',
+                  landValue: 0,
+                  impvtValue: 0,
+                  totalValue: 0,
+                  previousOwner: '',
+                  effectivity: '',
+                  arPageNo: '',
+                  recordingPersonnel: '',
+                },
+                signatories: {
+                  appraiser: '',
+                  appraiserDate: '',
+                  recommending: 'FELIX S. BALANSAG, JR.',
+                  recommendingDate: '',
+                  approver: 'JUNIE P. VINATERO, REA',
+                  approverDate: '',
+                },
+              },
+              effectivityDate: '',
+              declarationDate: '',
+            }}
+            assessmentRows={[]}
+            summary={{
+              totalArea: 0,
+              totalAdjustedMarketValue: 0,
+              totalAssessedValue: 0,
+            }}
+            reportTitle="MACHINERY ASSESSMENT"
+          />
         </div>
       </div>
     </div>

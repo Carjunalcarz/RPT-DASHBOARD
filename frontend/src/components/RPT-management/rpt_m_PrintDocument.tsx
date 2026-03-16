@@ -102,6 +102,7 @@ interface PrintDocumentProps {
     totalAdjustedMarketValue: number;
     totalAssessedValue: number;
   };
+  reportTitle?: string;
 }
 
 const PrintDocument: React.FC<PrintDocumentProps> = ({
@@ -111,6 +112,7 @@ const PrintDocument: React.FC<PrintDocumentProps> = ({
   valueAdjustmentRows = [],
   propertyAssessmentRows = [],
   summary,
+  reportTitle = 'LAND & OTHER IMPROVEMENTS',
 }) => {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-PH', {
@@ -128,7 +130,7 @@ const PrintDocument: React.FC<PrintDocumentProps> = ({
   };
 
   const formatDate = (dateStr: string) => {
-    if (!dateStr) return 'N/A';
+    if (!dateStr) return '';
     try {
       const date = new Date(dateStr);
       if (isNaN(date.getTime())) return dateStr;
@@ -182,7 +184,7 @@ const PrintDocument: React.FC<PrintDocumentProps> = ({
             </div>
             <div className="faas-header-text">
               <div className="faas-country">REPUBLIC OF THE PHILIPPINES | FIELD APPRAISAL & ASSESSMENT REPORT</div>
-              <div className="faas-report-title">LAND & OTHER IMPROVEMENTS</div>
+              <div className="faas-report-title uppercase">{reportTitle}</div>
             </div>
           </div>
 
@@ -522,38 +524,57 @@ const PrintDocument: React.FC<PrintDocumentProps> = ({
             </div>
           </div>
 
-          {/* Signatories at the top of the section per image */}
-          <div className="faas-row py-4 border-b">
-             <div className="faas-col faas-col-4">
-                <div className="text-[7pt] font-bold mb-4 uppercase">Appraised/Assessed By:</div>
-                <div className="w-40 border-b border-black text-center pt-2">
-                   <span className="italic text-[7pt]">{propertyInfo.backPart.signatories.appraiser || ''}</span>
+          {/* Signatories exactly as per image */}
+          <div className="py-2 border-b space-y-4 px-4">
+             {/* First Row: Appraised and Recommending */}
+             <div className="flex justify-between items-start">
+                <div className="flex-1 max-w-[45%]">
+                   <div className="text-[7pt] font-bold mb-2 uppercase text-left">APPRAISED/ASSESSED BY:</div>
+                   <div className="flex gap-4 items-end pr-4">
+                      <div className="flex-1 border-b border-black text-center min-h-[16px]">
+                         <span className="text-[8pt] font-medium italic">{propertyInfo.backPart.signatories.appraiser || ''}</span>
+                      </div>
+                      <div className="w-24 border-b border-black text-center min-h-[16px]">
+                         <span className="text-[8pt]">{propertyInfo.backPart.signatories.appraiserDate !== 'N/A' ? formatDate(propertyInfo.backPart.signatories.appraiserDate) : ''}</span>
+                      </div>
+                   </div>
+                   <div className="flex gap-4 text-[7pt] mt-1 pr-4">
+                      <div className="flex-1"></div>
+                      <div className="w-24 text-center">Date</div>
+                   </div>
                 </div>
-                <div className="flex justify-between w-40 text-[6pt] mt-1">
-                   <span></span>
-                   <span className="border-t border-black px-4">Date</span>
+
+                <div className="flex-1 max-w-[45%]">
+                   <div className="text-[7pt] font-bold mb-2 uppercase text-left">RECOMMENDING APPROVAL:</div>
+                   <div className="flex gap-4 items-end pl-4">
+                      <div className="flex-1 border-b border-black text-center min-h-[16px]">
+                         <span className="text-[8pt] font-bold uppercase">{propertyInfo.backPart.signatories.recommending || 'FELIX S. BALANSAG, JR.'}</span>
+                      </div>
+                      <div className="w-24 border-b border-black text-center min-h-[16px]">
+                         <span className="text-[8pt]">{propertyInfo.backPart.signatories.recommendingDate !== 'N/A' ? formatDate(propertyInfo.backPart.signatories.recommendingDate) : ''}</span>
+                      </div>
+                   </div>
+                   <div className="flex gap-4 text-[7pt] mt-1 pl-4">
+                      <div className="flex-1 text-center italic text-slate-700 font-bold">MUNICIPAL ASSESSOR</div>
+                      <div className="w-24 text-center">Date</div>
+                   </div>
                 </div>
              </div>
 
-             <div className="faas-col faas-col-4">
-                <div className="text-[7pt] font-bold mb-4 uppercase">Recommending Approval:</div>
-                <div className="w-40 border-b border-black text-center pt-2">
-                   <span className="font-bold text-[7pt] uppercase">{propertyInfo.backPart.signatories.recommending || 'FELIX S. BALANSAG, JR.'}</span>
+             {/* Second Row: Approved By */}
+             <div className="max-w-[60%]">
+                <div className="text-[7pt] font-bold mb-2 uppercase text-left">APPROVED BY:</div>
+                <div className="flex gap-4 items-end ml-16 pr-4">
+                   <div className="flex-1 border-b border-black text-center min-h-[16px]">
+                      <span className="text-[8pt] font-bold uppercase whitespace-nowrap">{propertyInfo.backPart.signatories.approver || 'JUNIE P. VINATERO, REA'}</span>
+                   </div>
+                   <div className="w-24 border-b border-black text-center min-h-[16px]">
+                      <span className="text-[8pt]">{propertyInfo.backPart.signatories.approverDate !== 'N/A' ? formatDate(propertyInfo.backPart.signatories.approverDate) : ''}</span>
+                   </div>
                 </div>
-                <div className="flex justify-between w-40 text-[6pt] mt-1">
-                   <span className="text-center flex-1">MUNICIPAL ASSESSOR</span>
-                   <span className="border-t border-black px-4">{formatDate(propertyInfo.backPart.signatories.recommendingDate)}</span>
-                </div>
-             </div>
-
-             <div className="faas-col faas-col-4">
-                <div className="text-[7pt] font-bold mb-4 uppercase">Approved By:</div>
-                <div className="w-40 border-b border-black text-center pt-2">
-                   <span className="font-bold text-[7pt] uppercase">{propertyInfo.backPart.signatories.approver || 'JUNIE P. VINATERO, REA'}</span>
-                </div>
-                <div className="flex justify-between w-40 text-[6pt] mt-1">
-                   <span className="text-center flex-1">Provincial Assessor</span>
-                   <span className="border-t border-black px-4">{formatDate(propertyInfo.backPart.signatories.approverDate)}</span>
+                <div className="flex gap-4 text-[7pt] mt-1 ml-16 pr-4">
+                   <div className="flex-1 text-center italic font-bold">Provincial Assessor</div>
+                   <div className="w-24 text-center">Date</div>
                 </div>
              </div>
           </div>

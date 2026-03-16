@@ -407,9 +407,13 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
 
   // Handle Print
   const handlePrint = () => {
+    // If running in the new structure with onPrint prop, use it (for main document print)
     if (onPrint) {
       onPrint();
     } else {
+      // Fallback or specific building print logic if needed
+      // But typically we want to print the full FAAS document which is handled by the parent
+      // If this is standalone, we can trigger a print of just this section or show a modal
       window.print();
     }
   };
