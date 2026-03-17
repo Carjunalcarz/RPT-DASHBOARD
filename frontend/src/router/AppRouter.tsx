@@ -205,6 +205,26 @@ const AppRouter: React.FC = () => {
           }
         />
         <Route
+          path="/approvals/municipal"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <PendingApprovals fixedStatus="pending-municipal" />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/approvals/provincial"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <PendingApprovals fixedStatus="pending-provincial" />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/property-approval/:id"
           element={
             <ProtectedRoute>

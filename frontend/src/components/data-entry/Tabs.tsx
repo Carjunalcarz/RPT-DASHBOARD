@@ -13,7 +13,7 @@ interface TabsProps {
 
 const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onTabChange }) => {
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-t-lg border-b border-slate-200 dark:border-slate-800 mb-0">
+    <div className="bg-white dark:bg-slate-900 rounded-t-lg shadow-sm mb-0">
       <div className="flex flex-wrap gap-1 px-2 pt-2">
         {tabs.map((tab) => (
           <button

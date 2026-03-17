@@ -1,5 +1,5 @@
-import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useSidebar } from '@/context/SidebarContext';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -17,7 +17,8 @@ import {
   Package,
   UserCog,
   Database,
-  CheckCircle
+  CheckCircle,
+  ChevronDown
 } from 'lucide-react';
 
 interface MenuItem {
@@ -35,7 +36,6 @@ const menuItems: MenuItem[] = [
   { path: '/reports', label: 'Reports', icon: BarChart3 },
   { path: '/data-entry', label: 'Data Entry (Legacy)', icon: ClipboardEdit },
   { path: '/rpt-management', label: 'RPT Management', icon: Database },
-  { path: '/approvals', label: 'Approvals', icon: CheckCircle },
   { path: '/items', label: 'Items', icon: Package },
   { path: '/tasks', label: 'Tasks', icon: CheckSquare },
   { path: '/audit-trail', label: 'Audit Trail', icon: FileClock },
@@ -44,31 +44,164 @@ const menuItems: MenuItem[] = [
 ];
 
 const Sidebar: React.FC = () => {
-  const { isCollapsed } = useSidebar();
+  const { isCollapsed, setIsCollapsed } = useSidebar();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [isApprovingExpanded, setIsApprovingExpanded] = useState(false);
+  const [shouldFocusApprovalsChild, setShouldFocusApprovalsChild] = useState(false);
+  const municipalityRef = useRef<HTMLAnchorElement | null>(null);
+
+  const isApprovingActive = useMemo(() => {
+    return location.pathname.startsWith('/approvals') || location.pathname.startsWith('/property-approval');
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (isCollapsed) return;
+    if (isApprovingActive) {
+      setIsApprovingExpanded(true);
+    }
+  }, [isApprovingActive, isCollapsed]);
+
+  useEffect(() => {
+    if (isCollapsed) return;
+    if (!isApprovingExpanded) return;
+    if (!shouldFocusApprovalsChild) return;
+
+    requestAnimationFrame(() => {
+      municipalityRef.current?.focus();
+      setShouldFocusApprovalsChild(false);
+    });
+  }, [isCollapsed, isApprovingExpanded, shouldFocusApprovalsChild]);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
+  const filteredMenuItems = useMemo(() => {
+    return menuItems.filter(item => {
+      if (item.adminOnly) {
+        return user?.role && ['admin', 'administrator'].includes(user.role.toLowerCase());
+      }
+      return true;
+    });
+  }, [user?.role]);
+
+  const handleApprovingParentClick = () => {
+    if (isCollapsed) {
+      setIsCollapsed(false);
+      setIsApprovingExpanded(true);
+      setShouldFocusApprovalsChild(true);
+      return;
+    }
+
+    setIsApprovingExpanded(prev => {
+      const next = !prev;
+      if (next) setShouldFocusApprovalsChild(true);
+      return next;
+    });
+  };
+
   return (
     <aside
       data-testid="sidebar"
-      className={`fixed left-0 top-16 h-[calc(100%-4rem)] bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl border-r border-white/30 dark:border-slate-800/70 shadow-[0_8px_30px_rgba(15,23,42,0.08)] transition-all duration-300 ease-in-out z-20 ${
+      className={`fixed left-0 top-16 h-[calc(100%-4rem)] bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl shadow-[0_8px_30px_rgba(15,23,42,0.08)] transition-all duration-300 ease-in-out z-20 ${
         isCollapsed ? 'w-16' : 'w-64'
       }`}
     >
       <div className="flex flex-col h-full">
         {/* Navigation Menu */}
         <nav className="flex-1 px-2 py-4 overflow-y-auto">
-          {menuItems.filter(item => {
-            if (item.adminOnly) {
-              return user?.role && ['admin', 'administrator'].includes(user.role.toLowerCase());
-            }
-            return true;
-          }).map((item) => {
+          {filteredMenuItems.slice(0, 7).map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-2.5 my-1 rounded-lg transition-colors ${
+                    isActive
+                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  }`
+                }
+              >
+                <Icon size={20} className="flex-shrink-0" />
+                {!isCollapsed && (
+                  <span className="text-sm font-medium">{item.label}</span>
+                )}
+              </NavLink>
+            );
+          })}
+
+          <div>
+            <button
+              type="button"
+              onClick={handleApprovingParentClick}
+              data-testid="nav-approving-parent"
+              aria-expanded={!isCollapsed && isApprovingExpanded}
+              aria-controls="approving-children"
+              className={`w-full flex items-center gap-3 px-3 py-2.5 my-1 rounded-lg transition-colors ${
+                isApprovingActive
+                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+              }`}
+            >
+              <CheckCircle size={20} className="flex-shrink-0" />
+              {!isCollapsed && (
+                <>
+                  <span className="text-sm font-medium flex-1 text-left">Approving Parent</span>
+                  <ChevronDown
+                    size={18}
+                    className={`transition-transform ${isApprovingExpanded ? 'rotate-180' : ''}`}
+                  />
+                </>
+              )}
+            </button>
+
+            {!isCollapsed && (
+              <div
+                id="approving-children"
+                className={`ml-6 pl-2 transition-all duration-200 ease-in-out ${
+                  isApprovingExpanded
+                    ? 'max-h-40 opacity-100 border-l border-slate-200 dark:border-slate-700'
+                    : 'max-h-0 opacity-0 overflow-hidden pointer-events-none border-l border-transparent'
+                }`}
+              >
+                <NavLink
+                  to="/approvals/municipal"
+                  data-testid="nav-municipality"
+                  ref={municipalityRef}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-3 py-2 my-1 rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <span className="text-sm font-medium">Municipality</span>
+                </NavLink>
+                <NavLink
+                  to="/approvals/provincial"
+                  data-testid="nav-province"
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-3 py-2 my-1 rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                  <span className="text-sm font-medium">Province</span>
+                </NavLink>
+              </div>
+            )}
+          </div>
+
+          {filteredMenuItems.slice(7).map((item) => {
             const Icon = item.icon;
             return (
               <NavLink
@@ -91,7 +224,7 @@ const Sidebar: React.FC = () => {
             );
           })}
         </nav>
-        <div className="px-2 py-3 border-t border-slate-200 dark:border-slate-800">
+        <div className="px-2 py-3">
           {isCollapsed ? (
             <div className="flex justify-center">
               <button

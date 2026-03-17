@@ -945,20 +945,11 @@ const RealPropertyDataEntry: React.FC = () => {
     <div className="h-full flex flex-col" data-testid="real-property-data-entry">
       {/* Main Toolbar */}
       <div className="bg-transparent  dark:border-slate-700 px-3 py-2">
-        <div className="flex flex-wrap items-center gap-1">
-          {/* FAAS/TDN Button */}
-          <button className="px-3 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 font-medium">
-            <FileText size={14} />
-            FAAS/TDN
-          </button>
-          
-          <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1" />
-          
-          {/* CRUD Buttons */}
+        <div className="min-w-0 flex items-center gap-2 flex-nowrap overflow-x-auto pb-2 pr-2">
           <button
             onClick={handleAdd}
             disabled={isFormEnabled}
-            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-green-50 dark:hover:bg-green-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-green-700 dark:text-green-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-green-50 dark:hover:bg-green-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-green-700 dark:text-green-400 disabled:opacity-50 disabled:cursor-not-allowed h-9 whitespace-nowrap"
             data-testid="btn-add"
           >
             <Plus size={14} />
@@ -968,7 +959,7 @@ const RealPropertyDataEntry: React.FC = () => {
           {isAdding && (
             <button
               onClick={handlePopulateDummy}
-              className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-purple-700 dark:text-purple-400"
+              className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-purple-700 dark:text-purple-400 h-9 whitespace-nowrap"
               title="Populate Dummy Data"
             >
               <Sparkles size={14} />
@@ -979,18 +970,17 @@ const RealPropertyDataEntry: React.FC = () => {
           <button
             onClick={() => setShowJson(true)}
             disabled={!selectedRecord}
-            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-orange-700 dark:text-orange-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-orange-50 dark:hover:bg-orange-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-orange-700 dark:text-orange-400 disabled:opacity-50 disabled:cursor-not-allowed h-9 whitespace-nowrap"
             title="Show JSON Data"
           >
             <Code size={14} />
             JSON
           </button>
 
-          {/* Edit/Delete Controls */}
           <button
             onClick={handleEdit}
             disabled={!selectedRecord || isFormEnabled || selectedRecord.status === 'for-review'}
-            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-blue-700 dark:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-blue-700 dark:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed h-9 whitespace-nowrap"
             data-testid="btn-edit"
           >
             <Edit2 size={14} />
@@ -1000,67 +990,64 @@ const RealPropertyDataEntry: React.FC = () => {
           <button
             onClick={handleDelete}
             disabled={!selectedRecord || isFormEnabled}
-            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-red-50 dark:hover:bg-red-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-red-600 dark:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-red-50 dark:hover:bg-red-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-red-600 dark:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed h-9 whitespace-nowrap"
             data-testid="btn-delete"
           >
             <Trash2 size={14} />
             Delete
           </button>
 
-          <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1" />
-
-          {/* Save/Cancel - Main Record Control */}
-          <button
-            onClick={handleSaveDraft}
-            disabled={!selectedRecord || selectedRecord.status === 'for-review' || selectedRecord.status === 'approved' || isSaving}
-            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-blue-700 dark:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Save as Draft (Work in Progress)"
-          >
-            {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            {isSaving ? 'Saving...' : 'Save Draft'}
-          </button>
-
-          <button
-            onClick={handleSubmit}
-            disabled={!isFormEnabled || isSubComponentEditing || isSaving}
-            className="px-3 py-2 text-xs bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="btn-submit"
-            title="Submit for Review"
-          >
-            {isSaving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
-            {isSaving ? 'Submitting...' : 'Submit'}
-          </button>
-          
-          {/* Cancel Changes */}
-          {selectedRecord && selectedRecord.id && selectedRecord.id.startsWith('TRANS') ? (
+          {isFormEnabled && (
             <button
-                onClick={handleCancel}
-                disabled={!selectedRecord}
-                className="px-3 py-2 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Cancel Transaction"
+              onClick={handleSaveDraft}
+              disabled={!selectedRecord || selectedRecord.status === 'for-review' || selectedRecord.status === 'approved' || isSaving}
+              className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-blue-700 dark:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed h-9 whitespace-nowrap"
+              title="Save as Draft (Work in Progress)"
             >
-                <X size={14} />
-                Cancel Transaction
-            </button>
-          ) : (
-            <button
-                onClick={handleCancel}
-                disabled={!isFormEnabled}
-                className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                data-testid="btn-cancel"
-            >
-                <X size={14} />
-                Cancel
+              {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              {isSaving ? 'Saving...' : 'Save Draft'}
             </button>
           )}
 
-          <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1" />
-          
-          {/* Utility Buttons */}
+          {isFormEnabled && (
+            <button
+              onClick={handleSubmit}
+              disabled={isSubComponentEditing || isSaving}
+              className="px-3 py-2 text-xs bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed h-9 whitespace-nowrap"
+              data-testid="btn-submit"
+              title="Submit for Review"
+            >
+              {isSaving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+              {isSaving ? 'Submitting...' : 'Submit'}
+            </button>
+          )}
+
+          {selectedRecord && selectedRecord.id && selectedRecord.id.startsWith('TRANS') ? (
+            <button
+              onClick={handleCancel}
+              disabled={!selectedRecord}
+              className="px-3 py-2 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed h-9 whitespace-nowrap"
+              title="Cancel Transaction"
+            >
+              <X size={14} />
+              Cancel Transaction
+            </button>
+          ) : isFormEnabled ? (
+            <button
+              onClick={handleCancel}
+              disabled={!isFormEnabled}
+              className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed h-9 whitespace-nowrap"
+              data-testid="btn-cancel"
+            >
+              <X size={14} />
+              Cancel
+            </button>
+          ) : null}
+
           <button
             onClick={handleRefresh}
             disabled={isValidating}
-            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-70"
+            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-70 h-9 whitespace-nowrap"
             data-testid="btn-refresh"
           >
             <RefreshCw size={14} className={isValidating ? "animate-spin" : ""} />
@@ -1068,38 +1055,29 @@ const RealPropertyDataEntry: React.FC = () => {
           </button>
           <button
             onClick={handlePrint}
-            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
+            className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 h-9 whitespace-nowrap"
             data-testid="btn-print"
           >
             <Printer size={14} />
             Print
           </button>
-          
-          <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1" />
-          
-          {/* Additional Actions */}
-          <button className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5">
+
+          <button className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 h-9 whitespace-nowrap">
             <Info size={14} />
             Other Info
           </button>
           <button 
             onClick={handleTransactionClick}
             disabled={!selectedRecord}
-            className="px-4 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all transform active:scale-95 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none ring-2 ring-blue-500/20"
+            className="px-3 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 whitespace-nowrap"
           >
-            <FileText size={16} strokeWidth={2.5} />
-            TRANSACTION
+            <FileText size={14} />
+            Transaction
           </button>
-          <button className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-purple-700 dark:text-purple-400">
+          <button className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-purple-700 dark:text-purple-400 h-9 whitespace-nowrap">
             <DollarSign size={14} />
             Payment Inq.
           </button>
-          
-          <div className="flex-1" />
-          
-          <div className="px-3 py-2 text-xs bg-cyan-600 text-white rounded-lg shadow-sm font-medium">
-            Number of Records: {totalRecords.toLocaleString()}
-          </div>
         </div>
       </div>
 
@@ -1179,7 +1157,7 @@ const RealPropertyDataEntry: React.FC = () => {
                         {record.status || 'N/A'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap truncate max-w-xs">{record.owner}</td>
+                    <td className="px-4 py-3 text-slate-700 dark:text-slate-300 whitespace-nowrap truncate max-w-xs">{record.owner}</td>
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap text-center">{record.cityCode}</td>
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap text-center">{record.barangayCode}</td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-400 whitespace-nowrap truncate max-w-xs">{record.barangay}</td>
@@ -1192,7 +1170,7 @@ const RealPropertyDataEntry: React.FC = () => {
           
           {/* Resize Handle */}
           <div
-            className={`w-full h-5 bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 cursor-row-resize flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors select-none ${isResizing ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
+            className={`w-full h-5 bg-slate-50 dark:bg-slate-800 cursor-row-resize flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors select-none ${isResizing ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
             onMouseDown={startResizing}
           >
             <div className="flex items-center gap-2 text-xs text-slate-400">
@@ -1204,7 +1182,7 @@ const RealPropertyDataEntry: React.FC = () => {
           </div>
           
           {/* Pagination */}
-          <div className="p-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+          <div className="p-2 bg-slate-50 dark:bg-slate-800/50">
              <DataTablePagination 
                pageIndex={pagination.page}
                pageSize={pagination.limit}

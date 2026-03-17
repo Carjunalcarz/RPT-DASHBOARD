@@ -144,7 +144,9 @@ describe('RealPropertyDataEntry Duplicate Handling', () => {
     await act(async () => {
         fireEvent.click(screen.getByTestId('btn-update-tdn'));
     });
-    await screen.findByText('duplicate-draft'); // Ensure state is updated
+    await waitFor(() => {
+      expect(screen.getByTestId('record-tdn').textContent).toContain('duplicate-draft');
+    });
 
     // 3. Click Save Draft (using the real button in the toolbar)
     const saveBtn = screen.getByText('Save Draft'); // or getByTitle('Save as Draft (Work in Progress)')
@@ -182,7 +184,9 @@ describe('RealPropertyDataEntry Duplicate Handling', () => {
     await act(async () => {
         fireEvent.click(screen.getByTestId('btn-update-tdn'));
     });
-    await screen.findByText('duplicate-draft'); // Ensure state is updated
+    await waitFor(() => {
+      expect(screen.getByTestId('record-tdn').textContent).toContain('duplicate-draft');
+    });
 
     // 3. Save
     const saveBtn = screen.getByText('Save Draft');

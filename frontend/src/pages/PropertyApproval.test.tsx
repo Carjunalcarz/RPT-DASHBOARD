@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useAlert } from '@/context/AlertContext';
 import { getRptMastDataDirect, updateSignatory } from '@/services/rptMastService';
 import { getRptAssByTdn } from '@/services/rptAssService';
+import { getFaasRecord, updateFaasStatus } from '@/services/faasService';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 // Mock hooks
@@ -18,16 +19,20 @@ vi.mock('@/context/ThemeColorContext', () => ({
 // Mock services
 vi.mock('@/services/rptMastService');
 vi.mock('@/services/rptAssService');
+vi.mock('@/services/faasService');
 
 // Mock child components to avoid deep rendering issues
 vi.mock('@/components/RPT-management/faas/rpt_m_PropertyDetailsView', () => {
-  return function DummyPropertyDetailsView() {
-    return <div data-testid="property-details-view">Property Details</div>;
+  return {
+    default: function DummyPropertyDetailsView() {
+      return <div data-testid="property-details-view">Property Details</div>;
+    },
   };
 });
 
 describe('PropertyApproval Page', () => {
   const mockUser = { name: 'Test Admin', role: 'admin', position: 'Administrator' };
+  const showConfirmMock = vi.fn().mockResolvedValue(true);
   const mockRecord = {
     id: '1',
     TDN: '123-456',
@@ -41,7 +46,9 @@ describe('PropertyApproval Page', () => {
 
   beforeEach(() => {
     (useAuth as Mock).mockReturnValue({ user: mockUser });
-    (useAlert as Mock).mockReturnValue({ showConfirm: vi.fn().mockResolvedValue(true) });
+    (useAlert as Mock).mockReturnValue({ showConfirm: showConfirmMock });
+    (getFaasRecord as Mock).mockRejectedValue(new Error('Not a FAAS record ID'));
+    (updateFaasStatus as Mock).mockResolvedValue({ success: true });
     (getRptMastDataDirect as Mock).mockResolvedValue({
       data: [{ id: '1', tdn: '123-456', status: 'for-review', data: mockRecord.data }]
     });
@@ -57,7 +64,7 @@ describe('PropertyApproval Page', () => {
     return render(
       <MemoryRouter initialEntries={['/property-approval/123-456']}>
         <Routes>
-          <Route path="/property-approval/:tdn" element={<PropertyApproval />} />
+          <Route path="/property-approval/:id" element={<PropertyApproval />} />
         </Routes>
       </MemoryRouter>
     );
@@ -77,26 +84,25 @@ describe('PropertyApproval Page', () => {
     });
 
     // Check Action Buttons
-    expect(screen.getByText('Approve')).toBeInTheDocument();
+    expect(screen.getByText(/Approve \(/)).toBeInTheDocument();
     expect(screen.getByText('Reject')).toBeInTheDocument();
     expect(screen.getByText('Request Changes')).toBeInTheDocument();
   });
 
   it('handles Approve action', async () => {
     renderComponent();
-    await waitFor(() => screen.getByText('Approve'));
+    await waitFor(() => screen.getByText(/Approve \(/));
 
-    fireEvent.click(screen.getByText('Approve'));
+    fireEvent.click(screen.getByText(/Approve \(/));
 
     // Check if confirmation was called
-    const { showConfirm } = useAlert();
-    expect(showConfirm).toHaveBeenCalled();
+    expect(showConfirmMock).toHaveBeenCalled();
 
     // Wait for update call
     await waitFor(() => {
       expect(updateSignatory).toHaveBeenCalledWith('123-456', expect.objectContaining({
         status: 'approved',
-        SGD_APPROVED: true
+        Approved: 'Test Admin'
       }));
     });
   });

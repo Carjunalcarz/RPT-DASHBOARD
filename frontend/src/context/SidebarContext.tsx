@@ -9,17 +9,29 @@ interface SidebarContextType {
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
 
 export const SidebarProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsedState] = useState<boolean>(() => {
+    try {
+      const stored = localStorage.getItem('sidebarCollapsed');
+      return stored ? JSON.parse(stored) : false;
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     const stored = localStorage.getItem('sidebarCollapsed');
     if (stored) {
-      setIsCollapsed(JSON.parse(stored));
+      setIsCollapsedState(JSON.parse(stored));
     }
   }, []);
 
+  const setIsCollapsed = (value: boolean) => {
+    setIsCollapsedState(value);
+    localStorage.setItem('sidebarCollapsed', JSON.stringify(value));
+  };
+
   const toggleSidebar = () => {
-    setIsCollapsed((prev) => {
+    setIsCollapsedState((prev) => {
       const newValue = !prev;
       localStorage.setItem('sidebarCollapsed', JSON.stringify(newValue));
       return newValue;

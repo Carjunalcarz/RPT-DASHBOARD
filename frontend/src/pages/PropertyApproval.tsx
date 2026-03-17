@@ -274,7 +274,15 @@ const PropertyApproval: React.FC = () => {
   };
 
   const handleBack = () => {
-    navigate('/rpt-management');
+    if (record?.status === 'pending-municipal') {
+      navigate('/approvals/municipal');
+      return;
+    }
+    if (record?.status === 'pending-provincial') {
+      navigate('/approvals/provincial');
+      return;
+    }
+    navigate('/approvals');
   };
 
   if (isLoading) {

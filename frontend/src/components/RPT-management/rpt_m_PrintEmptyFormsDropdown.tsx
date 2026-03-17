@@ -13,6 +13,9 @@ interface PrintEmptyFormsDropdownProps {
   onPrintMachinery: () => void;
 }
 
+const DropdownMenuContentAny = DropdownMenuContent as unknown as React.ComponentType<any>;
+const DropdownMenuItemAny = DropdownMenuItem as unknown as React.ComponentType<any>;
+
 const PrintEmptyFormsDropdown: React.FC<PrintEmptyFormsDropdownProps> = ({
   onPrintBuilding,
   onPrintLand,
@@ -22,7 +25,7 @@ const PrintEmptyFormsDropdown: React.FC<PrintEmptyFormsDropdownProps> = ({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 outline-none focus:ring-2 focus:ring-blue-500 h-9 whitespace-nowrap"
           title="Print Empty Assessment Forms"
         >
           <Printer size={14} />
@@ -30,17 +33,17 @@ const PrintEmptyFormsDropdown: React.FC<PrintEmptyFormsDropdownProps> = ({
           <ChevronDown size={12} className="opacity-50" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuItem onClick={onPrintBuilding} className="cursor-pointer text-xs">
+      <DropdownMenuContentAny align="end" className="w-48">
+        <DropdownMenuItemAny onClick={onPrintBuilding} className="cursor-pointer text-xs">
           Building Assessment
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onPrintLand} className="cursor-pointer text-xs">
+        </DropdownMenuItemAny>
+        <DropdownMenuItemAny onClick={onPrintLand} className="cursor-pointer text-xs">
           Land Assessment
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={onPrintMachinery} className="cursor-pointer text-xs">
+        </DropdownMenuItemAny>
+        <DropdownMenuItemAny onClick={onPrintMachinery} className="cursor-pointer text-xs">
           Machinery Assessment
-        </DropdownMenuItem>
-      </DropdownMenuContent>
+        </DropdownMenuItemAny>
+      </DropdownMenuContentAny>
     </DropdownMenu>
   );
 };

@@ -100,7 +100,7 @@ const Header: React.FC = () => {
 
   // Refresh count when navigating to pending approvals to ensure it's up to date
   useEffect(() => {
-    if (location.pathname === '/approvals' && isAdmin) {
+    if (location.pathname.startsWith('/approvals') && isAdmin) {
       fetchPendingApprovals(true);
     }
   }, [location.pathname, isAdmin]);
@@ -110,7 +110,15 @@ const Header: React.FC = () => {
     // We need to check if tab is actually a string before using it
     const targetTab = typeof tab === 'string' ? tab : undefined;
     
-    navigate('/approvals', { state: { defaultTab: targetTab } });
+    if (targetTab === 'municipal') {
+      navigate('/approvals/municipal');
+      return;
+    }
+    if (targetTab === 'provincial') {
+      navigate('/approvals/provincial');
+      return;
+    }
+    navigate('/approvals');
     // Optionally we could reset a "new" indicator here, 
     // but the count reflects actual pending items, so it stays until they are approved.
   };

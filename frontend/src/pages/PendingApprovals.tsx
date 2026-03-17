@@ -9,21 +9,35 @@ import { Checkbox } from '../components/ui/checkbox';
 import { useAlert } from '@/context/AlertContext';
 import { toast } from 'sonner';
 
-const PendingApprovals: React.FC = () => {
+type ApprovalStatusFilter = 'pending-municipal' | 'pending-provincial' | 'draft';
+
+type PendingApprovalsProps = {
+  fixedStatus?: ApprovalStatusFilter;
+};
+
+const PendingApprovals: React.FC<PendingApprovalsProps> = ({ fixedStatus }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { headerColor, headerColorDark } = useThemeColor();
   const { showConfirm } = useAlert();
   
   const [pagination, setPagination] = useState({ page: 1, limit: 10, totalPages: 1 });
-  const [statusFilter, setStatusFilter] = useState<'pending-municipal' | 'pending-provincial' | 'draft'>('pending-municipal');
+  const [statusFilter, setStatusFilter] = useState<ApprovalStatusFilter>(fixedStatus ?? 'pending-municipal');
   
   // Bulk Action State
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
+  useEffect(() => {
+    if (!fixedStatus) return;
+    setStatusFilter(fixedStatus);
+    setPagination(prev => ({ ...prev, page: 1 }));
+    setSelectedIds(new Set());
+  }, [fixedStatus]);
+
   // Handle incoming state for default tab
   useEffect(() => {
+    if (fixedStatus) return;
     if (location.state?.defaultTab) {
       const tab = location.state.defaultTab;
       if (tab === 'municipal') {
@@ -187,20 +201,39 @@ const PendingApprovals: React.FC = () => {
   const isAllSelected = records.length > 0 && selectedIds.size === records.length;
   const isIndeterminate = selectedIds.size > 0 && selectedIds.size < records.length;
 
+  const pageTitle =
+    fixedStatus === 'pending-municipal'
+      ? 'Municipal Approvals'
+      : fixedStatus === 'pending-provincial'
+      ? 'Provincial Approvals'
+      : fixedStatus === 'draft'
+      ? 'Drafts'
+      : 'Approvals & Drafts';
+
+  const pageSubtitle =
+    fixedStatus === 'pending-municipal'
+      ? 'Review and forward properties to Provincial.'
+      : fixedStatus === 'pending-provincial'
+      ? 'Final review and approval of properties.'
+      : fixedStatus === 'draft'
+      ? 'Review draft assessments before submitting.'
+      : 'Manage pending approvals and review draft assessments.';
+
   return (
     <div className="h-full flex flex-col p-6 space-y-6 bg-slate-50 dark:bg-slate-900 overflow-auto">
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
             <CheckCircle className="text-blue-600" />
-            Approvals & Drafts
+            {pageTitle}
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-            Manage pending approvals and review draft assessments.
+            {pageSubtitle}
           </p>
         </div>
         
         {/* Status Filter Tabs */}
+        {!fixedStatus && (
         <div className="bg-white dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700 flex">
           <button
             onClick={() => {
@@ -245,6 +278,7 @@ const PendingApprovals: React.FC = () => {
             Drafts
           </button>
         </div>
+        )}
       </div>
 
       {/* Bulk Action Bar */}
