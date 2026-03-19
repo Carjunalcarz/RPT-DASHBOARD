@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, ChevronDown } from 'lucide-react';
+import { Calendar, Info, Map, FileText, ChevronRight, Search, Clock, Plus, Trash2, Edit2, AlertCircle } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
+import { cleanPin } from '../utils';
 
 interface PropertyRecord {
   id: string;
@@ -168,7 +169,7 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
           // motherTdn: !!selectedRecord.MTDN, // Logic unclear, leaving as is or default
           tdNo: selectedRecord.tdn || '',
           arpNo: selectedRecord.arp || '',
-          propertyIndexNo: selectedRecord.pin || '',
+          propertyIndexNo: cleanPin(selectedRecord.pin || ''),
           improvementNo: selectedRecord.IMP_NO || '',
           buildingName: selectedRecord.BLDGNAME || '',
           buildingUnit: selectedRecord.BLDGUNIT || '',
@@ -213,11 +214,12 @@ const PropertyInformationSection: React.FC<PropertyInformationSectionProps> = ({
       
       // Apply auto-formatting for TDN
       if (field === 'tdNo' && typeof value === 'string') {
-          // Allow user to backspace by checking if length decreased
-          // But strict formatting usually reapplies. 
-          // Let's just apply formatTdn if the user is typing (length increased) or if we want strict format.
-          // Simple approach: Always format.
           finalValue = formatTdn(value);
+      }
+
+      // Apply cleaning for PIN
+      if (field === 'propertyIndexNo' && typeof value === 'string') {
+          finalValue = cleanPin(value);
       }
 
       const newData = { ...prev, [field]: finalValue };

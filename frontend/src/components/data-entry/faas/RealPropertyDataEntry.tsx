@@ -8,6 +8,7 @@ import { useReactToPrint } from 'react-to-print';
 import { dummyPropertyRecord, dummyAssessmentRecords } from './dummyData';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { useAlert } from '@/context/AlertContext';
+import { cleanPin } from '../utils';
 import { getRptMastDataDirect, RptMastRecord, getMastExtn } from '@/services/rptMastService';
 import { getRptAssByTdn, RptAssRecord } from '@/services/rptAssService';
 import PropertyInformationSection from './PropertyInformationSection';
@@ -31,6 +32,9 @@ import {
 } from '@/components/ui/dialog';
 import { saveDraft, submitForReview, listFaasRecords } from '@/services/faasService';
 import { useIdempotency } from '@/hooks/useIdempotency';
+import { useMigrationCart } from '@/context/MigrationCartContext';
+import MigrationCartIndicator from '@/components/migration/MigrationCartIndicator';
+import { Database } from 'lucide-react';
 
 // Types
 interface PropertyRecord {
@@ -124,6 +128,7 @@ interface PropertyRecord {
 const RealPropertyDataEntry: React.FC = () => {
   const { headerColor, headerColorDark } = useThemeColor();
   const { showConfirm } = useAlert();
+  const { addToCart, removeFromCart, isInCart } = useMigrationCart();
   
   // Records state
   const [records, setRecords] = useState<PropertyRecord[]>([]);
@@ -150,6 +155,7 @@ const RealPropertyDataEntry: React.FC = () => {
   const [isSubComponentEditing, setIsSubComponentEditing] = useState(false);
 
   const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [transactionSource, setTransactionSource] = useState<{ record: PropertyRecord; assessments: RptAssRecord[] } | null>(null);
   const [isRestored, setIsRestored] = useState(false);
   const PERSISTENCE_KEY = 'rpt_data_entry_state';
 
@@ -207,6 +213,7 @@ const RealPropertyDataEntry: React.FC = () => {
       return;
     }
 
+    setTransactionSource({ record: selectedRecord, assessments: assessmentRecords });
     refreshKey(); // New transaction, new key
 
     // Create a new record based on the selected one
@@ -401,7 +408,7 @@ const RealPropertyDataEntry: React.FC = () => {
         id: `${item.TDN}-${index}`, // Ensure unique ID even with duplicate TDNs
         tdn: item.TDN || '',
         arp: item.TDN || '', // ARP should use CURRENT TDN
-        pin: item.PIN || '',
+        pin: cleanPin(item.PIN || ''),
         ownerNo: item.OWNER_NO || '',
         owner: item.Owner_Name || 'N/A',
         barangay: item.BARANGAY || 'N/A',
@@ -410,7 +417,7 @@ const RealPropertyDataEntry: React.FC = () => {
         // Map Reference Fields
         pNewTdn: item.P_NEW_TDN,
         pOldTdn: item.P_OLD_TDN,
-        pPin: item.P_PIN,
+        pPin: cleanPin(item.P_PIN || ''),
         pMarketValue: item.P_MARKET_VALUE,
         pAssessedValue: item.P_ASS_VALUE,
         pOwnerCode: item.P_OWNER_CODE,
@@ -570,7 +577,7 @@ const RealPropertyDataEntry: React.FC = () => {
       ...recordData,
       TDN: selectedRecord.TDN || selectedRecord.tdn,
       ARP: selectedRecord.TDN || selectedRecord.tdn, // Ensure ARP = TDN
-      PIN: selectedRecord.PIN || selectedRecord.pin,
+      PIN: cleanPin(selectedRecord.PIN || selectedRecord.pin || ''),
       assessments: updatedAssessmentRecords,
       status: 'draft'
     };
@@ -618,16 +625,19 @@ const RealPropertyDataEntry: React.FC = () => {
   };
 
   const checkDuplicatePinTdn = async (pin: string, tdn: string): Promise<string | null> => {
+    // Clean PIN before checking
+    const cleanedPin = cleanPin(pin);
+    
     // Skip check if values are empty
-    if (!pin && !tdn) return null;
+    if (!cleanedPin && !tdn) return null;
 
     try {
       // Parallelize checks to reduce latency
       const checks = [];
       
-      if (pin) {
+      if (cleanedPin) {
         checks.push(
-          listFaasRecords({ searchField: 'PIN', filterValue: pin, limit: 1 })
+          listFaasRecords({ searchField: 'PIN', filterValue: cleanedPin, limit: 1 })
             .then(res => ({ type: 'PIN', data: res.data }))
         );
       }
@@ -662,7 +672,7 @@ const RealPropertyDataEntry: React.FC = () => {
                      continue; // Valid continuity
                 }
                 const tdn = duplicateTdn || 'Unknown TDN';
-                return `PIN ${pin} already exists in a pending/approved record (TDN: ${tdn}, Status: ${conflict.status})`;
+                return `PIN ${cleanedPin} already exists in a pending/approved record (TDN: ${tdn}, Status: ${conflict.status})`;
             }
             
             if (result.type === 'TDN') {
@@ -714,7 +724,7 @@ const RealPropertyDataEntry: React.FC = () => {
         ...recordData,
         TDN: currentRecord.TDN || currentRecord.tdn,
         ARP: currentRecord.TDN || currentRecord.tdn, // Ensure ARP = TDN
-        PIN: currentRecord.PIN || currentRecord.pin,
+        PIN: cleanPin(currentRecord.PIN || currentRecord.pin || ''),
         assessments: assessmentRecords,
         status: 'draft'
       };
@@ -805,7 +815,7 @@ const RealPropertyDataEntry: React.FC = () => {
         ...recordData,
         TDN: currentRecord.TDN || currentRecord.tdn,
         ARP: currentRecord.TDN || currentRecord.tdn, // Ensure ARP = TDN
-        PIN: currentRecord.PIN || currentRecord.pin,
+        PIN: cleanPin(currentRecord.PIN || currentRecord.pin || ''),
         assessments: assessmentRecords,
         status: 'for-review' // Optimistically set status
       };
@@ -908,6 +918,23 @@ const RealPropertyDataEntry: React.FC = () => {
     setIsAdding(false);
   };
 
+  const handleCancelTransaction = () => {
+    setIsEditing(false);
+    setIsAdding(false);
+
+    if (transactionSource) {
+      setSelectedRecord(transactionSource.record);
+      setAssessmentRecords(transactionSource.assessments || []);
+    } else {
+      setSelectedRecord(null);
+      setAssessmentRecords([]);
+    }
+
+    setTransactionSource(null);
+    localStorage.removeItem(PERSISTENCE_KEY);
+    toast.info('Transaction cancelled');
+  };
+
   const handleRefresh = async () => {
     await mutate();
     toast.success('Data refreshed');
@@ -942,7 +969,7 @@ const RealPropertyDataEntry: React.FC = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col" data-testid="real-property-data-entry">
+    <div className="flex-1 flex flex-col" data-testid="real-property-data-entry">
       {/* Main Toolbar */}
       <div className="bg-transparent  dark:border-slate-700 px-3 py-2">
         <div className="min-w-0 flex items-center gap-2 flex-nowrap overflow-x-auto pb-2 pr-2">
@@ -1024,7 +1051,7 @@ const RealPropertyDataEntry: React.FC = () => {
 
           {selectedRecord && selectedRecord.id && selectedRecord.id.startsWith('TRANS') ? (
             <button
-              onClick={handleCancel}
+              onClick={handleCancelTransaction}
               disabled={!selectedRecord}
               className="px-3 py-2 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed h-9 whitespace-nowrap"
               title="Cancel Transaction"
@@ -1082,7 +1109,7 @@ const RealPropertyDataEntry: React.FC = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-auto p-4 space-y-4">
+      <div className="flex-1 p-4 space-y-4">
         {/* Records Grid - Hidden when in adding/editing mode */}
         {(!isAdding && !isEditing) && (
         <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col">
@@ -1106,6 +1133,9 @@ const RealPropertyDataEntry: React.FC = () => {
                   }
                 `}</style>
                 <tr>
+                  <th className="px-4 py-3 text-center font-semibold tracking-wide whitespace-nowrap w-10">
+                    <Database size={14} className="mx-auto" />
+                  </th>
                   <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[180px]">TDN</th>
                   <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[180px]">OLD TDN</th>
                   <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[180px]">ARP</th>
@@ -1121,7 +1151,7 @@ const RealPropertyDataEntry: React.FC = () => {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, index) => (
                     <tr key={index}>
-                      <td colSpan={9} className="px-4 py-3">
+                      <td colSpan={10} className="px-4 py-3">
                          <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse"></div>
                       </td>
                     </tr>
@@ -1140,10 +1170,31 @@ const RealPropertyDataEntry: React.FC = () => {
                     }`}
                     data-testid={`record-row-${record.id}`}
                   >
+                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={isInCart(record.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            addToCart({
+                              id: record.id,
+                              tdn: record.TDN || record.tdn,
+                              pin: record.PIN || record.pin,
+                              owner: record.owner,
+                              barangay: record.barangay,
+                              data: record
+                            });
+                          } else {
+                            removeFromCart(record.id);
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                    </td>
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.TDN || record.tdn}</td>
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.pOldTdn || ''}</td>
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.ARP || record.tdn}</td>
-                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.PIN || record.pin}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{cleanPin(record.PIN || record.pin)}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
                         record.status === 'approved' 
@@ -1346,6 +1397,8 @@ const RealPropertyDataEntry: React.FC = () => {
                 assessmentRecords={assessmentRecords}
                 isLoading={isAssessmentLoading}
                 onUpdate={handleAutoSave}
+                onEditModeChange={setIsSubComponentEditing}
+                onRefresh={handleRefresh}
                 onPrint={handlePrint}
               />
             )}
@@ -1364,6 +1417,7 @@ const RealPropertyDataEntry: React.FC = () => {
                 isEnabled={isFormEnabled} 
                 onEditModeChange={setIsSubComponentEditing}
                 onUpdate={handlePropertyInfoUpdate}
+                onRefresh={handleRefresh}
               />
             )}
             
@@ -1557,6 +1611,7 @@ const RealPropertyDataEntry: React.FC = () => {
           )}
         </div>
       </div>
+      <MigrationCartIndicator />
     </div>
   );
 };

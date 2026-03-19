@@ -138,7 +138,7 @@ const PropertyDetailsView: React.FC<PropertyDetailsViewProps> = ({
         )}
         
         {activeTab === 'previous-tdns' && (
-          <PreviousTDNsSection />
+          <PreviousTDNsSection selectedRecord={selectedRecord} />
         )}
         
         {activeTab === 'tax-dec' && (

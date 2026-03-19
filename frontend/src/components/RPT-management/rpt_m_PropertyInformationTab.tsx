@@ -3,6 +3,7 @@ import { Edit2, Save, X } from 'lucide-react';
 
 interface PropertyInformationTabProps {
   isEditing: boolean;
+  isTransactionActive?: boolean;
   onEnterEdit: () => void;
   onSave: () => void;
   onCancel: () => void;
@@ -85,6 +86,7 @@ const defaultFormData: PropertyFormData = {
 
 const PropertyInformationTab: React.FC<PropertyInformationTabProps> = ({
   isEditing,
+  isTransactionActive = false,
   onEnterEdit,
   onSave,
   onCancel,
@@ -92,6 +94,7 @@ const PropertyInformationTab: React.FC<PropertyInformationTabProps> = ({
 }) => {
   const [formData, setFormData] = useState<PropertyFormData>(defaultFormData);
   const [originalData, setOriginalData] = useState<PropertyFormData>(defaultFormData);
+  const isEnabled = isEditing || isTransactionActive;
 
   useEffect(() => {
     if (isEditing && onDataChange) {
@@ -180,7 +183,7 @@ const PropertyInformationTab: React.FC<PropertyInformationTabProps> = ({
     <div>
       {/* Action Buttons */}
       <div className="mb-4 flex justify-end gap-2">
-        {!isEditing ? (
+        {isEnabled && !isEditing ? (
           <button
             onClick={onEnterEdit}
             className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors font-medium flex items-center gap-2"
@@ -189,7 +192,7 @@ const PropertyInformationTab: React.FC<PropertyInformationTabProps> = ({
             <Edit2 size={14} />
             Edit Property Information
           </button>
-        ) : (
+        ) : isEditing ? (
           <>
             <button
               onClick={handleCancel}
@@ -208,7 +211,7 @@ const PropertyInformationTab: React.FC<PropertyInformationTabProps> = ({
               Save Changes
             </button>
           </>
-        )}
+        ) : null}
       </div>
 
       {/* Property Information Section */}

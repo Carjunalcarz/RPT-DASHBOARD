@@ -11,21 +11,23 @@ interface LandAssessmentProps {
   records?: RptAssRecord[];
   isEnabled?: boolean;
   onUpdate?: (records: any[]) => void;
+  onEditModeChange?: (isEditing: boolean) => void;
+  onRefresh?: () => void;
   status?: string;
 }
 
-interface LandRecord {
+interface LandAssessmentRecord {
   id: string;
   uniqueId?: string;
-  tdn?: string; // Add TDN field
+  tdn?: string;
   kind: string;
   classification: string;
   subClass: string;
-  classLevel?: string; // Added
-  municipality?: string; // Added
+  classLevel?: string;
+  municipality?: string;
   actualUse: string;
   area: number;
-  ifDefault: boolean; // Added IF_DEFAULT
+  ifDefault: boolean;
   unitValue: number;
   baseMarketValue: number;
   adjustedMarketValue: number;
@@ -38,14 +40,14 @@ interface LandRecord {
   trees?: TreePlant[];
 }
 
-interface FormData {
+interface LandAssessmentFormData {
   classification: string;
   subClass: string;
-  classLevel: string; // Added Class Level
-  municipality: string; // Added Municipality
-  actualUse: string; // Keep for compatibility but might be unused
+  classLevel: string;
+  municipality: string;
+  actualUse: string;
   area: string;
-  ifDefault: boolean; // Added IF_DEFAULT
+  ifDefault: boolean;
   unitValue: string;
   assessmentLevel: string;
   taxable: boolean;
@@ -54,7 +56,7 @@ interface FormData {
 }
 
 
-const defaultFormData: FormData = {
+const defaultFormData: LandAssessmentFormData = {
   classification: '',
   subClass: '',
   classLevel: '1st',
@@ -69,15 +71,28 @@ const defaultFormData: FormData = {
   idleLand: false,
 };
 
-const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, isEnabled, onUpdate, status }) => {
+const LandAssessment: React.FC<LandAssessmentProps> = ({ 
+  records: apiRecords, 
+  isEnabled = true, 
+  onUpdate, 
+  onEditModeChange,
+  onRefresh,
+  status 
+}) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const { showConfirm } = useAlert();
-  const [records, setRecords] = useState<LandRecord[]>([]);
-  const [selectedRecord, setSelectedRecord] = useState<LandRecord | null>(null);
+  const [records, setRecords] = useState<LandAssessmentRecord[]>([]);
+  const [selectedRecord, setSelectedRecord] = useState<LandAssessmentRecord | null>(null);
   const [selectedTdn, setSelectedTdn] = useState<string>(''); // Store TDN for trees modal
-  const [formData, setFormData] = useState<FormData>(defaultFormData);
+  const [formData, setFormData] = useState<LandAssessmentFormData>(defaultFormData);
   const [isEditing, setIsEditing] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+
+  // Sync edit mode with parent
+  useEffect(() => {
+    onEditModeChange?.(isEditing || isAdding);
+  }, [isEditing, isAdding, onEditModeChange]);
+
   const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
   const [isTreesOpen, setIsTreesOpen] = useState(false);
   const [isLoadingUnitValue, setIsLoadingUnitValue] = useState(false);
@@ -245,7 +260,7 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
     const currentAdjustments = selectedRecord?.adjustments || [];
     // Recalculate adjustment values based on new Base Market Value if they are percentage based
     // Ideally we iterate adjustments and use percentage.
-    const totalAdjustment = currentAdjustments.reduce((sum, a) => {
+    const totalAdjustment = currentAdjustments.reduce((sum: number, a: LandAdjustment) => {
         // If we want strict percentage adherence:
         return sum + (baseMarketValue * (a.percentage / 100));
         // Or if we trust the valueAdjustment in the object:
@@ -266,7 +281,7 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
   }, [formData.area, formData.unitValue, formData.assessmentLevel, selectedRecord?.adjustments]);
 
   // Handle row selection
-  const handleRowSelect = (record: LandRecord) => {
+  const handleRowSelect = (record: LandAssessmentRecord) => {
     if (isEditing || isAdding) return;
     setSelectedRecord(record);
     setSelectedTdn(record.tdn || '');
@@ -330,7 +345,7 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
     
     const baseMarketValue = unitVal * areaVal;
     
-    const newRecord: LandRecord = {
+    const newRecord: LandAssessmentRecord = {
       id: isAdding ? `${selectedTdn}-Land-${Date.now()}` : selectedRecord!.id,
       uniqueId: selectedRecord?.uniqueId || `${selectedTdn}-Land-${Date.now()}-${Math.random()}`,
       tdn: selectedTdn,
@@ -354,7 +369,7 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
       trees: selectedRecord?.trees || [],
     };
 
-    let newRecords: LandRecord[] = [];
+    let newRecords: LandAssessmentRecord[] = [];
     if (isAdding) {
       newRecords = [...records, newRecord];
     } else {
@@ -413,8 +428,13 @@ const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, is
   };
 
   // Handle Refresh
-  const handleRefresh = () => {
-    console.log('Refreshing data...');
+  const handleRefresh = async () => {
+    if (onRefresh) {
+      await onRefresh();
+      // Data will be updated via records prop
+    }
+    setIsEditing(false);
+    setIsAdding(false);
   };
 
   // Handle Print

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('../generated/supabase-client-v5');
+const { PrismaClient } = require('../generated/supabase-client-v6');
 const prisma = new PrismaClient();
 const logger = require('../utils/logger');
 const protect = require('../middleware/auth');
@@ -73,27 +73,27 @@ router.get('/properties', protect, async (req, res) => {
 
     // Get total count of assessments for pagination
     const countQuery = `
-      SELECT COUNT(*) 
-      FROM rpt_assessment ra
-      JOIN rpt_property rp ON ra.property_id = rp.id
+      SELECT COUNT(*) as count
+      FROM public.rpt_property rp
+      LEFT JOIN public.rpt_assessment ra ON ra.property_id = rp.id
       WHERE ${whereClause}
     `;
     const countResult = await prisma.$queryRawUnsafe(countQuery, ...params);
-    const totalCount = Number(countResult[0].count);
+    const totalCount = Number(countResult[0]?.count || 0);
 
     // Raw SQL to fetch individual assessments joined with property info
     const query = `
       SELECT 
-        ra.id as "assessmentId",
-        ra.kind,
-        ra.ass_level as "assLevel",
-        ra.taxability,
-        ra.classification,
-        ra.subclass,
-        ra.area,
-        ra.measurement,
-        ra.market_value as "marketValue",
-        ra.ass_value as "assValue",
+        COALESCE(ra.id::TEXT, 'missing-' || rp.id::TEXT) as "assessmentId",
+        COALESCE(ra.kind, 'N/A') as kind,
+        COALESCE(ra.ass_level, 0) as "assLevel",
+        COALESCE(ra.taxability, 'N/A') as taxability,
+        COALESCE(ra.classification, 'N/A') as classification,
+        COALESCE(ra.subclass, 'N/A') as subclass,
+        COALESCE(ra.area, 0) as area,
+        COALESCE(ra.measurement, '') as measurement,
+        COALESCE(ra.market_value, 0) as "marketValue",
+        COALESCE(ra.ass_value, 0) as "assValue",
         rp.id as "propertyId",
         rp.pin, 
         rp.tdn, 
@@ -105,8 +105,8 @@ router.get('/properties', protect, async (req, res) => {
         rp.tax_beg_yr as "taxBegYr",
         rp.trans_code as "transCode",
         rp.tax_beg_yr as "taxYear"
-      FROM rpt_assessment ra
-      JOIN rpt_property rp ON ra.property_id = rp.id
+      FROM public.rpt_property rp
+      LEFT JOIN public.rpt_assessment ra ON ra.property_id = rp.id
       WHERE ${whereClause}
       ORDER BY rp.created_at DESC, ra.id ASC
       LIMIT $${params.length + 1} OFFSET $${params.length + 2}
@@ -116,10 +116,10 @@ router.get('/properties', protect, async (req, res) => {
 
     const serializedResults = results.map(row => ({
       ...row,
-      assLevel: Number(row.assLevel),
-      area: Number(row.area),
-      marketValue: Number(row.marketValue),
-      assValue: Number(row.assValue)
+      assLevel: Number(row.assLevel || 0),
+      area: Number(row.area || 0),
+      marketValue: Number(row.marketValue || 0),
+      assValue: Number(row.assValue || 0)
     }));
 
     res.json({
@@ -153,7 +153,7 @@ router.get('/tax-beg-years', protect, async (req, res) => {
   try {
     const query = `
       SELECT DISTINCT tax_beg_yr as "taxBegYr"
-      FROM rpt_property
+      FROM public.rpt_property
       WHERE tax_beg_yr IS NOT NULL
         AND tax_beg_yr <> ''
         AND tax_beg_yr ~ '^\\d{4}$'
@@ -223,8 +223,8 @@ router.get('/summary', protect, async (req, res) => {
         COALESCE(SUM(ra.market_value), 0) as "totalMarketValue",
         COALESCE(SUM(ra.ass_value), 0) as "totalAssessedValue",
         COUNT(DISTINCT rp.source_record_id) as "approvedFaasCount"
-      FROM rpt_property rp
-      LEFT JOIN rpt_assessment ra ON ra.property_id = rp.id
+      FROM public.rpt_property rp
+      LEFT JOIN public.rpt_assessment ra ON ra.property_id = rp.id
       WHERE ${whereClause}
     `;
 

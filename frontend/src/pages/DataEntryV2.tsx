@@ -26,7 +26,7 @@ const DataEntryV2: React.FC = () => {
   const darkerColorDark = `rgb(${Math.max(0, rgbDark.r - 40)}, ${Math.max(0, rgbDark.g - 40)}, ${Math.max(0, rgbDark.b - 40)})`;
   
   return (
-    <div data-testid="data-entry-page-v2" className="h-[calc(100vh-64px)] flex flex-col">
+    <div data-testid="data-entry-page-v2" className="min-h-[calc(100vh-64px)] flex flex-col">
        {/* Dynamic Color Header with Breadcrumb */}
        <div
         className="px-4 py-3 -mx-6 -mt-6 mb-6"
@@ -59,7 +59,7 @@ const DataEntryV2: React.FC = () => {
         </div>
       </div>
       
-      <div className="flex-1 overflow-hidden relative">
+      <div className="flex-1 relative">
         <RealPropertyDataEntry />
       </div>
     </div>

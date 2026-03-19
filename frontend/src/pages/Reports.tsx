@@ -184,7 +184,7 @@ const Reports: React.FC = () => {
         
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1200px] text-sm text-left">
-            <thead className="bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 font-medium">
+            <thead className="bg-slate-50 dark:bg-slate-950 text-slate-500 dark:text-slate-400 font-normal">
               <tr>
                 <th className="px-4 py-3 whitespace-nowrap">Assessment ID</th>
                 <th className="px-4 py-3 whitespace-nowrap">TDN / PIN</th>

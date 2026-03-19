@@ -4,6 +4,7 @@ import { BuildingAssessment } from './building';
 
 interface AssessmentTabProps {
   isEditing: boolean;
+  isTransactionActive?: boolean;
   onEnterEdit: () => void;
   onSave: () => void;
   onCancel: () => void;
@@ -14,12 +15,14 @@ type AssessmentType = 'land' | 'building' | 'machinery';
 
 const AssessmentTab: React.FC<AssessmentTabProps> = ({
   isEditing,
+  isTransactionActive = false,
   onEnterEdit,
   onSave,
   onCancel,
   onDataChange,
 }) => {
   const [activeType, setActiveType] = useState<AssessmentType>('building');
+  const isEnabled = isEditing || isTransactionActive;
 
   return (
     <div className="space-y-4">
@@ -78,7 +81,7 @@ const AssessmentTab: React.FC<AssessmentTabProps> = ({
         )}
 
         {activeType === 'building' && (
-          <BuildingAssessment />
+          <BuildingAssessment isEnabled={isEnabled} />
         )}
 
         {activeType === 'machinery' && (

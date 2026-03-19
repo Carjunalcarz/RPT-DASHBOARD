@@ -31,16 +31,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             {!hideBreadcrumb && <Breadcrumb />}
             {children}
           </div>
+          
+          {/* Footer */}
+          <footer className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 mt-auto">
+            <div className="px-6 py-4">
+              <p className="text-xs text-center text-slate-600 dark:text-slate-400">
+                © {new Date().getFullYear()} Real Property Tax System. All rights reserved.
+              </p>
+            </div>
+          </footer>
         </main>
-        
-        {/* Footer */}
-        <footer className="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 mt-auto">
-          <div className="px-6 py-4">
-            <p className="text-xs text-center text-slate-600 dark:text-slate-400">
-              © {new Date().getFullYear()} Real Property Tax System. All rights reserved.
-            </p>
-          </div>
-        </footer>
       </div>
     </div>
   );

@@ -43,6 +43,8 @@ const buildingAppraisalRoutes = require('./routes/buildingAppraisalRoutes');
 const faasRoutes = require('./routes/faasRoutes');
 const pdfRoutes = require('./routes/pdfRoutes');
 const reportsRoutes = require('./routes/reportsRoutes');
+const setupSignatoriesRoutes = require('./routes/setupSignatoriesRoutes');
+const setupSignatoryTemplatesRoutes = require('./routes/setupSignatoryTemplatesRoutes');
 
 const app = express();
 
@@ -170,6 +172,8 @@ app.use('/api/v1/building-appraisals', buildingAppraisalRoutes);
 app.use('/api/v1/faas', faasRoutes);
 app.use('/api/v1/pdf', pdfRoutes);
 app.use('/api/v1/reports', reportsRoutes);
+app.use('/api/v1/setup/signatories', setupSignatoriesRoutes);
+app.use('/api/v1/setup/signatory-templates', setupSignatoryTemplatesRoutes);
 // Legacy routes support if needed
 app.use('/api/classifications', classificationRoutes);
 app.use('/api/actual-uses', actualUseRoutes);

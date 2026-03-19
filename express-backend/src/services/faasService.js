@@ -3,6 +3,8 @@ const { AppError } = require('../middleware/errorHandler');
 const logger = require('../utils/logger');
 const rptMastService = require('./rptMastService');
 
+const rptAssService = require('./rptAssService');
+
 class FaasService {
   /**
    * Validate TDN and PIN uniqueness
@@ -501,6 +503,305 @@ class FaasService {
     }
   }
 
+  async getTdnHistory(id) {
+    try {
+      const rp = await supabasePrisma.$queryRawUnsafe(
+        `SELECT master_property_id
+         FROM public.rpt_property
+         WHERE source_record_id = $1
+         LIMIT 1`,
+        id
+      );
+      let masterPropertyId = rp?.[0]?.master_property_id || null;
+
+      let faas = null;
+      if (!masterPropertyId) {
+        faas = await supabasePrisma.faasRecord.findUnique({ where: { id } });
+        if (!faas) return [];
+
+        const data = faas.data || {};
+        const muncode = data.cityCode || data.CITY || null;
+        const barangayCode = data.barangayCode || data['BRGY.CODE'] || null;
+        const pin = data.PIN || data.pin || null;
+        const newTdn = data.TDN || data.tdn || faas.tdn || null;
+        const oldTdn =
+          data.P_OLD_TDN ||
+          data.pOldTdn ||
+          data.pOldTDN ||
+          data.OLD_TDN ||
+          data.old_tdn ||
+          null;
+        const arpNo = data.ARP || data.arp || data.ARP_NO || data.arpNo || null;
+        const lotNo = data.LOT_NO || data.lotNo || data.lot || null;
+        const blockNo = data.BLOCK_NO || data.blockNo || data.block || null;
+
+        if (!muncode || !barangayCode) return [];
+
+        if (pin) {
+          const matches = await supabasePrisma.$queryRawUnsafe(
+            `SELECT id
+             FROM public.properties
+             WHERE municipality_code = $1
+               AND barangay_code = $2
+               AND pin = $3
+             LIMIT 2`,
+            muncode,
+            barangayCode,
+            pin
+          );
+          if (matches.length === 1) masterPropertyId = matches[0].id;
+        }
+
+        if (!masterPropertyId && oldTdn) {
+          const matches = await supabasePrisma.$queryRawUnsafe(
+            `SELECT property_id
+             FROM public.property_tdn_history
+             WHERE tdn = $1
+             ORDER BY created_at DESC
+             LIMIT 2`,
+            oldTdn
+          );
+          if (matches.length === 1) masterPropertyId = matches[0].property_id;
+        }
+
+        if (!masterPropertyId && newTdn) {
+          const matches = await supabasePrisma.$queryRawUnsafe(
+            `SELECT property_id
+             FROM public.property_tdn_history
+             WHERE tdn = $1 AND is_current = TRUE
+             ORDER BY created_at DESC
+             LIMIT 2`,
+            newTdn
+          );
+          if (matches.length === 1) masterPropertyId = matches[0].property_id;
+        }
+
+        if (!masterPropertyId && lotNo && blockNo) {
+          const matches = await supabasePrisma.$queryRawUnsafe(
+            `SELECT id
+             FROM public.properties
+             WHERE municipality_code = $1
+               AND barangay_code = $2
+               AND lot_no = $3
+               AND block_no = $4
+             LIMIT 2`,
+            muncode,
+            barangayCode,
+            lotNo,
+            blockNo
+          );
+          if (matches.length === 1) masterPropertyId = matches[0].id;
+        }
+
+        if (!masterPropertyId && arpNo) {
+          const matches = await supabasePrisma.$queryRawUnsafe(
+            `SELECT id
+             FROM public.properties
+             WHERE municipality_code = $1
+               AND barangay_code = $2
+               AND arp_no = $3
+             LIMIT 2`,
+            muncode,
+            barangayCode,
+            arpNo
+          );
+          if (matches.length === 1) masterPropertyId = matches[0].id;
+        }
+      }
+
+      if (!masterPropertyId) return [];
+
+      const rows = await supabasePrisma.$queryRawUnsafe(
+        `SELECT
+           h.id,
+           h.tdn,
+           h.old_tdn as "previousTdn",
+           rp.pin,
+           COALESCE(
+             to_char(make_date(h.tax_beg_year, 1, 1), 'YYYY-MM-DD'),
+             rp.tax_beg_yr
+           ) as "effectivityDate",
+           COALESCE(rp.owner_id::text, '') as "ownerCode",
+           COALESCE(rp.owner_name_snapshot, '') as "declaredOwner",
+           COALESCE(SUM(ra.market_value), 0) as "prevMarketValue",
+           COALESCE(SUM(ra.ass_value), 0) as "prevAssessedValue",
+           h.tax_beg_year as "taxBegYear",
+           h.is_current as "isCurrent",
+           h.change_reason as "changeReason"
+         FROM public.property_tdn_history h
+         LEFT JOIN public.rpt_property rp
+           ON rp.source_record_id = h.source_record_id
+         LEFT JOIN public.rpt_assessment ra
+           ON ra.property_id = rp.id
+         WHERE h.property_id = $1::uuid
+         GROUP BY
+           h.id,
+           h.tdn,
+           h.old_tdn,
+           h.tax_beg_year,
+           h.is_current,
+           h.change_reason,
+           rp.pin,
+           rp.tax_beg_yr,
+           rp.owner_id,
+           rp.owner_name_snapshot
+         ORDER BY
+           h.tax_beg_year DESC NULLS LAST,
+           h.created_at DESC`,
+        String(masterPropertyId)
+      );
+
+      return rows.map((r) => ({
+        ...r,
+        prevMarketValue: Number(r.prevMarketValue || 0),
+        prevAssessedValue: Number(r.prevAssessedValue || 0),
+      }));
+    } catch (error) {
+      logger.error('Error in FaasService.getTdnHistory:', error);
+      throw new AppError(error.message, 500);
+    }
+  }
+
+  /**
+   * Bulk Migrate Properties
+   * @param {Array} properties 
+   * @param {string} migrationType 
+   * @param {string} userEmail 
+   * @param {string} userId 
+   * @param {boolean} skipExisting
+   */
+  async bulkMigrate(properties, migrationType, userEmail, userId, skipExisting = false) {
+    logger.info(`Starting bulk migration for ${properties.length} properties. Type: ${migrationType}, SkipExisting: ${skipExisting}`);
+    
+    const results = [];
+    
+    try {
+      // If skipExisting is true, find which ones to skip first
+      let tdnsToSkip = [];
+      if (skipExisting) {
+        const tdns = properties.map(p => (p.data?.TDN || p.tdn));
+        const existing = await supabasePrisma.faasRecord.findMany({
+          where: { tdn: { in: tdns } },
+          select: { tdn: true }
+        });
+        tdnsToSkip = existing.map(e => e.tdn);
+      }
+
+      await supabasePrisma.$transaction(async (tx) => {
+        for (const property of properties) {
+          try {
+            const propertyData = property.data || property;
+            const tdn = propertyData.TDN || propertyData.tdn;
+            
+            // Clean PIN if present in propertyData
+            if (propertyData.PIN) {
+              propertyData.PIN = propertyData.PIN.replace(/\s+/g, '');
+            } else if (propertyData.pin) {
+              propertyData.pin = propertyData.pin.replace(/\s+/g, '');
+            }
+            
+            if (!tdn) {
+              throw new Error(`Property at index ${properties.indexOf(property)} is missing TDN`);
+            }
+
+            if (skipExisting && tdnsToSkip.includes(tdn)) {
+              logger.info(`Skipping existing property ${tdn} during bulk migration`);
+              results.push({
+                id: property.id,
+                tdn: tdn,
+                status: 'skipped',
+                message: 'Property already exists in Supabase, skipped as requested'
+              });
+              continue;
+            }
+
+            // --- FIX: Fetch assessments if missing ---
+            if (!propertyData.assessments || !Array.isArray(propertyData.assessments) || propertyData.assessments.length === 0) {
+              logger.info(`Fetching assessments for property ${tdn} from MSSQL`);
+              const assResult = await rptAssService.getAll({ filters: { TDN: tdn } });
+              if (assResult && assResult.data) {
+                propertyData.assessments = assResult.data;
+              }
+            }
+            // ----------------------------------------
+
+            // 1. Upsert the FAAS Record (Direct to pending-municipal for approval)
+            const record = await tx.faasRecord.upsert({
+              where: { tdn: tdn },
+              update: {
+                status: 'pending-municipal',
+                updatedAt: new Date(),
+                data: propertyData,
+                createdBy: userEmail
+              },
+              create: {
+                tdn: tdn,
+                status: 'pending-municipal',
+                createdBy: userEmail,
+                data: propertyData
+              }
+            });
+
+            // 2. Create Audit Log
+            await tx.auditLog.create({
+              data: {
+                tableName: 'faas_records',
+                recordId: record.id,
+                action: 'BULK_MIGRATE',
+                userEmail: userEmail,
+                userId: userId,
+                details: {
+                  tdn: tdn,
+                  migrationType: migrationType,
+                  message: `Property ${tdn} migrated and submitted for approval (pending-municipal)`
+                },
+                timestamp: new Date()
+              }
+            });
+
+            results.push({
+              id: property.id,
+              tdn: tdn,
+              status: 'success',
+              message: 'Migration successful'
+            });
+          } catch (err) {
+            logger.error(`Failed to migrate property ${property.tdn || 'unknown'}: ${err.message}`);
+            // Rethrow to trigger transaction rollback
+            throw err;
+          }
+        }
+      }, {
+        timeout: 60000, // Increase timeout to 60 seconds for bulk operations
+        maxWait: 5000   // Max time to wait for a connection
+      });
+
+      return results;
+    } catch (error) {
+      logger.error(`Bulk migration transaction failed: ${error.message}`);
+      // Return the error so frontend can show which property caused the rollback
+      throw new AppError(`Bulk migration failed. All changes rolled back. Reason: ${error.message}`, 500);
+    }
+  }
+
+  /**
+   * Check which TDNs already exist in Supabase
+   * @param {Array} tdns 
+   * @returns {Promise<Array>} List of existing TDNs
+   */
+  async checkExistingTdns(tdns) {
+    try {
+      const existing = await supabasePrisma.faasRecord.findMany({
+        where: { tdn: { in: tdns } },
+        select: { tdn: true }
+      });
+      return existing.map(e => e.tdn);
+    } catch (error) {
+      logger.error('Error checking existing TDNs:', error);
+      throw new AppError('Failed to check existing properties', 500);
+    }
+  }
+
   /**
    * List FAAS records
    * @param {Object} params - { status, page, limit, searchField, filterValue }
@@ -521,24 +822,25 @@ class FaasService {
                     where.tdn = { contains: cleanValue, mode: 'insensitive' };
                     break;
                 case 'OWNER':
-                    // Owner is inside the JSON data -> owner (or owner_name depending on frontend save)
-                    // We need to check path: data->>'owner'
-                    where.data = {
-                        path: ['owner'],
-                        string_contains: cleanValue
-                    };
+                    where.OR = [
+                        { data: { path: ['owner'], string_contains: cleanValue } },
+                        { data: { path: ['OWNER'], string_contains: cleanValue } },
+                        { data: { path: ['owner_name'], string_contains: cleanValue } },
+                        { data: { path: ['Owner_Name'], string_contains: cleanValue } }
+                    ];
                     break;
                 case 'PIN':
-                    where.data = {
-                        path: ['pin'],
-                        string_contains: cleanValue
-                    };
+                    // Check both lowercase and uppercase keys in JSON data
+                    where.OR = [
+                        { data: { path: ['pin'], string_contains: cleanValue } },
+                        { data: { path: ['PIN'], string_contains: cleanValue } }
+                    ];
                     break;
                 case 'ARP':
-                    where.data = {
-                        path: ['arp'],
-                        string_contains: cleanValue
-                    };
+                    where.OR = [
+                        { data: { path: ['arp'], string_contains: cleanValue } },
+                        { data: { path: ['ARP'], string_contains: cleanValue } }
+                    ];
                     break;
                 default:
                     // Try to search in data with the field name

@@ -46,6 +46,19 @@ exports.getRecord = async (req, res, next) => {
   }
 };
 
+exports.getTdnHistory = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const rows = await faasService.getTdnHistory(id);
+    res.status(200).json({
+      success: true,
+      data: rows
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports.cancelTransaction = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -74,6 +87,45 @@ exports.deleteRecord = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: 'Record deleted successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.bulkMigrate = async (req, res, next) => {
+  try {
+    const { properties, migrationType, skipExisting = false } = req.body;
+    const userEmail = req.user ? req.user.email : 'anonymous';
+    const userId = req.user ? req.user.id : null;
+
+    if (!properties || !Array.isArray(properties)) {
+      throw new AppError('Properties array is required', 400);
+    }
+
+    const result = await faasService.bulkMigrate(properties, migrationType, userEmail, userId, skipExisting);
+
+    res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.checkExistingTdns = async (req, res, next) => {
+  try {
+    const { tdns } = req.body;
+    if (!tdns || !Array.isArray(tdns)) {
+      throw new AppError('TDNs array is required', 400);
+    }
+
+    const existingTdns = await faasService.checkExistingTdns(tdns);
+
+    res.status(200).json({
+      success: true,
+      data: existingTdns
     });
   } catch (error) {
     next(error);

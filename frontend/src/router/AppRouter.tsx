@@ -11,12 +11,14 @@ import Reports from '@/pages/Reports';
 import Settings from '@/pages/Settings';
 import DataEntry from '@/pages/DataEntry';
 import DataEntryV2 from '@/pages/DataEntryV2';
+import MigrationCartPage from '@/components/migration/MigrationCartPage';
 import AuditTrail from '@/pages/AuditTrail';
 import Items from '@/pages/Items';
 import Tasks from '@/pages/Tasks';
 import UserManagement from '@/pages/admin/UserManagement';
 import PropertyApproval from '@/pages/PropertyApproval';
 import PendingApprovals from '@/pages/PendingApprovals';
+import SignatorySetupPage from '@/pages/setup/SignatorySetupPage';
 import RouteRestorer from '@/components/layout/RouteRestorer';
 
 interface ProtectedRouteProps {
@@ -165,6 +167,16 @@ const AppRouter: React.FC = () => {
           }
         />
         <Route
+          path="/migration-cart"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <MigrationCartPage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/audit-trail"
           element={
             <ProtectedRoute>
@@ -240,6 +252,16 @@ const AppRouter: React.FC = () => {
             <ProtectedRoute>
               <Layout>
                 <UserManagement />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/setup/signatory"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <SignatorySetupPage />
               </Layout>
             </ProtectedRoute>
           }

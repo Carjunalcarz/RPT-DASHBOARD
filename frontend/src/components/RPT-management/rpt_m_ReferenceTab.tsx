@@ -3,6 +3,7 @@ import { Edit2, Save, X } from 'lucide-react';
 
 interface ReferenceTabProps {
   isEditing: boolean;
+  isTransactionActive?: boolean;
   onEnterEdit: () => void;
   onSave: () => void;
   onCancel: () => void;
@@ -31,6 +32,7 @@ const defaultFormData: ReferenceFormData = {
 
 const ReferenceTab: React.FC<ReferenceTabProps> = ({
   isEditing,
+  isTransactionActive = false,
   onEnterEdit,
   onSave,
   onCancel,
@@ -38,6 +40,7 @@ const ReferenceTab: React.FC<ReferenceTabProps> = ({
 }) => {
   const [formData, setFormData] = useState<ReferenceFormData>(defaultFormData);
   const [originalData, setOriginalData] = useState<ReferenceFormData>(defaultFormData);
+  const isEnabled = isEditing || isTransactionActive;
 
   useEffect(() => {
     if (isEditing && onDataChange) {
@@ -90,7 +93,7 @@ const ReferenceTab: React.FC<ReferenceTabProps> = ({
           Reference Information
         </h3>
         <div className="flex gap-2">
-          {!isEditing ? (
+          {isEnabled && !isEditing ? (
             <button
               onClick={onEnterEdit}
               className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors font-medium flex items-center gap-2"
@@ -99,7 +102,7 @@ const ReferenceTab: React.FC<ReferenceTabProps> = ({
               <Edit2 size={14} />
               Edit References
             </button>
-          ) : (
+          ) : isEditing ? (
             <>
               <button
                 onClick={handleCancel}
@@ -118,7 +121,7 @@ const ReferenceTab: React.FC<ReferenceTabProps> = ({
                 Save Changes
               </button>
             </>
-          )}
+          ) : null}
         </div>
       </div>
 

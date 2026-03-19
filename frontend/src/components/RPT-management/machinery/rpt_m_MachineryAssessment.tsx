@@ -10,6 +10,8 @@ interface MachineryAssessmentProps {
   records?: RptAssRecord[];
   isEnabled?: boolean;
   onUpdate?: (records: any[]) => void;
+  onEditModeChange?: (isEditing: boolean) => void;
+  onRefresh?: () => void;
   status?: string;
 }
 
@@ -32,7 +34,7 @@ interface MachineryRecord {
   idleLand: boolean;
 }
 
-interface FormData {
+interface MachineryAssessmentFormData {
   classification: string;
   actualUse: string;
   subClass: string;
@@ -44,7 +46,7 @@ interface FormData {
   idleLand: boolean;
 }
 
-const defaultFormData: FormData = {
+const defaultFormData: MachineryAssessmentFormData = {
   classification: '',
   actualUse: '',
   subClass: '',
@@ -56,14 +58,27 @@ const defaultFormData: FormData = {
   idleLand: false,
 };
 
-const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiRecords, isEnabled, onUpdate, status }) => {
+const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ 
+  records: apiRecords, 
+  isEnabled = true, 
+  onUpdate, 
+  onEditModeChange,
+  onRefresh,
+  status 
+}) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const { showConfirm } = useAlert();
   const [records, setRecords] = useState<MachineryRecord[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<MachineryRecord | null>(null);
-  const [formData, setFormData] = useState<FormData>(defaultFormData);
+  const [formData, setFormData] = useState<MachineryAssessmentFormData>(defaultFormData);
   const [isEditing, setIsEditing] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+
+  // Sync edit mode with parent
+  useEffect(() => {
+    onEditModeChange?.(isEditing || isAdding);
+  }, [isEditing, isAdding, onEditModeChange]);
+
   const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
   
   // Dynamic Options State
@@ -265,8 +280,12 @@ const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiR
     }
   };
 
-  const handleRefresh = () => {
-    console.log('Refreshing data...');
+  const handleRefresh = async () => {
+    if (onRefresh) {
+      await onRefresh();
+    }
+    setIsEditing(false);
+    setIsAdding(false);
   };
 
   const handlePrint = () => {

@@ -28,6 +28,8 @@ import {
   AuditEntry,
 } from './rpt_m_signatoriesCrud';
 import { updateSignatory } from '@/services/rptMastService';
+import { listTemplates, SetupSignatoryTemplate } from '@/services/setupSignatoryTemplatesService';
+import { listSetupSignatories, SetupSignatory } from '@/services/setupSignatoriesService';
 
 interface DocumentationData {
   preparedBy: string;
@@ -169,13 +171,15 @@ interface SignatoriesSectionProps {
   isEnabled?: boolean;
   onEditModeChange?: (isEditing: boolean) => void;
   onUpdate?: (updatedData: any) => void;
+  onRefresh?: () => void;
 }
 
 const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ 
   selectedRecord: initialRecord, 
   isEnabled = true, 
   onEditModeChange,
-  onUpdate
+  onUpdate,
+  onRefresh
 }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const { user } = useAuth();
@@ -193,17 +197,17 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({
   React.useEffect(() => {
     if (initialRecord) {
       setFormData({
-        appraisedBy: initialRecord.appraisedBy || '',
-        appraisedPosition: initialRecord.appraisedPos || '',
-        appraisedDate: initialRecord.appraisedDate ? initialRecord.appraisedDate.split('T')[0] : '',
-        appraisedSGD: initialRecord.sgdAppraised || false,
-        appraisedTPD: initialRecord.tpdAppraised || false,
+        appraisedBy: initialRecord.appraisedBy || initialRecord.Appraiser || '',
+        appraisedPosition: initialRecord.appraisedPos || initialRecord.AppraiserPos || '',
+        appraisedDate: (initialRecord.appraisedDate || initialRecord.AppraisedDate) ? (initialRecord.appraisedDate || initialRecord.AppraisedDate).split('T')[0] : '',
+        appraisedSGD: initialRecord.sgdAppraised || initialRecord.SGD_APPRAISED || false,
+        appraisedTPD: initialRecord.tpdAppraised || initialRecord.TPD_APPRAISED || false,
         
-        assessedBy: initialRecord.assessor || '',
-        assessedPosition: initialRecord.assessorPos || '',
-        assessedDate: initialRecord.assessorDate ? initialRecord.assessorDate.split('T')[0] : '',
-        assessedSGD: initialRecord.sgdAssessed || false,
-        assessedTPD: initialRecord.tpdAssessed || false,
+        assessedBy: initialRecord.assessedBy || initialRecord.Assessor || initialRecord.assessor || '',
+        assessedPosition: initialRecord.assessedPos || initialRecord.AssessorPos || initialRecord.assessorPos || '',
+        assessedDate: (initialRecord.assessedDate || initialRecord.AssessorDate || initialRecord.assessorDate) ? (initialRecord.assessedDate || initialRecord.AssessorDate || initialRecord.assessorDate).split('T')[0] : '',
+        assessedSGD: initialRecord.sgdAssessed || initialRecord.SGD_ASSESSED || false,
+        assessedTPD: initialRecord.tpdAssessed || initialRecord.TPD_ASSESSED || false,
         
         checkedBy: '', // Not in API response
         checkedPosition: '', // Not in API response
@@ -211,35 +215,35 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({
         checkedSGD: false,
         checkedTPD: false,
         
-        recommendingBy: initialRecord.recApproval || '',
-        recommendingPosition: initialRecord.recApprovalPos || '',
-        recommendingDate: initialRecord.recAppDate ? initialRecord.recAppDate.split('T')[0] : '',
-        recommendingSGD: initialRecord.sgdRecommend || false,
-        recommendingTPD: initialRecord.tpdRecommend || false,
+        recommendingBy: initialRecord.recApproval || initialRecord.Rec_Approval || '',
+        recommendingPosition: initialRecord.recApprovalPos || initialRecord.Rec_ApprovalPos || '',
+        recommendingDate: (initialRecord.recAppDate || initialRecord.Rec_AppDate) ? (initialRecord.recAppDate || initialRecord.Rec_AppDate).split('T')[0] : '',
+        recommendingSGD: initialRecord.sgdRecommend || initialRecord.SGD_RECOMMEND || false,
+        recommendingTPD: initialRecord.tpdRecommend || initialRecord.TPD_RECOMMEND || false,
         
-        approvedBy: initialRecord.approved || '',
-        approvedPosition: initialRecord.approvedPos || '',
-        approvedDate: initialRecord.approvedDate ? initialRecord.approvedDate.split('T')[0] : '',
-        approvedSGD: initialRecord.sgdApproved || false,
-        approvedTPD: initialRecord.tpdApproved || false,
+        approvedBy: initialRecord.approved || initialRecord.Approved || '',
+        approvedPosition: initialRecord.approvedPos || initialRecord.ApprovedPos || '',
+        approvedDate: (initialRecord.approvedDate || initialRecord.ApprovedDate) ? (initialRecord.approvedDate || initialRecord.ApprovedDate).split('T')[0] : '',
+        approvedSGD: initialRecord.sgdApproved || initialRecord.SGD_APPROVED || false,
+        approvedTPD: initialRecord.tpdApproved || initialRecord.TPD_APPROVED || false,
         
-        provincialAssessor: initialRecord.provAssessor || '',
-        provincialPosition: initialRecord.provAssessorPos || '',
-        provincialDate: initialRecord.provAssessorDate ? initialRecord.provAssessorDate.split('T')[0] : '',
-        provincialSGD: initialRecord.sgdProv || false,
-        provincialTPD: initialRecord.tpdProv || false,
+        provincialAssessor: initialRecord.provAssessor || initialRecord.ProvAssessor || '',
+        provincialPosition: initialRecord.provAssessorPos || initialRecord.ProvAssessorPos || '',
+        provincialDate: (initialRecord.provAssessorDate || initialRecord.ProvAssessorDate) ? (initialRecord.provAssessorDate || initialRecord.ProvAssessorDate).split('T')[0] : '',
+        provincialSGD: initialRecord.sgdProv || initialRecord.SGD_PROV || false,
+        provincialTPD: initialRecord.tpdProv || initialRecord.TPD_PROV || false,
         
-        cityAssessor: initialRecord.cityAssessor || '',
-        cityPosition: initialRecord.cityAssessorPos || '',
-        cityDate: initialRecord.cityAssessorDate ? initialRecord.cityAssessorDate.split('T')[0] : '',
-        citySGD: initialRecord.sgdCity || false,
-        cityTPD: initialRecord.tpdCity || false,
+        cityAssessor: initialRecord.cityAssessor || initialRecord.CityAssessor || '',
+        cityPosition: initialRecord.cityAssessorPos || initialRecord.CityAssessorPos || '',
+        cityDate: (initialRecord.cityAssessorDate || initialRecord.CityAssessorDate) ? (initialRecord.cityAssessorDate || initialRecord.CityAssessorDate).split('T')[0] : '',
+        citySGD: initialRecord.sgdCity || initialRecord.SGD_CITY || false,
+        cityTPD: initialRecord.tpdCity || initialRecord.TPD_CITY || false,
         
-        deputy: initialRecord.deputy || '',
-        deputyPosition: initialRecord.deputyPos || '',
-        deputyDate: initialRecord.deputyDate ? initialRecord.deputyDate.split('T')[0] : '',
-        deputySGD: initialRecord.sgdDeputy || false,
-        deputyTPD: initialRecord.tpdDeputy || false,
+        deputy: initialRecord.deputy || initialRecord.Deputy || '',
+        deputyPosition: initialRecord.deputyPos || initialRecord.DeputyPos || '',
+        deputyDate: (initialRecord.deputyDate || initialRecord.DeputyDate) ? (initialRecord.deputyDate || initialRecord.DeputyDate).split('T')[0] : '',
+        deputySGD: initialRecord.sgdDeputy || initialRecord.SGD_DEPUTY || false,
+        deputyTPD: initialRecord.tpdDeputy || initialRecord.TPD_DEPUTY || false,
         
         entryDate: '', // Not explicitly in API for this section
         entryBy: '', // Not explicitly in API for this section
@@ -254,10 +258,107 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({
   const [isSavingSignatory, setIsSavingSignatory] = useState(false);
   const [isSavingMemo, setIsSavingMemo] = useState(false);
   const [isSavingSworn, setIsSavingSworn] = useState(false);
+  
+  const [templates, setTemplates] = useState<SetupSignatoryTemplate[]>([]);
+  const [selectedTemplateYear, setSelectedTemplateYear] = useState<string>('');
+  const [setupSignatories, setSetupSignatories] = useState<SetupSignatory[]>([]);
+
+  React.useEffect(() => {
+    listTemplates().then(res => setTemplates(res.data)).catch(console.error);
+  }, []);
+
+  React.useEffect(() => {
+    const run = async () => {
+      try {
+        const all: SetupSignatory[] = [];
+        let page = 1;
+        let totalPages = 1;
+        do {
+          const res = await listSetupSignatories({ page, limit: 100, isActive: 'true' });
+          all.push(...res.data);
+          totalPages = res.meta.totalPages;
+          page += 1;
+        } while (page <= totalPages);
+        setSetupSignatories(all);
+      } catch (e: any) {
+        console.error(e);
+        pushNotice('error', e?.response?.data?.message || 'Failed to load setup signatories.');
+      }
+    };
+    run();
+  }, []);
+
+  const handleApplyTemplate = (yearStr: string) => {
+    const year = parseInt(yearStr);
+    const template = templates.find(t => t.year === year);
+    if (!template) return;
+    
+    setFormData(prev => ({
+      ...prev,
+      appraisedBy: template.appraisedBy?.name || '',
+      appraisedPosition: template.appraisedBy?.title || '',
+      appraisedSGD: template.appraisedSgd || false,
+      appraisedTPD: template.appraisedTpd || false,
+      appraisedDate: template.appraisedDate ? template.appraisedDate.split('T')[0] : '',
+      
+      assessedBy: template.assessedBy?.name || '',
+      assessedPosition: template.assessedBy?.title || '',
+      assessedSGD: template.assessedSgd || false,
+      assessedTPD: template.assessedTpd || false,
+      assessedDate: template.assessedDate ? template.assessedDate.split('T')[0] : '',
+      
+      recommendingBy: template.recommendingBy?.name || '',
+      recommendingPosition: template.recommendingBy?.title || '',
+      recommendingSGD: template.recommendingSgd || false,
+      recommendingTPD: template.recommendingTpd || false,
+      recommendingDate: template.recommendingDate ? template.recommendingDate.split('T')[0] : '',
+      
+      approvedBy: template.approvedBy?.name || '',
+      approvedPosition: template.approvedBy?.title || '',
+      approvedSGD: template.approvedSgd || false,
+      approvedTPD: template.approvedTpd || false,
+      approvedDate: template.approvedDate ? template.approvedDate.split('T')[0] : '',
+      
+      provincialAssessor: template.provincialAssessor?.name || '',
+      provincialPosition: template.provincialAssessor?.title || '',
+      provincialSGD: template.provincialAssessorSgd || false,
+      provincialTPD: template.provincialAssessorTpd || false,
+      provincialDate: template.provincialAssessorDate ? template.provincialAssessorDate.split('T')[0] : '',
+      
+      cityAssessor: template.cityAssessor?.name || '',
+      cityPosition: template.cityAssessor?.title || '',
+      citySGD: template.cityAssessorSgd || false,
+      cityTPD: template.cityAssessorTpd || false,
+      cityDate: template.cityAssessorDate ? template.cityAssessorDate.split('T')[0] : '',
+      
+      deputy: template.deputy?.name || '',
+      deputyPosition: template.deputy?.title || '',
+      deputySGD: template.deputySgd || false,
+      deputyTPD: template.deputyTpd || false,
+      deputyDate: template.deputyDate ? template.deputyDate.split('T')[0] : '',
+    }));
+    
+    pushNotice('success', `Applied signatories from ${year} template.`);
+    setSelectedTemplateYear('');
+  };
+
+  const handleAutoApplyTemplate = () => {
+    // Find the most recent active template
+    const activeTemplates = templates.filter(t => t.isActive);
+    if (activeTemplates.length === 0) {
+      pushNotice('error', 'No active templates found.');
+      return;
+    }
+    
+    // Sort descending by year
+    const latestTemplate = activeTemplates.sort((a, b) => b.year - a.year)[0];
+    handleApplyTemplate(latestTemplate.year.toString());
+  };
 
   const currentUser = user?.name || 'System';
   const role = (user?.role || '').toLowerCase();
-  const canEdit = isEnabled || ['administrator', 'admin', 'dataentry', 'assessor'].includes(role);
+  const isTransactionActive = !!initialRecord?.id?.startsWith('TRANS-');
+  const canEdit = isEnabled && ['administrator', 'admin', 'dataentry', 'assessor'].includes(role);
   const controlsEnabled = isEditing;
 
   const [signatories, setSignatories] = useState<SignatoryRecord[]>([
@@ -411,10 +512,14 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({
   const [pendingDelete, setPendingDelete] = useState<{ type: 'signatory' | 'memorandum' | 'sworn'; id: string } | null>(null);
 
   const handleSave = async () => {
-    if (!initialRecord?.tdn) return;
+    const tdn = initialRecord?.TDN || initialRecord?.tdn;
+    if (!tdn) {
+      pushNotice('error', 'No TDN found for this record.');
+      return;
+    }
     try {
       pushNotice('success', 'Saving changes...');
-      await updateSignatory(initialRecord.tdn, formData);
+      await updateSignatory(tdn, formData);
       
       // Propagate changes to parent (faas_records system)
       if (onUpdate) {
@@ -425,9 +530,9 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({
           sgdAppraised: formData.appraisedSGD,
           tpdAppraised: formData.appraisedTPD,
           
-          assessor: formData.assessedBy,
-          assessorPos: formData.assessedPosition,
-          assessorDate: formData.assessedDate,
+          assessedBy: formData.assessedBy,
+          assessedPos: formData.assessedPosition,
+          assessedDate: formData.assessedDate,
           sgdAssessed: formData.assessedSGD,
           tpdAssessed: formData.assessedTPD,
           
@@ -450,8 +555,8 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({
           tpdProv: formData.provincialTPD,
           
           cityAssessor: formData.cityAssessor,
-          cityAssessorPos: formData.cityPosition,
-          cityAssessorDate: formData.cityDate,
+          cityPos: formData.cityPosition,
+          cityDate: formData.cityDate,
           sgdCity: formData.citySGD,
           tpdCity: formData.cityTPD,
           
@@ -476,10 +581,71 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({
     setFormData(defaultFormData);
   };
 
-  const handleRefresh = () => {
-    setFormData(defaultFormData);
+  const handleRefresh = async () => {
+    if (onRefresh) {
+      await onRefresh();
+    }
+    
+    if (initialRecord) {
+      setFormData({
+        appraisedBy: initialRecord.appraisedBy || initialRecord.Appraiser || '',
+        appraisedPosition: initialRecord.appraisedPos || initialRecord.AppraiserPos || '',
+        appraisedDate: (initialRecord.appraisedDate || initialRecord.AppraisedDate) ? (initialRecord.appraisedDate || initialRecord.AppraisedDate).split('T')[0] : '',
+        appraisedSGD: initialRecord.sgdAppraised || initialRecord.SGD_APPRAISED || false,
+        appraisedTPD: initialRecord.tpdAppraised || initialRecord.TPD_APPRAISED || false,
+        
+        assessedBy: initialRecord.assessedBy || initialRecord.Assessor || initialRecord.assessor || '',
+        assessedPosition: initialRecord.assessedPos || initialRecord.AssessorPos || initialRecord.assessorPos || '',
+        assessedDate: (initialRecord.assessedDate || initialRecord.AssessorDate || initialRecord.assessorDate) ? (initialRecord.assessedDate || initialRecord.AssessorDate || initialRecord.assessorDate).split('T')[0] : '',
+        assessedSGD: initialRecord.sgdAssessed || initialRecord.SGD_ASSESSED || false,
+        assessedTPD: initialRecord.tpdAssessed || initialRecord.TPD_ASSESSED || false,
+        
+        checkedBy: '',
+        checkedPosition: '',
+        checkedDate: '',
+        checkedSGD: false,
+        checkedTPD: false,
+        
+        recommendingBy: initialRecord.recApproval || initialRecord.Rec_Approval || '',
+        recommendingPosition: initialRecord.recApprovalPos || initialRecord.Rec_ApprovalPos || '',
+        recommendingDate: (initialRecord.recAppDate || initialRecord.Rec_AppDate) ? (initialRecord.recAppDate || initialRecord.Rec_AppDate).split('T')[0] : '',
+        recommendingSGD: initialRecord.sgdRecommend || initialRecord.SGD_RECOMMEND || false,
+        recommendingTPD: initialRecord.tpdRecommend || initialRecord.TPD_RECOMMEND || false,
+        
+        approvedBy: initialRecord.approved || initialRecord.Approved || '',
+        approvedPosition: initialRecord.approvedPos || initialRecord.ApprovedPos || '',
+        approvedDate: (initialRecord.approvedDate || initialRecord.ApprovedDate) ? (initialRecord.approvedDate || initialRecord.ApprovedDate).split('T')[0] : '',
+        approvedSGD: initialRecord.sgdApproved || initialRecord.SGD_APPROVED || false,
+        approvedTPD: initialRecord.tpdApproved || initialRecord.TPD_APPROVED || false,
+        
+        provincialAssessor: initialRecord.provAssessor || initialRecord.ProvAssessor || '',
+        provincialPosition: initialRecord.provAssessorPos || initialRecord.ProvAssessorPos || '',
+        provincialDate: (initialRecord.provAssessorDate || initialRecord.ProvAssessorDate) ? (initialRecord.provAssessorDate || initialRecord.ProvAssessorDate).split('T')[0] : '',
+        provincialSGD: initialRecord.sgdProv || initialRecord.SGD_PROV || false,
+        provincialTPD: initialRecord.tpdProv || initialRecord.TPD_PROV || false,
+        
+        cityAssessor: initialRecord.cityAssessor || initialRecord.CityAssessor || '',
+        cityPosition: initialRecord.cityAssessorPos || initialRecord.CityAssessorPos || '',
+        cityDate: (initialRecord.cityAssessorDate || initialRecord.CityAssessorDate) ? (initialRecord.cityAssessorDate || initialRecord.CityAssessorDate).split('T')[0] : '',
+        citySGD: initialRecord.sgdCity || initialRecord.SGD_CITY || false,
+        cityTPD: initialRecord.tpdCity || initialRecord.TPD_CITY || false,
+        
+        deputy: initialRecord.deputy || initialRecord.Deputy || '',
+        deputyPosition: initialRecord.deputyPos || initialRecord.DeputyPos || '',
+        deputyDate: (initialRecord.deputyDate || initialRecord.DeputyDate) ? (initialRecord.deputyDate || initialRecord.DeputyDate).split('T')[0] : '',
+        deputySGD: initialRecord.sgdDeputy || initialRecord.SGD_DEPUTY || false,
+        deputyTPD: initialRecord.tpdDeputy || initialRecord.TPD_DEPUTY || false,
+        
+        entryDate: '',
+        entryBy: '',
+      });
+      pushNotice('success', 'Data refreshed from server.');
+    } else {
+      setFormData(defaultFormData);
+    }
     setDocumentationData(defaultDocumentationData);
     setRemarksData(defaultRemarksData);
+    setIsEditing(false);
   };
 
   const pushNotice = (type: 'success' | 'error', message: string) => {
@@ -924,7 +1090,7 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({
     sgdField: keyof SignatoriesFormData,
     tpdField: keyof SignatoriesFormData
   ) => (
-    <div className="grid grid-cols-12 gap-2 items-center py-2 border-b border-slate-200 dark:border-slate-700">
+    <div className="grid grid-cols-12 gap-2 items-center py-1">
       <div className="col-span-2 flex items-center gap-2">
         <label className="flex items-center gap-1">
           <input
@@ -951,12 +1117,30 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({
         <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">{label}:</label>
         <select
           value={formData[nameField] as string}
-          onChange={(e) => setFormData({ ...formData, [nameField]: e.target.value })}
+          onChange={(e) => {
+            const name = e.target.value;
+            const selected = setupSignatories.find((s) => s.name === name);
+            setFormData((prev) => ({
+              ...prev,
+              [nameField]: name,
+              [positionField]: selected?.title ?? (prev[positionField] as string),
+            } as SignatoriesFormData));
+          }}
           disabled={!controlsEnabled}
           className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
         >
-          <option value={formData[nameField] as string}>{formData[nameField] as string}</option>
-          {/* Add more options dynamically if needed */}
+          <option value="">{`Select ${label}`}</option>
+          {formData[nameField] && !setupSignatories.some((s) => s.name === (formData[nameField] as string)) && (
+            <option value={formData[nameField] as string}>{formData[nameField] as string}</option>
+          )}
+          {setupSignatories
+            .slice()
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((s) => (
+              <option key={s.id} value={s.name}>
+                {s.name}
+              </option>
+            ))}
         </select>
       </div>
       <div className="col-span-4">
@@ -1002,7 +1186,7 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({
         <div className="flex items-center gap-2">
           <Users size={20} className="text-white" />
           <h2 className="text-base font-semibold text-white">
-            Signatories / Memorandum of TDN {initialRecord ? initialRecord.tdn : ''}
+            Signatories / Memorandum of TDN {initialRecord ? (initialRecord.TDN || initialRecord.tdn) : ''}
           </h2>
         </div>
       </div>
@@ -1073,6 +1257,35 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({
                 <RefreshCw size={14} />
                 Refresh
               </button>
+              
+              {(isEditing || isTransactionActive) && (
+                <>
+                  <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1 self-center" />
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleAutoApplyTemplate}
+                      disabled={!isEditing}
+                      data-testid="btn-auto-prefill"
+                      title="Automatically prefill signatories from latest active template"
+                      className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <RefreshCw size={14} />
+                      Auto-Prefill
+                    </button>
+                    <select
+                      value={selectedTemplateYear}
+                      onChange={(e) => handleApplyTemplate(e.target.value)}
+                      disabled={!isEditing}
+                      className="px-2 py-1.5 text-xs bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                    >
+                      <option value="">Load Template...</option>
+                      {templates.map(t => (
+                        <option key={t.id} value={t.year}>{t.year} {t.description ? `- ${t.description}` : ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
             </div>
 
             {renderSignatoryRow('Appraised By', 'appraisedBy', 'appraisedPosition', 'appraisedDate', 'appraisedSGD', 'appraisedTPD')}
@@ -1085,7 +1298,7 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({
             {renderSignatoryRow('Deputy', 'deputy', 'deputyPosition', 'deputyDate', 'deputySGD', 'deputyTPD')}
             
             {/* Entry Date */}
-            <div className="grid grid-cols-12 gap-2 items-center py-2 border-b border-slate-200 dark:border-slate-700">
+            <div className="grid grid-cols-12 gap-2 items-center py-1">
               <div className="col-span-2"></div>
               <div className="col-span-3">
                 <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Entry Date:</label>

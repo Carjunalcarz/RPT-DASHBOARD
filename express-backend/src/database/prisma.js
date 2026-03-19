@@ -1,5 +1,5 @@
 const { PrismaClient: MssqlClient } = require('../generated/mssql-client');
-const { PrismaClient: SupabaseClient } = require('../generated/supabase-client-v5');
+const { PrismaClient: SupabaseClient } = require('../generated/supabase-client-v6');
 const { getContext } = require('../utils/context');
 const logger = require('../utils/logger');
 

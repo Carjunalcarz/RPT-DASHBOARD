@@ -26,7 +26,7 @@ const DataEntry: React.FC = () => {
   const darkerColorDark = `rgb(${Math.max(0, rgbDark.r - 40)}, ${Math.max(0, rgbDark.g - 40)}, ${Math.max(0, rgbDark.b - 40)})`;
   
   return (
-    <div data-testid="data-entry-page" className="h-[calc(100vh-64px)]">
+    <div data-testid="data-entry-page" className="min-h-full flex flex-col">
       {/* Dynamic Color Header with Breadcrumb */}
       <div
         className="px-4 py-3 -mx-6 -mt-6 mb-6"

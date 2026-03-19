@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dialog';
 import { saveDraft, submitForReview, listFaasRecords, getFaasRecord, deleteFaasRecord, cancelFaasTransaction } from '@/services/faasService';
 import { PropertyRecord } from './types';
+import { cleanPin } from '@/components/data-entry/utils';
 
 const RealPropertyDataEntry: React.FC = () => {
   const { headerColor, headerColorDark } = useThemeColor();
@@ -564,7 +565,7 @@ const RealPropertyDataEntry: React.FC = () => {
       ...recordData,
       TDN: selectedRecord.TDN,
       ARP: selectedRecord.TDN, // Ensure ARP = TDN
-      PIN: selectedRecord.PIN,
+      PIN: cleanPin(selectedRecord.PIN),
       assessments: updatedAssessmentRecords,
       status: 'draft'
     };
@@ -618,18 +619,21 @@ const RealPropertyDataEntry: React.FC = () => {
   };
 
   const checkDuplicatePinTdn = async (pin: string, tdn: string): Promise<string | null> => {
+    // Clean PIN before checking
+    const cleanedPin = cleanPin(pin);
+    
     // Skip check if values are empty
-    if (!pin && !tdn) return null;
+    if (!cleanedPin && !tdn) return null;
 
     try {
       // 1. Check Supabase (New System) - Primary Validation
       // We check for conflicts in Drafts/For-Review/Approved records in Supabase
       
       // Check PIN in Supabase
-      if (pin) {
+      if (cleanedPin) {
         const pinResult = await listFaasRecords({
           searchField: 'PIN',
-          filterValue: pin,
+          filterValue: cleanedPin,
           limit: 1
         });
 
@@ -649,7 +653,7 @@ const RealPropertyDataEntry: React.FC = () => {
                  // Valid continuity - The found record is the predecessor of this transaction
              } else {
                  const tdn = duplicateTdn || 'Unknown TDN';
-                 return `PIN ${pin} already exists in a pending/approved record (TDN: ${tdn}, Status: ${duplicatePin.status})`;
+                 return `PIN ${cleanedPin} already exists in a pending/approved record (TDN: ${tdn}, Status: ${duplicatePin.status})`;
              }
          }
       }
@@ -719,7 +723,7 @@ const RealPropertyDataEntry: React.FC = () => {
         ...recordData,
         TDN: selectedRecord.TDN,
         ARP: selectedRecord.TDN, // Ensure ARP = TDN as per user request
-        PIN: selectedRecord.PIN,
+        PIN: cleanPin(selectedRecord.PIN),
         assessments: assessmentRecords,
         status: 'draft'
       };
@@ -814,7 +818,7 @@ const RealPropertyDataEntry: React.FC = () => {
         ...recordData,
         TDN: selectedRecord.TDN,
         ARP: selectedRecord.TDN, // Ensure ARP = TDN
-        PIN: selectedRecord.PIN,
+        PIN: cleanPin(selectedRecord.PIN),
         assessments: assessmentRecords,
         status: 'for-review'
       };
@@ -1127,7 +1131,7 @@ const RealPropertyDataEntry: React.FC = () => {
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.TDN}</td>
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.pOldTdn || ''}</td>
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.TDN}</td>
-                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{record.PIN}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap">{cleanPin(record.PIN)}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
                         record.status === 'approved' 

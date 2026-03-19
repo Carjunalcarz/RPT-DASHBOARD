@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/supabase-client-v5"
+  output   = "../src/generated/supabase-client-v6"
 }
 
 datasource db {
@@ -92,6 +92,99 @@ model UserRole {
 
   @@unique([userId, roleId])
   @@map("user_roles")
+}
+
+model SetupSignatory {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @db.VarChar(200)
+  title       String   @db.VarChar(200)
+  department  String   @db.VarChar(200)
+  email       String?  @db.VarChar(254)
+  phone       String?  @db.VarChar(50)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdById String?  @map("created_by_id") @db.Uuid
+  updatedById String?  @map("updated_by_id") @db.Uuid
+  deletedById String?  @map("deleted_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  // Reverse relations for templates
+  appraisedTemplates          SetupSignatoryTemplate[] @relation("AppraisedBy")
+  assessedTemplates           SetupSignatoryTemplate[] @relation("AssessedBy")
+  recommendingTemplates       SetupSignatoryTemplate[] @relation("RecommendingBy")
+  approvedTemplates           SetupSignatoryTemplate[] @relation("ApprovedBy")
+  provincialAssessorTemplates SetupSignatoryTemplate[] @relation("ProvincialAssessor")
+  cityAssessorTemplates       SetupSignatoryTemplate[] @relation("CityAssessor")
+  deputyTemplates             SetupSignatoryTemplate[] @relation("Deputy")
+
+  @@index([deletedAt])
+  @@index([department])
+  @@index([title])
+  @@index([name])
+  @@index([isActive])
+  @@map("setup_signatories")
+}
+
+model SetupSignatoryTemplate {
+  id                   String          @id @default(uuid()) @db.Uuid
+  year                 Int
+  description          String?
+  isActive             Boolean         @default(true) @map("is_active")
+  
+  appraisedById        String?         @map("appraised_by_id") @db.Uuid
+  appraisedSgd         Boolean?        @default(false) @map("appraised_sgd")
+  appraisedTpd         Boolean?        @default(false) @map("appraised_tpd")
+  appraisedDate        DateTime?       @map("appraised_date") @db.Date
+
+  assessedById         String?         @map("assessed_by_id") @db.Uuid
+  assessedSgd          Boolean?        @default(false) @map("assessed_sgd")
+  assessedTpd          Boolean?        @default(false) @map("assessed_tpd")
+  assessedDate         DateTime?       @map("assessed_date") @db.Date
+
+  recommendingById     String?         @map("recommending_by_id") @db.Uuid
+  recommendingSgd      Boolean?        @default(false) @map("recommending_sgd")
+  recommendingTpd      Boolean?        @default(false) @map("recommending_tpd")
+  recommendingDate     DateTime?       @map("recommending_date") @db.Date
+
+  approvedById         String?         @map("approved_by_id") @db.Uuid
+  approvedSgd          Boolean?        @default(false) @map("approved_sgd")
+  approvedTpd          Boolean?        @default(false) @map("approved_tpd")
+  approvedDate         DateTime?       @map("approved_date") @db.Date
+
+  provincialAssessorId String?         @map("provincial_assessor_id") @db.Uuid
+  provincialAssessorSgd Boolean?       @default(false) @map("provincial_assessor_sgd")
+  provincialAssessorTpd Boolean?       @default(false) @map("provincial_assessor_tpd")
+  provincialAssessorDate DateTime?      @map("provincial_assessor_date") @db.Date
+
+  cityAssessorId       String?         @map("city_assessor_id") @db.Uuid
+  cityAssessorSgd      Boolean?        @default(false) @map("city_assessor_sgd")
+  cityAssessorTpd      Boolean?        @default(false) @map("city_assessor_tpd")
+  cityAssessorDate     DateTime?       @map("city_assessor_date") @db.Date
+
+  deputyId             String?         @map("deputy_id") @db.Uuid
+  deputySgd            Boolean?        @default(false) @map("deputy_sgd")
+  deputyTpd            Boolean?        @default(false) @map("deputy_tpd")
+  deputyDate           DateTime?       @map("deputy_date") @db.Date
+
+  // Relations
+  appraisedBy          SetupSignatory? @relation("AppraisedBy", fields: [appraisedById], references: [id])
+  assessedBy           SetupSignatory? @relation("AssessedBy", fields: [assessedById], references: [id])
+  recommendingBy       SetupSignatory? @relation("RecommendingBy", fields: [recommendingById], references: [id])
+  approvedBy           SetupSignatory? @relation("ApprovedBy", fields: [approvedById], references: [id])
+  provincialAssessor   SetupSignatory? @relation("ProvincialAssessor", fields: [provincialAssessorId], references: [id])
+  cityAssessor         SetupSignatory? @relation("CityAssessor", fields: [cityAssessorId], references: [id])
+  deputy               SetupSignatory? @relation("Deputy", fields: [deputyId], references: [id])
+
+  createdById          String?         @map("created_by_id") @db.Uuid
+  updatedById          String?         @map("updated_by_id") @db.Uuid
+  deletedById          String?         @map("deleted_by_id") @db.Uuid
+  createdAt            DateTime        @default(now()) @map("created_at")
+  updatedAt            DateTime        @updatedAt @map("updated_at")
+  deletedAt            DateTime?       @map("deleted_at")
+
+  @@unique([year, deletedAt]) // Allow multiple years if one is deleted, but active unique year
+  @@map("setup_signatory_templates")
 }
 
 model BuildingType {

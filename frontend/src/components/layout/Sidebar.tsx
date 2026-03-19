@@ -18,7 +18,8 @@ import {
   UserCog,
   Database,
   CheckCircle,
-  ChevronDown
+  ChevronDown,
+  Settings2
 } from 'lucide-react';
 
 interface MenuItem {
@@ -49,11 +50,18 @@ const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isApprovingExpanded, setIsApprovingExpanded] = useState(false);
+  const [isSetupExpanded, setIsSetupExpanded] = useState(false);
   const [shouldFocusApprovalsChild, setShouldFocusApprovalsChild] = useState(false);
+  const [shouldFocusSetupChild, setShouldFocusSetupChild] = useState(false);
   const municipalityRef = useRef<HTMLAnchorElement | null>(null);
+  const setupSignatoryRef = useRef<HTMLAnchorElement | null>(null);
 
   const isApprovingActive = useMemo(() => {
     return location.pathname.startsWith('/approvals') || location.pathname.startsWith('/property-approval');
+  }, [location.pathname]);
+
+  const isSetupActive = useMemo(() => {
+    return location.pathname.startsWith('/setup');
   }, [location.pathname]);
 
   useEffect(() => {
@@ -61,7 +69,10 @@ const Sidebar: React.FC = () => {
     if (isApprovingActive) {
       setIsApprovingExpanded(true);
     }
-  }, [isApprovingActive, isCollapsed]);
+    if (isSetupActive) {
+      setIsSetupExpanded(true);
+    }
+  }, [isApprovingActive, isSetupActive, isCollapsed]);
 
   useEffect(() => {
     if (isCollapsed) return;
@@ -73,6 +84,17 @@ const Sidebar: React.FC = () => {
       setShouldFocusApprovalsChild(false);
     });
   }, [isCollapsed, isApprovingExpanded, shouldFocusApprovalsChild]);
+
+  useEffect(() => {
+    if (isCollapsed) return;
+    if (!isSetupExpanded) return;
+    if (!shouldFocusSetupChild) return;
+
+    requestAnimationFrame(() => {
+      setupSignatoryRef.current?.focus();
+      setShouldFocusSetupChild(false);
+    });
+  }, [isCollapsed, isSetupExpanded, shouldFocusSetupChild]);
 
   const handleLogout = () => {
     logout();
@@ -103,6 +125,21 @@ const Sidebar: React.FC = () => {
     });
   };
 
+  const handleSetupParentClick = () => {
+    if (isCollapsed) {
+      setIsCollapsed(false);
+      setIsSetupExpanded(true);
+      setShouldFocusSetupChild(true);
+      return;
+    }
+
+    setIsSetupExpanded(prev => {
+      const next = !prev;
+      if (next) setShouldFocusSetupChild(true);
+      return next;
+    });
+  };
+
   return (
     <aside
       data-testid="sidebar"
@@ -128,9 +165,9 @@ const Sidebar: React.FC = () => {
                   }`
                 }
               >
-                <Icon size={20} className="flex-shrink-0" />
+                <Icon size={19} className="flex-shrink-0" />
                 {!isCollapsed && (
-                  <span className="text-sm font-medium">{item.label}</span>
+                  <span className="text-[13px] font-medium">{item.label}</span>
                 )}
               </NavLink>
             );
@@ -149,12 +186,12 @@ const Sidebar: React.FC = () => {
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
               }`}
             >
-              <CheckCircle size={20} className="flex-shrink-0" />
+              <CheckCircle size={19} className="flex-shrink-0" />
               {!isCollapsed && (
                 <>
-                  <span className="text-sm font-medium flex-1 text-left">Approving Parent</span>
+                  <span className="text-[13px] font-medium flex-1 text-left">Approving Parent</span>
                   <ChevronDown
-                    size={18}
+                    size={17}
                     className={`transition-transform ${isApprovingExpanded ? 'rotate-180' : ''}`}
                   />
                 </>
@@ -182,7 +219,7 @@ const Sidebar: React.FC = () => {
                     }`
                   }
                 >
-                  <span className="text-sm font-medium">Municipality</span>
+                  <span className="text-[13px] font-medium">Municipality</span>
                 </NavLink>
                 <NavLink
                   to="/approvals/provincial"
@@ -195,9 +232,61 @@ const Sidebar: React.FC = () => {
                     }`
                   }
                 >
-                  <span className="text-sm font-medium">Province</span>
+                  <span className="text-[13px] font-medium">Province</span>
                 </NavLink>
               </div>
+            )}
+          </div>
+
+          <div>
+            <button
+              type="button"
+              onClick={handleSetupParentClick}
+              data-testid="nav-setup-parent"
+              aria-expanded={!isCollapsed && isSetupExpanded}
+              aria-controls="setup-children"
+              className={`w-full flex items-center gap-3 px-3 py-2.5 my-1 rounded-lg transition-colors ${
+                isSetupActive
+                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+              }`}
+            >
+              <Settings2 size={19} className="flex-shrink-0" />
+              {!isCollapsed && (
+                <>
+                  <span className="text-[13px] font-medium flex-1 text-left">Setup</span>
+                  <ChevronDown
+                    size={17}
+                    className={`transition-transform ${isSetupExpanded ? 'rotate-180' : ''}`}
+                  />
+                </>
+              )}
+            </button>
+
+            {!isCollapsed && (
+              <div
+                id="setup-children"
+                className={`ml-6 pl-2 transition-all duration-200 ease-in-out ${
+                  isSetupExpanded
+                    ? 'max-h-40 opacity-100 border-l border-slate-200 dark:border-slate-700'
+                    : 'max-h-0 opacity-0 overflow-hidden pointer-events-none border-l border-transparent'
+                }`}
+              >
+                <NavLink
+                  to="/setup/signatory"
+                  data-testid="nav-setup-signatory"
+                  ref={setupSignatoryRef}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 px-3 py-2 my-1 rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`
+                  }
+                >
+                   <span className="text-[13px] font-medium">Setup_Signatory</span>
+                 </NavLink>
+               </div>
             )}
           </div>
 
@@ -216,9 +305,9 @@ const Sidebar: React.FC = () => {
                   }`
                 }
               >
-                <Icon size={20} className="flex-shrink-0" />
+                <Icon size={19} className="flex-shrink-0" />
                 {!isCollapsed && (
-                  <span className="text-sm font-medium">{item.label}</span>
+                  <span className="text-[13px] font-medium">{item.label}</span>
                 )}
               </NavLink>
             );

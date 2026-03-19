@@ -61,6 +61,31 @@ export const getFaasRecord = async (id: string): Promise<FaasRecord> => {
   }
 };
 
+export interface FaasTdnHistoryRow {
+  id: string;
+  tdn: string;
+  previousTdn: string | null;
+  pin: string | null;
+  effectivityDate: string | null;
+  ownerCode: string | null;
+  declaredOwner: string | null;
+  prevMarketValue: number;
+  prevAssessedValue: number;
+  taxBegYear: number | null;
+  isCurrent: boolean;
+  changeReason: string;
+}
+
+export const getFaasTdnHistory = async (id: string): Promise<FaasTdnHistoryRow[]> => {
+  try {
+    const response = await api.get(`/faas/${id}/tdn-history`);
+    return response.data.data;
+  } catch (error) {
+    console.error('Error getting TDN history:', error);
+    throw error;
+  }
+};
+
 export const deleteFaasRecord = async (id: string): Promise<void> => {
   try {
     await api.delete(`/faas/${id}`);
@@ -95,6 +120,26 @@ export const batchUpdateFaasStatus = async (ids: string[], status: 'draft' | 'fo
     return response.data.data;
   } catch (error) {
     console.error('Error in batch update:', error);
+    throw error;
+  }
+};
+
+export const bulkMigrate = async (properties: any[], migrationType: string, skipExisting: boolean = false): Promise<any[]> => {
+  try {
+    const response = await api.post('/faas/bulk-migrate', { properties, migrationType, skipExisting });
+    return response.data.data;
+  } catch (error) {
+    console.error('Error in bulk migration:', error);
+    throw error;
+  }
+};
+
+export const checkExistingTdns = async (tdns: string[]): Promise<string[]> => {
+  try {
+    const response = await api.post('/faas/check-existing', { tdns });
+    return response.data.data;
+  } catch (error) {
+    console.error('Error checking existing TDNs:', error);
     throw error;
   }
 };

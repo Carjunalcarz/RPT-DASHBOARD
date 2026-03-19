@@ -10,6 +10,7 @@ interface TDN {
 
 interface PreviousTDNsTabProps {
   isEditing: boolean;
+  isTransactionActive?: boolean;
   onEnterEdit: () => void;
   onSave: () => void;
   onCancel: () => void;
@@ -18,6 +19,7 @@ interface PreviousTDNsTabProps {
 
 const PreviousTDNsTab: React.FC<PreviousTDNsTabProps> = ({
   isEditing,
+  isTransactionActive = false,
   onEnterEdit,
   onSave,
   onCancel,
@@ -29,6 +31,7 @@ const PreviousTDNsTab: React.FC<PreviousTDNsTabProps> = ({
   ]);
 
   const [originalTdns, setOriginalTdns] = useState(tdns);
+  const isEnabled = isEditing || isTransactionActive;
 
   useEffect(() => {
     if (isEditing && onDataChange) {
@@ -81,7 +84,7 @@ const PreviousTDNsTab: React.FC<PreviousTDNsTabProps> = ({
               Add TDN
             </button>
           )}
-          {!isEditing ? (
+          {isEnabled && !isEditing ? (
             <button
               onClick={onEnterEdit}
               className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors font-medium flex items-center gap-2"
@@ -90,7 +93,7 @@ const PreviousTDNsTab: React.FC<PreviousTDNsTabProps> = ({
               <Edit2 size={14} />
               Edit TDNs
             </button>
-          ) : (
+          ) : isEditing ? (
             <>
               <button
                 onClick={handleCancel}
@@ -109,7 +112,7 @@ const PreviousTDNsTab: React.FC<PreviousTDNsTabProps> = ({
                 Save Changes
               </button>
             </>
-          )}
+          ) : null}
         </div>
       </div>
 

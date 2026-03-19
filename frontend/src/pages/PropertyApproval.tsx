@@ -22,6 +22,7 @@ const PropertyApproval: React.FC = () => {
   const [record, setRecord] = useState<PropertyRecord | null>(null);
   const [assessmentRecords, setAssessmentRecords] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isApproving, setIsApproving] = useState(false);
   const [activeTab, setActiveTab] = useState('property-info');
   const [comments, setComments] = useState('');
   
@@ -165,6 +166,7 @@ const PropertyApproval: React.FC = () => {
     });
 
     if (isConfirmed) {
+        setIsApproving(true);
         try {
             const isFaasRecord = record.id && record.id.length === 36;
             
@@ -185,6 +187,8 @@ const PropertyApproval: React.FC = () => {
         } catch (error: any) {
             console.error('Approval failed:', error);
             toast.error(error.response?.data?.message || 'Failed to approve property');
+        } finally {
+            setIsApproving(false);
         }
     }
   };
@@ -192,6 +196,7 @@ const PropertyApproval: React.FC = () => {
   const handleRejectSubmit = async () => {
     if (!record || !actionReason) return;
     
+    setIsApproving(true);
     try {
         const remarks = `[REJECTED by ${user?.name}: ${actionReason}] ${record.status === 'draft' ? '' : (comments || '')}`;
         const updateData = {
@@ -214,12 +219,15 @@ const PropertyApproval: React.FC = () => {
     } catch (error) {
         console.error('Rejection failed:', error);
         toast.error('Failed to reject property');
+    } finally {
+        setIsApproving(false);
     }
   };
 
   const handleRequestChangesSubmit = async () => {
     if (!record || !actionReason) return;
 
+    setIsApproving(true);
     try {
         const remarks = `[CHANGES REQUESTED by ${user?.name}: ${actionReason}] ${comments || ''}`;
         const updateData = {
@@ -242,6 +250,8 @@ const PropertyApproval: React.FC = () => {
     } catch (error) {
         console.error('Request changes failed:', error);
         toast.error('Failed to request changes');
+    } finally {
+        setIsApproving(false);
     }
   };
 
@@ -256,6 +266,7 @@ const PropertyApproval: React.FC = () => {
     });
 
     if (isConfirmed) {
+      setIsApproving(true);
       try {
         const isFaasRecord = record.id && record.id.length === 36;
         if (isFaasRecord) {
@@ -269,6 +280,8 @@ const PropertyApproval: React.FC = () => {
       } catch (error) {
         console.error('Submission failed:', error);
         toast.error('Failed to submit for review');
+      } finally {
+        setIsApproving(false);
       }
     }
   };
@@ -341,10 +354,17 @@ const PropertyApproval: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-3">
+            {isApproving && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-medium animate-pulse border border-blue-100 dark:border-blue-800">
+                <RefreshCw size={16} className="animate-spin" />
+                Processing...
+              </div>
+            )}
             {record?.status === 'draft' ? (
                 <button
                     onClick={handleSubmitForReview}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2 shadow-md font-medium text-sm"
+                    disabled={isApproving}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center gap-2 shadow-md font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <Send size={16} />
                     Submit for Review
@@ -353,21 +373,24 @@ const PropertyApproval: React.FC = () => {
                 <>
                     <button
                         onClick={() => setShowRequestChangesDialog(true)}
-                        className="px-4 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors flex items-center gap-2 shadow-sm font-medium text-sm"
+                        disabled={isApproving}
+                        className="px-4 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors flex items-center gap-2 shadow-sm font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <MessageSquare size={16} />
                         Request Changes
                     </button>
                     <button
                         onClick={() => setShowRejectDialog(true)}
-                        className="px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors flex items-center gap-2 shadow-sm font-medium text-sm"
+                        disabled={isApproving}
+                        className="px-4 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors flex items-center gap-2 shadow-sm font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <XCircle size={16} />
                         Reject
                     </button>
                     <button
                         onClick={handleApprove}
-                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2 shadow-md font-medium text-sm"
+                        disabled={isApproving}
+                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2 shadow-md font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <CheckCircle size={16} />
                         Approve ({record?.status === 'pending-municipal' ? 'Municipal' : 'Provincial'})
@@ -376,6 +399,13 @@ const PropertyApproval: React.FC = () => {
             )}
           </div>
         </div>
+        
+        {/* Top Progress Bar */}
+        {isApproving && (
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-100 dark:bg-blue-900/50 overflow-hidden">
+            <div className="h-full bg-blue-600 animate-[progress_1.5s_ease-in-out_infinite] w-full origin-left" style={{ animationName: 'indeterminate-progress' }}></div>
+          </div>
+        )}
       </div>
 
       {/* Main Layout */}

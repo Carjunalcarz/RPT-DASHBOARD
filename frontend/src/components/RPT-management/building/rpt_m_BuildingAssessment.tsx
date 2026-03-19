@@ -33,10 +33,12 @@ interface BuildingAssessmentProps {
   records?: RptAssRecord[];
   isEnabled?: boolean;
   onUpdate?: (records: any[]) => void;
+  onEditModeChange?: (isEditing: boolean) => void;
+  onRefresh?: () => void;
   status?: string;
 }
 
-interface FormData {
+interface BuildingAssessmentFormData {
   classification: string;
   actualUse: string;
   subClass: string;
@@ -48,7 +50,7 @@ interface FormData {
   idleLand: boolean;
 }
 
-const defaultFormData: FormData = {
+const defaultFormData: BuildingAssessmentFormData = {
   classification: '',
   actualUse: '',
   subClass: '',
@@ -60,7 +62,14 @@ const defaultFormData: FormData = {
   idleLand: false,
 };
 
-const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRecords, isEnabled = true, onUpdate, status }) => {
+const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ 
+  records: apiRecords, 
+  isEnabled = true, 
+  onUpdate, 
+  onEditModeChange,
+  onRefresh,
+  status 
+}) => {
   // State for records table
   const [records, setRecords] = useState<BuildingRecord[]>([]);
   const { showConfirm } = useAlert();
@@ -90,9 +99,15 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
 
   const { headerColor, headerColorDark } = useThemeColor();
   const [selectedRecord, setSelectedRecord] = useState<BuildingRecord | null>(null);
-  const [formData, setFormData] = useState<FormData>(defaultFormData);
+  const [formData, setFormData] = useState<BuildingAssessmentFormData>(defaultFormData);
   const [isEditing, setIsEditing] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+
+  // Sync edit mode with parent
+  useEffect(() => {
+    onEditModeChange?.(isEditing || isAdding);
+  }, [isEditing, isAdding, onEditModeChange]);
+
   const [adjustments, setAdjustments] = useState<BldgAdjRecord[]>([]);
   const [structures, setStructures] = useState<BldgStrucRecord[]>([]);
   const [isStructureOpen, setIsStructureOpen] = useState(false);
@@ -403,9 +418,12 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRec
   };
 
   // Handle Refresh
-  const handleRefresh = () => {
-    // In real app, would fetch from API
-    console.log('Refreshing data...');
+  const handleRefresh = async () => {
+    if (onRefresh) {
+      await onRefresh();
+    }
+    setIsEditing(false);
+    setIsAdding(false);
   };
 
   // Handle Print

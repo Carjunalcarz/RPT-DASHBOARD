@@ -3,6 +3,7 @@ import { Edit2, Save, X } from 'lucide-react';
 
 interface SignatoriesTabProps {
   isEditing: boolean;
+  isTransactionActive?: boolean;
   onEnterEdit: () => void;
   onSave: () => void;
   onCancel: () => void;
@@ -37,6 +38,7 @@ const defaultFormData: SignatoryFormData = {
 
 const SignatoriesTab: React.FC<SignatoriesTabProps> = ({
   isEditing,
+  isTransactionActive = false,
   onEnterEdit,
   onSave,
   onCancel,
@@ -44,6 +46,7 @@ const SignatoriesTab: React.FC<SignatoriesTabProps> = ({
 }) => {
   const [formData, setFormData] = useState<SignatoryFormData>(defaultFormData);
   const [originalData, setOriginalData] = useState<SignatoryFormData>(defaultFormData);
+  const isEnabled = isEditing || isTransactionActive;
 
   useEffect(() => {
     if (isEditing && onDataChange) {
@@ -94,7 +97,7 @@ const SignatoriesTab: React.FC<SignatoriesTabProps> = ({
           Signatories / Memorandum
         </h3>
         <div className="flex gap-2">
-          {!isEditing ? (
+          {isEnabled && !isEditing ? (
             <button
               onClick={onEnterEdit}
               className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors font-medium flex items-center gap-2"
@@ -103,7 +106,7 @@ const SignatoriesTab: React.FC<SignatoriesTabProps> = ({
               <Edit2 size={14} />
               Edit Signatories
             </button>
-          ) : (
+          ) : isEditing ? (
             <>
               <button
                 onClick={handleCancel}
@@ -122,7 +125,7 @@ const SignatoriesTab: React.FC<SignatoriesTabProps> = ({
                 Save Changes
               </button>
             </>
-          )}
+          ) : null}
         </div>
       </div>
 

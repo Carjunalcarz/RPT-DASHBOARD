@@ -10,13 +10,24 @@ interface AssessmentSectionProps {
   assessmentRecords?: RptAssRecord[];
   isLoading?: boolean;
   onUpdate?: (records: any[]) => void;
+  onEditModeChange?: (isEditing: boolean) => void;
+  onRefresh?: () => void;
   trees?: any[]; // Array of tree records from parent
   status?: string;
 }
 
 type AssessmentType = 'land' | 'building' | 'machinery';
 
-const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assessmentRecords = [], isLoading = false, onUpdate, trees = [], status }) => {
+const AssessmentSection: React.FC<AssessmentSectionProps> = ({ 
+  isEnabled, 
+  assessmentRecords = [], 
+  isLoading = false, 
+  onUpdate, 
+  onEditModeChange,
+  onRefresh,
+  trees = [], 
+  status 
+}) => {
   const [activeType, setActiveType] = useState<AssessmentType>('land'); // Default to land as it's often the base
 
   // Filter records by type
@@ -164,31 +175,35 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assess
         </button>
       </div>
 
-      {/* Assessment Content */}
-      <div>
+      {/* Content Area */}
+      <div className="flex-1">
         {activeType === 'land' && (
-          <LandAssessment
-            records={landRecords}
-            isEnabled={isEnabled}
+          <LandAssessment 
+            records={landRecords} 
+            isEnabled={isEnabled} 
             onUpdate={(records) => handleUpdate('land', records)}
+            onEditModeChange={onEditModeChange}
+            onRefresh={onRefresh}
             status={status}
           />
         )}
-
         {activeType === 'building' && (
           <BuildingAssessment 
-            records={buildingRecords}
-            isEnabled={isEnabled}
+            records={buildingRecords} 
+            isEnabled={isEnabled} 
             onUpdate={(records) => handleUpdate('building', records)}
+            onEditModeChange={onEditModeChange}
+            onRefresh={onRefresh}
             status={status}
           />
         )}
-
         {activeType === 'machinery' && (
-          <MachineryAssessment
-            records={machineryRecords}
-            isEnabled={isEnabled}
+          <MachineryAssessment 
+            records={machineryRecords} 
+            isEnabled={isEnabled} 
             onUpdate={(records) => handleUpdate('machinery', records)}
+            onEditModeChange={onEditModeChange}
+            onRefresh={onRefresh}
             status={status}
           />
         )}

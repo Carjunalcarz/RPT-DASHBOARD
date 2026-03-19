@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, FileText } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { useAlert } from '@/context/AlertContext';
+import { cleanPin } from '../utils';
 
 interface ReferenceRecord {
   id: string;
@@ -74,7 +75,7 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
         extn1: '', 
         arp: initialRecord.canArp || '', 
         extn2: '', 
-        pin: initialRecord.pPin || '',
+        pin: cleanPin(initialRecord.pPin || ''),
         extn3: '', 
         effDate: initialRecord.pEffDate ? initialRecord.pEffDate.split('T')[0] : '', 
         ownerCode: initialRecord.pOwnerCode || '',
@@ -94,7 +95,7 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
         extn1: '',
         arp: initialRecord.canArp || '',
         extn2: '',
-        pin: initialRecord.pPin || '',
+        pin: cleanPin(initialRecord.pPin || ''),
         extn3: '',
         marketValue: initialRecord.pMarketValue?.toString() || '0.00',
         assessedValue: initialRecord.pAssessedValue?.toString() || '0.00',
@@ -428,7 +429,7 @@ const ReferenceSection: React.FC<ReferenceSectionProps> = ({ selectedRecord: ini
             <input
               type="text"
               value={formData.pin}
-              onChange={(e) => setFormData({ ...formData, pin: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, pin: cleanPin(e.target.value) })}
               onBlur={handleBlur}
               disabled={!isEditing}
               className="w-full px-2 py-1 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"

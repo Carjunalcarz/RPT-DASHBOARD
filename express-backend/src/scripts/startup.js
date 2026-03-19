@@ -4,7 +4,7 @@
  */
 const { execSync } = require('child_process');
 const { PrismaClient: MssqlClient } = require('../generated/mssql-client');
-const { PrismaClient: SupabaseClient } = require('../generated/supabase-client-v5');
+const { PrismaClient: SupabaseClient } = require('../generated/supabase-client-v6');
 const logger = require('../utils/logger');
 const path = require('path');
 const fs = require('fs');
