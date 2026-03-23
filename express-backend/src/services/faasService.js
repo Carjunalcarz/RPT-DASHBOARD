@@ -438,41 +438,16 @@ class FaasService {
             failed: []
         };
 
-        // Validate Sequential Workflow for the whole batch first?
-        // Or process one by one and track failures.
-        // Processing in a transaction would be better but if one fails due to status mismatch, 
-        // we might want others to succeed.
-        // Let's use Promise.allSettled to process in parallel but capture individual errors.
-        // Note: For very large batches, we might want to chunk this.
-        
-        // However, Prisma `updateMany` doesn't return the updated records or allow individual logic easily.
-        // And we have complex logic in `updateStatus` (audit logs, data JSON updates).
-        // So we should reuse `updateStatus` logic.
-        
-        const updates = ids.map(id => 
-            this.updateStatus(id, status, remarks, userEmail, userId)
-                .then(() => ({ status: 'fulfilled', id }))
-                .catch(error => ({ status: 'rejected', id, error: error.message }))
-        );
+        const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
 
-        const outcomes = await Promise.allSettled(updates);
-
-        outcomes.forEach(outcome => {
-            // Promise.allSettled wraps the result of our map's promises.
-            // Our map returns objects like { status: 'fulfilled', id }
-            
-            if (outcome.status === 'fulfilled') {
-                const result = outcome.value;
-                if (result.status === 'fulfilled') {
-                    results.success.push(result.id);
-                } else {
-                    results.failed.push({ id: result.id, error: result.error });
-                }
-            } else {
-                // This shouldn't happen as we catch errors in the map
-                 results.failed.push({ id: 'unknown', error: outcome.reason });
+        for (const id of uniqueIds) {
+            try {
+                await this.updateStatus(id, status, remarks, userEmail, userId);
+                results.success.push(id);
+            } catch (error) {
+                results.failed.push({ id, error: error?.message || 'Unknown error' });
             }
-        });
+        }
 
         return results;
     } catch (error) {

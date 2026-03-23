@@ -22,6 +22,7 @@ export interface PropertyReport {
   taxBegYr: string;
   transCode: string;
   taxYear: string;
+  paymentStatus?: 'unpaid' | 'pending' | 'paid';
 }
 
 export interface ReportSummary {

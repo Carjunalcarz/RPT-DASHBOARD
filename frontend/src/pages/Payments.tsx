@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CheckCircle, Clock, XCircle, DollarSign, Plus, Printer, RefreshCw } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
+import { useAuth } from '@/context/AuthContext';
 
 const Payments: React.FC = () => {
   const { headerColor, headerColorDark } = useThemeColor();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [payments] = useState([
     {
       id: 'PAY-2024-001',
@@ -70,9 +74,19 @@ const Payments: React.FC = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center gap-2 text-sm font-medium transition-colors">
+          <button
+            onClick={() => navigate('/payments/order')}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm flex items-center gap-2 text-sm font-medium transition-colors"
+          >
             <Plus size={16} />
             New Payment
+          </button>
+          <button
+            onClick={() => navigate('/payments/treasury')}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm flex items-center gap-2 text-sm font-medium transition-colors"
+          >
+            <CheckCircle size={16} />
+            Treasury
           </button>
           <button className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg shadow-sm flex items-center gap-2 text-sm font-medium transition-colors">
             <Printer size={16} />

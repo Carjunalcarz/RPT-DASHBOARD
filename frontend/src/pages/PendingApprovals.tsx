@@ -5,7 +5,7 @@ import { listFaasRecords, batchUpdateFaasStatus } from '@/services/faasService';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { FileText, User, Calendar, ArrowRight, CheckCircle, Clock, FileEdit, Loader2, AlertCircle } from 'lucide-react';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
-import { Checkbox } from '../components/ui/checkbox';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useAlert } from '@/context/AlertContext';
 import { toast } from 'sonner';
 
@@ -85,8 +85,8 @@ const PendingApprovals: React.FC<PendingApprovalsProps> = ({ fixedStatus }) => {
   const totalRecords = data?.pagination?.total || 0;
 
   // Bulk Action Handlers
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
+  const handleSelectAll = (checked: boolean | 'indeterminate') => {
+    if (checked === true) {
       // Select all visible records
       const allIds = new Set<string>(records.map((r: any) => r.id));
       setSelectedIds(allIds);
@@ -322,6 +322,23 @@ const PendingApprovals: React.FC<PendingApprovalsProps> = ({ fixedStatus }) => {
       )}
 
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col">
+        {error ? (
+          <div className="p-4 border-b border-slate-200 dark:border-slate-700 bg-red-50 dark:bg-red-900/10">
+            <div className="flex items-start gap-2 text-sm text-red-700 dark:text-red-200">
+              <AlertCircle className="h-4 w-4 mt-0.5" />
+              <div className="flex-1">
+                <div className="font-semibold">Failed to load approvals</div>
+                <div className="text-xs mt-0.5 opacity-90">{String((error as any)?.message || 'Unknown error')}</div>
+              </div>
+              <button
+                onClick={() => mutate()}
+                className="px-3 py-1.5 text-xs font-medium bg-white dark:bg-slate-900 border border-red-200 dark:border-red-800 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        ) : null}
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead
@@ -342,13 +359,13 @@ const PendingApprovals: React.FC<PendingApprovalsProps> = ({ fixedStatus }) => {
                 <th className="px-6 py-4 w-12">
                   <div className="flex items-center justify-center">
                     <Checkbox 
-                      checked={isAllSelected}
+                      checked={isAllSelected ? true : isIndeterminate ? 'indeterminate' : false}
                       onCheckedChange={handleSelectAll}
                       className="border-white/50 data-[state=checked]:bg-white data-[state=checked]:text-blue-600"
                     />
                   </div>
                 </th>
-                <th className="px-6 py-4 whitespace-nowrap">TDN / Ref Ref</th>
+                <th className="px-6 py-4 whitespace-nowrap">TDN / Reference</th>
                 <th className="px-6 py-4">Owner</th>
                 <th className="px-6 py-4">Submitted By</th>
                 <th className="px-6 py-4">Date Submitted</th>

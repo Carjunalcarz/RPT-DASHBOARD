@@ -1,12 +1,15 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { useSidebar } from '@/context/SidebarContext';
 import Layout from '@/components/layout/Layout';
 import Login from '@/pages/Login';
 import Dashboard from '@/pages/Dashboard';
 import Properties from '@/pages/Properties';
 import TaxAssessment from '@/pages/TaxAssessment';
 import Payments from '@/pages/Payments';
+import OrderOfPayment from '@/pages/OrderOfPayment';
+import TreasuryConfirm from '@/pages/TreasuryConfirm';
 import Reports from '@/pages/Reports';
 import Settings from '@/pages/Settings';
 import DataEntry from '@/pages/DataEntry';
@@ -16,6 +19,7 @@ import AuditTrail from '@/pages/AuditTrail';
 import Items from '@/pages/Items';
 import Tasks from '@/pages/Tasks';
 import UserManagement from '@/pages/admin/UserManagement';
+import SidebarManagement from '@/pages/admin/SidebarManagement';
 import PropertyApproval from '@/pages/PropertyApproval';
 import PendingApprovals from '@/pages/PendingApprovals';
 import SignatorySetupPage from '@/pages/setup/SignatorySetupPage';
@@ -33,9 +37,11 @@ const AuthRedirect: React.FC = () => {
 };
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { menuItems, loadingMenu } = useSidebar();
+  const location = useLocation();
   
-  if (isLoading) {
+  if (isAuthLoading || loadingMenu) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-slate-50 dark:bg-slate-900">
         <div className="flex flex-col items-center gap-4">
@@ -48,6 +54,44 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  // Check if current route is active in dynamic sidebar (if it exists in the list)
+  // We exclude certain system routes from this check
+  const systemRoutes = ['/dashboard', '/admin/users', '/admin/sidebar', '/settings', '/migration-cart', '/payments/treasury'];
+  const currentPath = location.pathname;
+
+  if (!systemRoutes.includes(currentPath)) {
+    // Flatten menu items to check children
+    const getAllPaths = (items: any[]): string[] => {
+      let paths: string[] = [];
+      items.forEach(item => {
+        if (item.path && item.path !== '#') paths.push(item.path);
+        if (item.children) paths.push(...getAllPaths(item.children));
+      });
+      return paths;
+    };
+
+    const activePaths = getAllPaths(menuItems);
+    const isPathActive = activePaths.some(path => {
+      if (!path) return false;
+      if (path.includes(':')) {
+        const pathRegex = new RegExp('^' + path.replace(/:[^\s/]+/g, '([\\w-]+)') + '$');
+        return pathRegex.test(currentPath);
+      }
+      return currentPath === path || currentPath.startsWith(`${path}/`);
+    });
+
+    // If path is NOT in the active items list and NOT a system route, redirect
+    // We only perform this check for paths that ARE in our database (meaning they CAN be deactivated)
+    // To keep it simple: if the path is supposed to be in the sidebar but isn't returned (inactive), block it.
+    // Note: This logic assumes that any path not in the systemRoutes or menuItems is "unauthorized" or "inactive".
+    if (!isPathActive) {
+      // Allow property-approval as it might not be in the sidebar but is a sub-page
+      if (!currentPath.startsWith('/property-approval/')) {
+        return <Navigate to="/dashboard" replace />;
+      }
+    }
   }
   
   return <>{children}</>;
@@ -122,6 +166,26 @@ const AppRouter: React.FC = () => {
             <ProtectedRoute>
               <Layout>
                 <Payments />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payments/order"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <OrderOfPayment />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payments/treasury"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <TreasuryConfirm />
               </Layout>
             </ProtectedRoute>
           }
@@ -252,6 +316,16 @@ const AppRouter: React.FC = () => {
             <ProtectedRoute>
               <Layout>
                 <UserManagement />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/sidebar"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <SidebarManagement />
               </Layout>
             </ProtectedRoute>
           }

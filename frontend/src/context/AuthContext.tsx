@@ -173,6 +173,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setIsMockMode(true);
         return { success: true, message: 'Logged in (Offline Mode)' };
       }
+      if (email === 'treasurer@tax.gov' && password === 'treasurer123') {
+        const mockUser: User = {
+          id: 'mock-2',
+          name: 'Treasurer (Offline)',
+          email: 'treasurer@tax.gov',
+          role: 'treasurer',
+        };
+        setUser(mockUser);
+        localStorage.setItem('user', JSON.stringify(mockUser));
+        localStorage.setItem('auth_mode', 'mock');
+        setIsMockMode(true);
+        return { success: true, message: 'Logged in (Offline Mode)' };
+      }
       return { success: false, message: 'Invalid credentials (Offline Mode)' };
   };
 

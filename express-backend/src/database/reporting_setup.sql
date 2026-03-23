@@ -86,6 +86,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'property_status' AND typnamespace = 'public'::regnamespace) THEN
         CREATE TYPE public.property_status AS ENUM ('active','archived','split','merged');
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'rpt_payment_status' AND typnamespace = 'public'::regnamespace) THEN
+        CREATE TYPE public.rpt_payment_status AS ENUM ('unpaid','pending','paid');
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'tdn_change_reason' AND typnamespace = 'public'::regnamespace) THEN
         CREATE TYPE public.tdn_change_reason AS ENUM ('new','general_revision','correction','split','merge','other');
     END IF;
@@ -174,6 +177,13 @@ CREATE TABLE IF NOT EXISTS public.manual_review_queue (
 
 ALTER TABLE public.rpt_property
     ADD COLUMN IF NOT EXISTS master_property_id UUID;
+
+ALTER TABLE public.rpt_property
+    ADD COLUMN IF NOT EXISTS payment_status public.rpt_payment_status NOT NULL DEFAULT 'unpaid';
+
+UPDATE public.rpt_property
+SET payment_status = 'unpaid'
+WHERE payment_status IS NULL;
 
 DO $$
 BEGIN

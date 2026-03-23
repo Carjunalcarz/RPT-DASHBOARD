@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useSidebar } from '@/context/SidebarContext';
 import { useAuth } from '@/context/AuthContext';
+import sidebarService, { SidebarItem } from '@/services/sidebarService';
 import {
   LayoutDashboard,
   Building2,
@@ -19,86 +20,63 @@ import {
   Database,
   CheckCircle,
   ChevronDown,
-  Settings2
+  Settings2,
+  Menu
 } from 'lucide-react';
 
-interface MenuItem {
-  path: string;
-  label: string;
-  icon: React.ElementType;
-  adminOnly?: boolean;
-}
-
-const menuItems: MenuItem[] = [
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/properties', label: 'Property Records', icon: Building2 },
-  { path: '/assessment', label: 'Tax Assessment', icon: FileText },
-  { path: '/payments', label: 'Payments', icon: CreditCard },
-  { path: '/reports', label: 'Reports', icon: BarChart3 },
-  { path: '/data-entry', label: 'Data Entry (Legacy)', icon: ClipboardEdit },
-  { path: '/rpt-management', label: 'RPT Management', icon: Database },
-  { path: '/items', label: 'Items', icon: Package },
-  { path: '/tasks', label: 'Tasks', icon: CheckSquare },
-  { path: '/audit-trail', label: 'Audit Trail', icon: FileClock },
-  { path: '/admin/users', label: 'User Management', icon: UserCog, adminOnly: false }, // Temporary allow all
-  { path: '/settings', label: 'Settings', icon: Settings },
-];
+const iconMap: Record<string, React.ElementType> = {
+  LayoutDashboard,
+  Building2,
+  FileText,
+  CreditCard,
+  BarChart3,
+  Settings,
+  ClipboardEdit,
+  Database,
+  Package,
+  CheckSquare,
+  FileClock,
+  UserCog,
+  CheckCircle,
+  Settings2,
+  Menu
+};
 
 const Sidebar: React.FC = () => {
-  const { isCollapsed, setIsCollapsed } = useSidebar();
+  const { isCollapsed, setIsCollapsed, menuItems, loadingMenu } = useSidebar();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [isApprovingExpanded, setIsApprovingExpanded] = useState(false);
-  const [isSetupExpanded, setIsSetupExpanded] = useState(false);
-  const [shouldFocusApprovalsChild, setShouldFocusApprovalsChild] = useState(false);
-  const [shouldFocusSetupChild, setShouldFocusSetupChild] = useState(false);
-  const municipalityRef = useRef<HTMLAnchorElement | null>(null);
-  const setupSignatoryRef = useRef<HTMLAnchorElement | null>(null);
-
-  const isApprovingActive = useMemo(() => {
-    return location.pathname.startsWith('/approvals') || location.pathname.startsWith('/property-approval');
-  }, [location.pathname]);
-
-  const isSetupActive = useMemo(() => {
-    return location.pathname.startsWith('/setup');
-  }, [location.pathname]);
-
-  useEffect(() => {
-    if (isCollapsed) return;
-    if (isApprovingActive) {
-      setIsApprovingExpanded(true);
+  
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>(() => {
+    try {
+      const stored = localStorage.getItem('sidebarExpandedItems');
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
     }
-    if (isSetupActive) {
-      setIsSetupExpanded(true);
+  });
+
+  useEffect(() => {
+    localStorage.setItem('sidebarExpandedItems', JSON.stringify(expandedItems));
+  }, [expandedItems]);
+
+  const isItemActive = (item: SidebarItem): boolean => {
+    if (location.pathname === item.path) return true;
+    if (item.children) {
+      return item.children.some(child => isItemActive(child));
     }
-  }, [isApprovingActive, isSetupActive, isCollapsed]);
+    return false;
+  };
 
-  useEffect(() => {
-    if (isCollapsed) return;
-    if (!isApprovingExpanded) return;
-    if (!shouldFocusApprovalsChild) return;
-
-    requestAnimationFrame(() => {
-      municipalityRef.current?.focus();
-      setShouldFocusApprovalsChild(false);
-    });
-  }, [isCollapsed, isApprovingExpanded, shouldFocusApprovalsChild]);
-
-  useEffect(() => {
-    if (isCollapsed) return;
-    if (!isSetupExpanded) return;
-    if (!shouldFocusSetupChild) return;
-
-    requestAnimationFrame(() => {
-      setupSignatoryRef.current?.focus();
-      setShouldFocusSetupChild(false);
-    });
-  }, [isCollapsed, isSetupExpanded, shouldFocusSetupChild]);
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const toggleExpand = (itemId: string) => {
+    if (isCollapsed) {
+      setIsCollapsed(false);
+    }
+    setExpandedItems(prev => ({
+      ...prev,
+      [itemId]: !prev[itemId]
+    }));
   };
 
   const filteredMenuItems = useMemo(() => {
@@ -108,37 +86,110 @@ const Sidebar: React.FC = () => {
       }
       return true;
     });
-  }, [user?.role]);
+  }, [user?.role, menuItems]);
 
-  const handleApprovingParentClick = () => {
-    if (isCollapsed) {
-      setIsCollapsed(false);
-      setIsApprovingExpanded(true);
-      setShouldFocusApprovalsChild(true);
-      return;
-    }
+  const NavItem: React.FC<{ item: SidebarItem; level: number }> = ({ item, level }) => {
+    const Icon = (item.icon && iconMap[item.icon]) || Menu;
+    const hasChildren = item.children && item.children.length > 0;
+    const isExpanded = !!expandedItems[item.id];
+    const isActive = isItemActive(item);
 
-    setIsApprovingExpanded(prev => {
-      const next = !prev;
-      if (next) setShouldFocusApprovalsChild(true);
-      return next;
-    });
+    // Auto-expand active parents on mount or location change
+    useEffect(() => {
+      if (isActive && hasChildren && !expandedItems[item.id]) {
+        setExpandedItems(prev => ({ ...prev, [item.id]: true }));
+      }
+    }, [isActive, hasChildren, item.id]);
+
+    return (
+      <div key={item.id} role="none">
+        {hasChildren ? (
+          <button
+            type="button"
+            onClick={() => toggleExpand(item.id)}
+            aria-expanded={isExpanded}
+            aria-controls={`submenu-${item.id}`}
+            aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${item.label}`}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 my-1 rounded-lg transition-all duration-200 ${
+              isActive
+                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+            }`}
+            style={{ paddingLeft: `${level * 12 + 12}px` }}
+          >
+            {level === 0 && <Icon size={19} className="flex-shrink-0" />}
+            {!isCollapsed && (
+              <>
+                <span className={`text-[13px] font-medium flex-1 text-left ${level > 0 ? 'ml-1' : ''}`}>
+                  {level > 0 && <span className="text-slate-300 mr-2" aria-hidden="true">↳</span>}
+                  {item.label}
+                </span>
+                <ChevronDown
+                  size={17}
+                  className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
+                />
+              </>
+            )}
+          </button>
+        ) : (
+          <NavLink
+            to={item.path}
+            aria-label={`Navigate to ${item.label}`}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 my-1 rounded-lg transition-all duration-200 ${
+                isActive
+                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+              }`
+            }
+            style={{ paddingLeft: `${level * 12 + 12}px` }}
+          >
+            {level === 0 && <Icon size={19} className="flex-shrink-0" />}
+            {!isCollapsed && (
+              <span className={`text-[13px] font-medium ${level > 0 ? 'ml-1' : ''}`}>
+                {level > 0 && <span className="text-slate-300 mr-2" aria-hidden="true">↳</span>}
+                {item.label}
+              </span>
+            )}
+          </NavLink>
+        )}
+
+        {!isCollapsed && hasChildren && (
+          <div
+            id={`submenu-${item.id}`}
+            role="group"
+            className={`transition-all duration-300 ease-in-out overflow-hidden ${
+              isExpanded
+                ? 'max-h-[1000px] opacity-100'
+                : 'max-h-0 opacity-0 pointer-events-none'
+            }`}
+            style={{ marginLeft: `${level * 4 + 4}px` }}
+          >
+            <div className="border-l-2 border-slate-100 dark:border-slate-800/50 ml-4 transition-colors duration-300">
+              {item.children?.map(child => (
+                <NavItem key={child.id} item={child} level={level + 1} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
-  const handleSetupParentClick = () => {
-    if (isCollapsed) {
-      setIsCollapsed(false);
-      setIsSetupExpanded(true);
-      setShouldFocusSetupChild(true);
-      return;
-    }
-
-    setIsSetupExpanded(prev => {
-      const next = !prev;
-      if (next) setShouldFocusSetupChild(true);
-      return next;
-    });
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
   };
+
+  if (loadingMenu && menuItems.length === 0) {
+    return (
+      <aside className={`fixed left-0 top-16 h-[calc(100%-4rem)] bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-64'}`}>
+        <div className="flex items-center justify-center h-full">
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+        </div>
+      </aside>
+    );
+  }
 
   return (
     <aside
@@ -149,171 +200,12 @@ const Sidebar: React.FC = () => {
     >
       <div className="flex flex-col h-full">
         {/* Navigation Menu */}
-        <nav className="flex-1 px-2 py-4 overflow-y-auto">
-          {filteredMenuItems.slice(0, 7).map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 my-1 rounded-lg transition-colors ${
-                    isActive
-                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-                  }`
-                }
-              >
-                <Icon size={19} className="flex-shrink-0" />
-                {!isCollapsed && (
-                  <span className="text-[13px] font-medium">{item.label}</span>
-                )}
-              </NavLink>
-            );
-          })}
-
-          <div>
-            <button
-              type="button"
-              onClick={handleApprovingParentClick}
-              data-testid="nav-approving-parent"
-              aria-expanded={!isCollapsed && isApprovingExpanded}
-              aria-controls="approving-children"
-              className={`w-full flex items-center gap-3 px-3 py-2.5 my-1 rounded-lg transition-colors ${
-                isApprovingActive
-                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-              }`}
-            >
-              <CheckCircle size={19} className="flex-shrink-0" />
-              {!isCollapsed && (
-                <>
-                  <span className="text-[13px] font-medium flex-1 text-left">Approving Parent</span>
-                  <ChevronDown
-                    size={17}
-                    className={`transition-transform ${isApprovingExpanded ? 'rotate-180' : ''}`}
-                  />
-                </>
-              )}
-            </button>
-
-            {!isCollapsed && (
-              <div
-                id="approving-children"
-                className={`ml-6 pl-2 transition-all duration-200 ease-in-out ${
-                  isApprovingExpanded
-                    ? 'max-h-40 opacity-100 border-l border-slate-200 dark:border-slate-700'
-                    : 'max-h-0 opacity-0 overflow-hidden pointer-events-none border-l border-transparent'
-                }`}
-              >
-                <NavLink
-                  to="/approvals/municipal"
-                  data-testid="nav-municipality"
-                  ref={municipalityRef}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 px-3 py-2 my-1 rounded-lg transition-colors ${
-                      isActive
-                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-                    }`
-                  }
-                >
-                  <span className="text-[13px] font-medium">Municipality</span>
-                </NavLink>
-                <NavLink
-                  to="/approvals/provincial"
-                  data-testid="nav-province"
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 px-3 py-2 my-1 rounded-lg transition-colors ${
-                      isActive
-                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-                    }`
-                  }
-                >
-                  <span className="text-[13px] font-medium">Province</span>
-                </NavLink>
-              </div>
-            )}
-          </div>
-
-          <div>
-            <button
-              type="button"
-              onClick={handleSetupParentClick}
-              data-testid="nav-setup-parent"
-              aria-expanded={!isCollapsed && isSetupExpanded}
-              aria-controls="setup-children"
-              className={`w-full flex items-center gap-3 px-3 py-2.5 my-1 rounded-lg transition-colors ${
-                isSetupActive
-                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-              }`}
-            >
-              <Settings2 size={19} className="flex-shrink-0" />
-              {!isCollapsed && (
-                <>
-                  <span className="text-[13px] font-medium flex-1 text-left">Setup</span>
-                  <ChevronDown
-                    size={17}
-                    className={`transition-transform ${isSetupExpanded ? 'rotate-180' : ''}`}
-                  />
-                </>
-              )}
-            </button>
-
-            {!isCollapsed && (
-              <div
-                id="setup-children"
-                className={`ml-6 pl-2 transition-all duration-200 ease-in-out ${
-                  isSetupExpanded
-                    ? 'max-h-40 opacity-100 border-l border-slate-200 dark:border-slate-700'
-                    : 'max-h-0 opacity-0 overflow-hidden pointer-events-none border-l border-transparent'
-                }`}
-              >
-                <NavLink
-                  to="/setup/signatory"
-                  data-testid="nav-setup-signatory"
-                  ref={setupSignatoryRef}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 px-3 py-2 my-1 rounded-lg transition-colors ${
-                      isActive
-                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-                    }`
-                  }
-                >
-                   <span className="text-[13px] font-medium">Setup_Signatory</span>
-                 </NavLink>
-               </div>
-            )}
-          </div>
-
-          {filteredMenuItems.slice(7).map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 my-1 rounded-lg transition-colors ${
-                    isActive
-                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-                  }`
-                }
-              >
-                <Icon size={19} className="flex-shrink-0" />
-                {!isCollapsed && (
-                  <span className="text-[13px] font-medium">{item.label}</span>
-                )}
-              </NavLink>
-            );
-          })}
+        <nav className="flex-1 px-2 py-4 overflow-y-auto custom-scrollbar">
+          {filteredMenuItems.map((item) => (
+            <NavItem key={item.id} item={item} level={0} />
+          ))}
         </nav>
-        <div className="px-2 py-3">
+        <div className="px-2 py-3 border-t border-slate-100 dark:border-slate-800">
           {isCollapsed ? (
             <div className="flex justify-center">
               <button

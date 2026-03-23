@@ -81,38 +81,77 @@ router.get('/properties', protect, async (req, res) => {
     const countResult = await prisma.$queryRawUnsafe(countQuery, ...params);
     const totalCount = Number(countResult[0]?.count || 0);
 
-    // Raw SQL to fetch individual assessments joined with property info
-    const query = `
-      SELECT 
-        COALESCE(ra.id::TEXT, 'missing-' || rp.id::TEXT) as "assessmentId",
-        COALESCE(ra.kind, 'N/A') as kind,
-        COALESCE(ra.ass_level, 0) as "assLevel",
-        COALESCE(ra.taxability, 'N/A') as taxability,
-        COALESCE(ra.classification, 'N/A') as classification,
-        COALESCE(ra.subclass, 'N/A') as subclass,
-        COALESCE(ra.area, 0) as area,
-        COALESCE(ra.measurement, '') as measurement,
-        COALESCE(ra.market_value, 0) as "marketValue",
-        COALESCE(ra.ass_value, 0) as "assValue",
-        rp.id as "propertyId",
-        rp.pin, 
-        rp.tdn, 
-        rp.owner_name_snapshot as "ownerName", 
-        rp.municipality_name_snapshot as "municipality", 
-        rp.barangay_name_snapshot as "barangay", 
-        rp.muncode,
-        rp.bcode,
-        rp.tax_beg_yr as "taxBegYr",
-        rp.trans_code as "transCode",
-        rp.tax_beg_yr as "taxYear"
-      FROM public.rpt_property rp
-      LEFT JOIN public.rpt_assessment ra ON ra.property_id = rp.id
-      WHERE ${whereClause}
-      ORDER BY rp.created_at DESC, ra.id ASC
-      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
-    `;
+    const paymentStatusColumnExists = async () => {
+      try {
+        const colCheck = await prisma.$queryRawUnsafe(
+          `
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'rpt_property'
+              AND column_name = 'payment_status'
+            LIMIT 1
+          `
+        );
+        return Array.isArray(colCheck) && colCheck.length > 0;
+      } catch {
+        return false;
+      }
+    };
 
-    const results = await prisma.$queryRawUnsafe(query, ...params, limit, offset);
+    const hasPaymentStatus = await paymentStatusColumnExists();
+    const buildQuery = (includePaymentStatus) => {
+      const paymentStatusSelect = includePaymentStatus
+        ? `rp.payment_status as "paymentStatus"`
+        : `'unpaid' as "paymentStatus"`;
+
+      return `
+        SELECT 
+          COALESCE(ra.id::TEXT, 'missing-' || rp.id::TEXT) as "assessmentId",
+          COALESCE(ra.kind, 'N/A') as kind,
+          COALESCE(ra.ass_level, 0) as "assLevel",
+          COALESCE(ra.taxability, 'N/A') as taxability,
+          COALESCE(ra.classification, 'N/A') as classification,
+          COALESCE(ra.subclass, 'N/A') as subclass,
+          COALESCE(ra.area, 0) as area,
+          COALESCE(ra.measurement, '') as measurement,
+          COALESCE(ra.market_value, 0) as "marketValue",
+          COALESCE(ra.ass_value, 0) as "assValue",
+          rp.id as "propertyId",
+          rp.pin, 
+          rp.tdn, 
+          rp.owner_name_snapshot as "ownerName", 
+          rp.municipality_name_snapshot as "municipality", 
+          rp.barangay_name_snapshot as "barangay", 
+          rp.muncode,
+          rp.bcode,
+          rp.tax_beg_yr as "taxBegYr",
+          rp.trans_code as "transCode",
+          rp.tax_beg_yr as "taxYear",
+          ${paymentStatusSelect}
+        FROM public.rpt_property rp
+        LEFT JOIN public.rpt_assessment ra ON ra.property_id = rp.id
+        WHERE ${whereClause}
+        ORDER BY rp.created_at DESC, ra.id ASC
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+      `;
+    };
+
+    let results;
+    try {
+      results = await prisma.$queryRawUnsafe(buildQuery(hasPaymentStatus), ...params, limit, offset);
+    } catch (err) {
+      const code = err?.code || err?.meta?.code;
+      const message = String(err?.message || '');
+      const isMissingPaymentStatus =
+        String(code) === '42703' || message.toLowerCase().includes('payment_status') && message.toLowerCase().includes('does not exist');
+
+      if (!hasPaymentStatus || !isMissingPaymentStatus) {
+        throw err;
+      }
+
+      results = await prisma.$queryRawUnsafe(buildQuery(false), ...params, limit, offset);
+    }
 
     const serializedResults = results.map(row => ({
       ...row,

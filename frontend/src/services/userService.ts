@@ -3,7 +3,7 @@ import api from './api';
 export interface User {
   id: string;
   email: string;
-  role: 'admin' | 'user';
+  role: string;
   municipalityCode?: string;
   fullName?: string;
   contactNo?: string;

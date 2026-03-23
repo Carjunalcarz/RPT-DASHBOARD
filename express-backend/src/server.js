@@ -45,6 +45,8 @@ const pdfRoutes = require('./routes/pdfRoutes');
 const reportsRoutes = require('./routes/reportsRoutes');
 const setupSignatoriesRoutes = require('./routes/setupSignatoriesRoutes');
 const setupSignatoryTemplatesRoutes = require('./routes/setupSignatoryTemplatesRoutes');
+const sidebarRoutes = require('./routes/sidebarRoutes');
+const oopRoutes = require('./routes/oopRoutes');
 
 const app = express();
 
@@ -174,6 +176,8 @@ app.use('/api/v1/pdf', pdfRoutes);
 app.use('/api/v1/reports', reportsRoutes);
 app.use('/api/v1/setup/signatories', setupSignatoriesRoutes);
 app.use('/api/v1/setup/signatory-templates', setupSignatoryTemplatesRoutes);
+app.use('/api/v1/sidebar', sidebarRoutes);
+app.use('/api/v1/oop', oopRoutes);
 // Legacy routes support if needed
 app.use('/api/classifications', classificationRoutes);
 app.use('/api/actual-uses', actualUseRoutes);
