@@ -10,6 +10,8 @@ interface AssessmentSectionProps {
   assessmentRecords?: RptAssRecord[];
   isLoading?: boolean;
   onUpdate?: (updatedRecords: RptAssRecord[]) => void;
+  onEditModeChange?: (isEditing: boolean) => void;
+  onRefresh?: () => void;
   onPrint?: () => void;
 }
 

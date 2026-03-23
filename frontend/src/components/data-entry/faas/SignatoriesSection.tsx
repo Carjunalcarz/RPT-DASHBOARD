@@ -169,6 +169,7 @@ interface SignatoriesSectionProps {
   isEnabled?: boolean;
   onEditModeChange?: (isEditing: boolean) => void;
   onUpdate?: (updatedData: any) => void;
+  onRefresh?: () => void;
 }
 
 const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({ 
