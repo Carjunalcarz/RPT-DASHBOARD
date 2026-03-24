@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Edit2, Save, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/context/AuthContext';
 
 interface SignatoriesTabProps {
   isEditing: boolean;
@@ -24,7 +25,7 @@ interface SignatoryFormData {
 }
 
 const defaultFormData: SignatoryFormData = {
-  preparedBy: 'Maria Santos',
+  preparedBy: '',
   preparedByPosition: 'Assessment Clerk',
   preparedByDate: '2024-01-15',
   verifiedBy: 'Jose Reyes',
@@ -43,9 +44,17 @@ const SignatoriesTab: React.FC<SignatoriesTabProps> = ({
   onCancel,
   onDataChange,
 }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState<SignatoryFormData>(defaultFormData);
   const [originalData, setOriginalData] = useState<SignatoryFormData>(defaultFormData);
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const name = user?.fullName || user?.name;
+    if (!name) return;
+    setFormData(prev => (prev.preparedBy ? prev : { ...prev, preparedBy: name }));
+    setOriginalData(prev => (prev.preparedBy ? prev : { ...prev, preparedBy: name }));
+  }, [user?.fullName, user?.name]);
 
   useEffect(() => {
     if (isEditing && onDataChange) {

@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { supabasePrisma } = require('../database/prisma');
+const treasuryEtlService = require('./treasuryEtlService');
 
 const normalizeRole = (role) => (role || '').toString().toLowerCase();
 
@@ -338,6 +339,10 @@ const markPaid = async ({ user, orderId, requestBody }) => {
       throw err;
     }
 
+    if (existing.status === 'paid') {
+      return { order: existing, etl: null, alreadyPaid: true };
+    }
+
     if (existing.status !== 'pending') {
       const err = new Error('Only pending orders can be paid');
       err.statusCode = 400;
@@ -356,6 +361,23 @@ const markPaid = async ({ user, orderId, requestBody }) => {
       err.statusCode = 500;
       throw err;
     }
+
+    const paidAt = new Date();
+    const etl = await treasuryEtlService.exportPaidOrder({
+      tx,
+      order: existing,
+      propertyIds,
+      paidAt,
+      performedBy: user,
+    });
+
+    await createHistory({
+      prisma: tx,
+      orderId: existing.id,
+      action: 'etl_exported',
+      performedBy: user.id,
+      payload: { etl, paidAt: paidAt.toISOString() },
+    });
 
     const updated = await setRptPropertyPaymentStatus(tx, { propertyIds, fromStatus: 'pending', toStatus: 'paid' });
     if (updated.length !== propertyIds.length) {
@@ -377,7 +399,7 @@ const markPaid = async ({ user, orderId, requestBody }) => {
       payload: buildSnapshot({ order: paid, requestBody }),
     });
 
-    return paid;
+    return { order: paid, etl };
   }, { timeout: 20000 });
 };
 

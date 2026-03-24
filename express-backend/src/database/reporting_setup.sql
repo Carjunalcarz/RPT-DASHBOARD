@@ -749,6 +749,44 @@ CREATE TRIGGER trg_faas_records_reporting_sync
     AFTER INSERT OR UPDATE OR DELETE ON public.faas_records
     FOR EACH ROW EXECUTE FUNCTION public.trg_sync_faas_to_reporting();
 
+--------------------------------------------------------------------------------
+-- 7. Treasury Payment Export (ETL Target)
+--------------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS public.treasury_payment_exports (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    etl_run_id UUID NOT NULL,
+    etl_version INT NOT NULL DEFAULT 1,
+    order_id UUID NOT NULL,
+    order_number TEXT NOT NULL,
+    order_description TEXT,
+    order_created_by UUID,
+    order_created_at TIMESTAMP WITH TIME ZONE,
+    paid_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    paid_by UUID NOT NULL,
+    order_amount NUMERIC,
+    property_id UUID NOT NULL,
+    pin TEXT,
+    tdn TEXT,
+    tax_beg_yr TEXT,
+    municipality_code TEXT,
+    municipality_name TEXT,
+    barangay_code TEXT,
+    barangay_name TEXT,
+    owner_name TEXT,
+    owner_address TEXT,
+    total_market_value NUMERIC,
+    total_assessed_value NUMERIC,
+    validation_errors JSONB NOT NULL DEFAULT '[]'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(order_id, property_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_treasury_payment_exports_paid_at ON public.treasury_payment_exports(paid_at);
+CREATE INDEX IF NOT EXISTS idx_treasury_payment_exports_order_id ON public.treasury_payment_exports(order_id);
+CREATE INDEX IF NOT EXISTS idx_treasury_payment_exports_property_id ON public.treasury_payment_exports(property_id);
+
 
 -- To run the ETL:
 -- SELECT public.refresh_reporting_data();

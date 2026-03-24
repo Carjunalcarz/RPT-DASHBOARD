@@ -47,6 +47,7 @@ const setupSignatoriesRoutes = require('./routes/setupSignatoriesRoutes');
 const setupSignatoryTemplatesRoutes = require('./routes/setupSignatoryTemplatesRoutes');
 const sidebarRoutes = require('./routes/sidebarRoutes');
 const oopRoutes = require('./routes/oopRoutes');
+const payorRoutes = require('./routes/payorRoutes');
 
 const app = express();
 
@@ -178,6 +179,7 @@ app.use('/api/v1/setup/signatories', setupSignatoriesRoutes);
 app.use('/api/v1/setup/signatory-templates', setupSignatoryTemplatesRoutes);
 app.use('/api/v1/sidebar', sidebarRoutes);
 app.use('/api/v1/oop', oopRoutes);
+app.use('/api/v1/payors', payorRoutes);
 // Legacy routes support if needed
 app.use('/api/classifications', classificationRoutes);
 app.use('/api/actual-uses', actualUseRoutes);

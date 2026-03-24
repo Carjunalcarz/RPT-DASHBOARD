@@ -420,3 +420,20 @@ model SidebarItemUserVisibility {
   @@index([userId])
   @@map("sidebar_item_user_visibility")
 }
+
+model Payor {
+  id        String   @id @default(uuid()) @db.Uuid
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  address   String
+  idType    String   @map("id_type")
+  idNumber  String   @map("id_number")
+  contact   Json
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([idType, idNumber], map: "payors_id_type_id_number_key")
+  @@index([lastName, firstName])
+  @@map("payors")
+}

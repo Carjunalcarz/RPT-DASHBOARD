@@ -440,6 +440,163 @@ class FaasService {
 
         const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
 
+        if (status === 'pending-provincial' || status === 'approved' || (typeof status === 'string' && status.includes('rejected'))) {
+            const rows = await supabasePrisma.faasRecord.findMany({
+                where: { id: { in: uniqueIds } },
+                select: { id: true, status: true }
+            });
+            const byId = new Map(rows.map(r => [r.id, r]));
+
+            const eligible = [];
+            for (const id of uniqueIds) {
+                const r = byId.get(id);
+                if (!r) {
+                    results.failed.push({ id, error: 'Record not found' });
+                    continue;
+                }
+
+                try {
+                    if (status === 'pending-provincial') {
+                        if (r.status !== 'pending-municipal' && r.status !== 'for-review') {
+                            throw new AppError('Cannot move to Provincial Approval. Municipal Approval required first.', 400);
+                        }
+                    }
+                    if (status === 'approved') {
+                        if (r.status !== 'pending-provincial') {
+                            throw new AppError('Cannot approve. Provincial Approval required.', 400);
+                        }
+                    }
+                    eligible.push(id);
+                } catch (e) {
+                    results.failed.push({ id, error: e?.message || 'Invalid transition' });
+                }
+            }
+
+            if (!eligible.length) return results;
+
+            const nowIso = new Date().toISOString();
+            const auditDetails =
+                status === 'pending-provincial'
+                    ? { status, remarks, stage: 'Municipal Approval', bulk: true }
+                    : status === 'approved'
+                      ? { status, remarks, stage: 'Provincial Approval', bulk: true }
+                      : { status, remarks, bulk: true };
+
+            await supabasePrisma.$transaction(async (tx) => {
+                if (status === 'pending-provincial') {
+                    await tx.$executeRawUnsafe(
+                        `
+                        UPDATE public.faas_records
+                        SET
+                          status = $1,
+                          updated_at = NOW(),
+                          data =
+                            jsonb_set(
+                              jsonb_set(
+                                jsonb_set(
+                                  jsonb_set(
+                                    COALESCE(data, '{}'::jsonb),
+                                    '{REM}',
+                                    to_jsonb(COALESCE($2, data->>'REM')),
+                                    true
+                                  ),
+                                  '{municipal_approver}',
+                                  to_jsonb($3),
+                                  true
+                                ),
+                                '{municipal_approval_date}',
+                                to_jsonb($4),
+                                true
+                              ),
+                              '{Rec_Approval}',
+                              to_jsonb($3),
+                              true
+                            )
+                            || jsonb_build_object('Rec_AppDate', $4)
+                        WHERE id = ANY($5::text[])
+                        `,
+                        status,
+                        remarks || null,
+                        userEmail,
+                        nowIso,
+                        eligible
+                    );
+                } else if (status === 'approved') {
+                    await tx.$executeRawUnsafe(
+                        `
+                        UPDATE public.faas_records
+                        SET
+                          status = $1,
+                          updated_at = NOW(),
+                          data =
+                            jsonb_set(
+                              jsonb_set(
+                                jsonb_set(
+                                  jsonb_set(
+                                    jsonb_set(
+                                      COALESCE(data, '{}'::jsonb),
+                                      '{REM}',
+                                      to_jsonb(COALESCE($2, data->>'REM')),
+                                      true
+                                    ),
+                                    '{provincial_approver}',
+                                    to_jsonb($3),
+                                    true
+                                  ),
+                                  '{provincial_approval_date}',
+                                  to_jsonb($4),
+                                  true
+                                ),
+                                '{Approved}',
+                                to_jsonb($3),
+                                true
+                              ),
+                              '{ApprovedDate}',
+                              to_jsonb($4),
+                              true
+                            )
+                            || jsonb_build_object('SGD_APPROVED', true)
+                        WHERE id = ANY($5::text[])
+                        `,
+                        status,
+                        remarks || null,
+                        userEmail,
+                        nowIso,
+                        eligible
+                    );
+                } else {
+                    await tx.$executeRawUnsafe(
+                        `
+                        UPDATE public.faas_records
+                        SET
+                          status = $1,
+                          updated_at = NOW(),
+                          data = jsonb_set(COALESCE(data, '{}'::jsonb), '{REM}', to_jsonb($2), true)
+                        WHERE id = ANY($3::text[])
+                        `,
+                        status,
+                        remarks || null,
+                        eligible
+                    );
+                }
+
+                await tx.auditLog.createMany({
+                    data: eligible.map((id) => ({
+                        tableName: 'faas_records',
+                        recordId: id,
+                        action: 'UPDATE_STATUS',
+                        userEmail,
+                        userId,
+                        details: auditDetails,
+                        timestamp: new Date(),
+                    }))
+                });
+            }, { timeout: 60000 });
+
+            results.success.push(...eligible);
+            return results;
+        }
+
         for (const id of uniqueIds) {
             try {
                 await this.updateStatus(id, status, remarks, userEmail, userId);

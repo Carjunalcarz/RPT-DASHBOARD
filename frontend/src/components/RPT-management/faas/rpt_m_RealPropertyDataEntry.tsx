@@ -1483,8 +1483,8 @@ const RealPropertyDataEntry: React.FC = () => {
                 }}
                 bldgStruc={bldgStruc}
                 bldgAdj={bldgAdj}
-                assessmentRows={assessmentRecords.map(ass => ({
-                  id: ass.uniqueId || ass.TDN || Math.random().toString(),
+                assessmentRows={assessmentRecords.map((ass, idx) => ({
+                  id: ass.id || ass.uniqueId || `ass-${selectedRecord.id || selectedRecord.TDN || 'rec'}-${idx}`,
                   kind: ass.KIND || '',
                   class: ass.CLASSIFICATION || '',
                   actualUse: ass.ACTUAL_USE || '',
@@ -1567,8 +1567,8 @@ const RealPropertyDataEntry: React.FC = () => {
                 effectivityDate: selectedRecord.pEffDate || '',
                 declarationDate: selectedRecord.approvedDate || '',
               }}
-              assessmentRows={assessmentRecords.map(ass => ({
-                id: ass.uniqueId || ass.TDN || Math.random().toString(),
+              assessmentRows={assessmentRecords.map((ass, idx) => ({
+                id: ass.id || ass.uniqueId || `ass-${selectedRecord.id || selectedRecord.TDN || 'rec'}-${idx}`,
                 kind: ass.KIND || '',
                 class: ass.CLASSIFICATION || '',
                 actualUse: ass.ACTUAL_USE || '',
@@ -1614,16 +1614,16 @@ const RealPropertyDataEntry: React.FC = () => {
                   baseMarketValue: baseMarketValue.toString(),
                 };
               })}
-              valueAdjustmentRows={assessmentRecords.filter(ass => (ass as any).ADJ_FACTOR).map(ass => ({
-                id: `adj-${ass.uniqueId || ass.TDN || Math.random()}`,
+              valueAdjustmentRows={assessmentRecords.filter(ass => (ass as any).ADJ_FACTOR).map((ass, idx) => ({
+                id: `adj-${ass.id || ass.uniqueId || `${selectedRecord.id || selectedRecord.TDN || 'rec'}-${idx}`}`,
                 baseMarketValue: ass.MARKET_VAL || 0,
                 adjustmentFactor: (ass as any).ADJ_FACTOR || '',
                 percentAdjustment: (ass as any).PERC_ADJ || '0%',
                 valueAdjustment: (ass as any).VAL_ADJ || 0,
                 marketValue: (ass as any).ADJ_MARKET_VAL || ass.MARKET_VAL || 0,
               }))}
-              propertyAssessmentRows={assessmentRecords.map(ass => ({
-                id: `ass-${ass.uniqueId || ass.TDN || Math.random()}`,
+              propertyAssessmentRows={assessmentRecords.map((ass, idx) => ({
+                id: `ass-${ass.id || ass.uniqueId || `${selectedRecord.id || selectedRecord.TDN || 'rec'}-${idx}`}`,
                 actualUse: ass.ACTUAL_USE || '',
                 adjustedMarketValue: (ass as any).ADJ_MARKET_VAL || ass.MARKET_VAL || 0,
                 assessmentLevel: (ass.ASS_LEVEL || 0).toString() + '%',

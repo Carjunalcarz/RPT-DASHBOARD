@@ -10,7 +10,9 @@ import TaxAssessment from '@/pages/TaxAssessment';
 import Payments from '@/pages/Payments';
 import OrderOfPayment from '@/pages/OrderOfPayment';
 import TreasuryConfirm from '@/pages/TreasuryConfirm';
+import PayorRegistry from '@/pages/PayorRegistry';
 import Reports from '@/pages/Reports';
+import TreasuryPaymentsReport from '@/pages/TreasuryPaymentsReport';
 import Settings from '@/pages/Settings';
 import DataEntry from '@/pages/DataEntry';
 import DataEntryV2 from '@/pages/DataEntryV2';
@@ -58,7 +60,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   // Check if current route is active in dynamic sidebar (if it exists in the list)
   // We exclude certain system routes from this check
-  const systemRoutes = ['/dashboard', '/admin/users', '/admin/sidebar', '/settings', '/migration-cart', '/payments/treasury'];
+  const systemRoutes = ['/dashboard', '/admin/users', '/admin/sidebar', '/settings', '/migration-cart', '/payments/treasury', '/payments/payors', '/reports/treasury-payments'];
   const currentPath = location.pathname;
 
   if (!systemRoutes.includes(currentPath)) {
@@ -191,11 +193,31 @@ const AppRouter: React.FC = () => {
           }
         />
         <Route
+          path="/payments/payors"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <PayorRegistry />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/reports"
           element={
             <ProtectedRoute>
               <Layout>
                 <Reports />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports/treasury-payments"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <TreasuryPaymentsReport />
               </Layout>
             </ProtectedRoute>
           }

@@ -58,13 +58,23 @@ exports.login = async (req, res, next) => {
     const { supabasePrisma } = require('../database/prisma'); // Import at top or here
 
     let role = user.role; // Default to Supabase Auth role (usually 'authenticated')
+    let profile = null;
     
     // Fetch custom role from public.users table
     try {
       const dbUser = await supabasePrisma.user.findUnique({
         where: { id: user.id },
-        select: { role: true }
+        select: {
+          role: true,
+          municipalityCode: true,
+          fullName: true,
+          displayName: true,
+          avatarUrl: true,
+        }
       });
+      if (dbUser) {
+        profile = dbUser;
+      }
       if (dbUser && dbUser.role) {
         role = dbUser.role;
       } else {
@@ -104,6 +114,10 @@ exports.login = async (req, res, next) => {
           id: user.id,
           email: user.email,
           role: role, // Use the fetched role
+          municipalityCode: profile?.municipalityCode || null,
+          fullName: profile?.fullName || null,
+          displayName: profile?.displayName || null,
+          avatarUrl: profile?.avatarUrl || null,
           created_at: user.created_at,
           last_sign_in_at: user.last_sign_in_at
         }

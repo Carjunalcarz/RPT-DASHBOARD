@@ -259,6 +259,12 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({
   const [isSavingMemo, setIsSavingMemo] = useState(false);
   const [isSavingSworn, setIsSavingSworn] = useState(false);
   
+  React.useEffect(() => {
+    const name = user?.fullName || user?.name;
+    if (!name) return;
+    setDocumentationData(prev => (prev.preparedBy ? prev : { ...prev, preparedBy: name }));
+  }, [user?.fullName, user?.name]);
+
   const [templates, setTemplates] = useState<SetupSignatoryTemplate[]>([]);
   const [selectedTemplateYear, setSelectedTemplateYear] = useState<string>('');
   const [setupSignatories, setSetupSignatories] = useState<SetupSignatory[]>([]);

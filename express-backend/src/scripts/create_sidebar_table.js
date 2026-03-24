@@ -53,20 +53,22 @@ async function createSidebarTable() {
       { label: 'Property Records', path: '/properties', icon: 'Building2', "order": 2 },
       { label: 'Tax Assessment', path: '/assessment', icon: 'FileText', "order": 3 },
       { label: 'Payments', path: '/payments', icon: 'CreditCard', "order": 4 },
-      { label: 'Reports', path: '/reports', icon: 'BarChart3', "order": 5 },
-      { label: 'Data Entry (Legacy)', path: '/data-entry', icon: 'ClipboardEdit', "order": 6 },
-      { label: 'RPT Management', path: '/rpt-management', icon: 'Database', "order": 7 },
-      { label: 'Items', path: '/items', icon: 'Package', "order": 8 },
-      { label: 'Tasks', path: '/tasks', icon: 'CheckSquare', "order": 9 },
-      { label: 'Audit Trail', path: '/audit-trail', icon: 'FileClock', "order": 10 },
-      { label: 'User Management', path: '/admin/users', icon: 'UserCog', "order": 11, admin_only: false },
-      { label: 'Settings', path: '/settings', icon: 'Settings', "order": 12 },
-      { label: 'Sidebar Management', path: '/admin/sidebar', icon: 'Menu', "order": 13, admin_only: true },
+      { label: 'Treasury Approval', path: '/payments/treasury', icon: 'CheckCircle', "order": 5 },
+      { label: 'Reports', path: '/reports', icon: 'BarChart3', "order": 6 },
+      { label: 'Treasury Payments Report', path: '/reports/treasury-payments', icon: 'BarChart3', "order": 7 },
+      { label: 'Data Entry (Legacy)', path: '/data-entry', icon: 'ClipboardEdit', "order": 8 },
+      { label: 'RPT Management', path: '/rpt-management', icon: 'Database', "order": 9 },
+      { label: 'Items', path: '/items', icon: 'Package', "order": 10 },
+      { label: 'Tasks', path: '/tasks', icon: 'CheckSquare', "order": 11 },
+      { label: 'Audit Trail', path: '/audit-trail', icon: 'FileClock', "order": 12 },
+      { label: 'User Management', path: '/admin/users', icon: 'UserCog', "order": 13, admin_only: false },
+      { label: 'Settings', path: '/settings', icon: 'Settings', "order": 14 },
+      { label: 'Sidebar Management', path: '/admin/sidebar', icon: 'Menu', "order": 15, admin_only: true },
     ];
 
     const parents = [
-      { label: 'Approving Parent', path: '#', icon: 'CheckCircle', "order": 14 },
-      { label: 'Setup', path: '#', icon: 'Settings2', "order": 15 },
+      { label: 'Approving Parent', path: '#', icon: 'CheckCircle', "order": 16 },
+      { label: 'Setup', path: '#', icon: 'Settings2', "order": 17 },
     ];
 
     // Clear existing

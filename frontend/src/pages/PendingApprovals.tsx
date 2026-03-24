@@ -108,10 +108,27 @@ const PendingApprovals: React.FC<PendingApprovalsProps> = ({ fixedStatus }) => {
   const handleBulkApprove = async () => {
     if (selectedIds.size === 0) return;
 
+    const actionLabel =
+      statusFilter === 'draft'
+        ? 'Submit'
+        : statusFilter === 'pending-municipal'
+        ? 'Forward to Provincial'
+        : 'Approve';
+
     const confirmed = await showConfirm({
-      title: 'Bulk Approval',
-      message: `Are you sure you want to approve ${selectedIds.size} selected properties? This action cannot be undone efficiently.`,
-      confirmLabel: `Approve ${selectedIds.size} Items`,
+      title: `Bulk ${actionLabel}`,
+      message:
+        statusFilter === 'draft'
+          ? `Are you sure you want to submit ${selectedIds.size} selected properties for Municipal review?`
+          : statusFilter === 'pending-municipal'
+          ? `Are you sure you want to forward ${selectedIds.size} selected properties to Provincial review?`
+          : `Are you sure you want to approve ${selectedIds.size} selected properties? This will finalize the record.`,
+      confirmLabel:
+        statusFilter === 'draft'
+          ? `Submit ${selectedIds.size} Items`
+          : statusFilter === 'pending-municipal'
+          ? `Forward ${selectedIds.size} Items`
+          : `Approve ${selectedIds.size} Items`,
       cancelLabel: 'Cancel',
     });
 
@@ -174,13 +191,23 @@ const PendingApprovals: React.FC<PendingApprovalsProps> = ({ fixedStatus }) => {
       const result = await batchUpdateFaasStatus(Array.from(selectedIds), nextStatus as any, 'Bulk Action');
 
       if (result.failed.length === 0) {
-        toast.success(`Successfully approved ${result.success.length} items.`, { id: toastId });
+        toast.success(
+          statusFilter === 'draft'
+            ? `Successfully submitted ${result.success.length} items.`
+            : statusFilter === 'pending-municipal'
+            ? `Successfully forwarded ${result.success.length} items.`
+            : `Successfully approved ${result.success.length} items.`,
+          { id: toastId }
+        );
       } else if (result.success.length > 0) {
-        toast.warning(`Approved ${result.success.length} items, but ${result.failed.length} failed.`, { id: toastId });
+        toast.warning(
+          `${result.success.length} processed, but ${result.failed.length} failed.`,
+          { id: toastId }
+        );
         // If some failed, we should revalidate to show them back
         mutate(); 
       } else {
-        toast.error(`Failed to approve selected items.`, { id: toastId });
+        toast.error('Failed to process selected items.', { id: toastId });
         mutate(); // Revert optimistic update on total failure
       }
 
@@ -313,7 +340,11 @@ const PendingApprovals: React.FC<PendingApprovalsProps> = ({ fixedStatus }) => {
               ) : (
                 <>
                   <CheckCircle size={14} />
-                  {statusFilter === 'draft' ? 'Submit Selected' : 'Approve Selected'}
+                  {statusFilter === 'draft'
+                    ? 'Submit Selected'
+                    : statusFilter === 'pending-municipal'
+                    ? 'Forward Selected'
+                    : 'Approve Selected'}
                 </>
               )}
             </button>

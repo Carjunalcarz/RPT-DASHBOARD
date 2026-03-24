@@ -5,6 +5,90 @@ const prisma = new PrismaClient();
 const logger = require('../utils/logger');
 const protect = require('../middleware/auth');
 
+const hasTreasuryVisibilityTable = async () => {
+  try {
+    const rows = await prisma.$queryRawUnsafe(
+      `
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = 'sidebar_item_user_visibility'
+        LIMIT 1
+      `
+    );
+    return Array.isArray(rows) && rows.length > 0;
+  } catch {
+    return false;
+  }
+};
+
+const getSidebarItemIdByPath = async (path) => {
+  const rows = await prisma.$queryRawUnsafe(
+    `
+      SELECT id::text as id
+      FROM public.sidebar_items
+      WHERE path = $1
+      LIMIT 1
+    `,
+    path
+  );
+  return rows?.[0]?.id || null;
+};
+
+const assertTreasuryAssigned = async (user) => {
+  if (!user?.id) {
+    const err = new Error('Unauthorized');
+    err.statusCode = 401;
+    throw err;
+  }
+
+  const supportsVisibility = await hasTreasuryVisibilityTable();
+  if (!supportsVisibility) {
+    const err = new Error('Sidebar user visibility table is missing. Run the sidebar_item_user_visibility migration.');
+    err.statusCode = 500;
+    throw err;
+  }
+
+  const treasurySidebarItemId = await getSidebarItemIdByPath('/payments/treasury');
+  if (!treasurySidebarItemId) {
+    const err = new Error('Treasury module is not configured in sidebar items');
+    err.statusCode = 500;
+    throw err;
+  }
+
+  const countRows = await prisma.$queryRawUnsafe(
+    `
+      SELECT COUNT(*)::int as count
+      FROM public.sidebar_item_user_visibility
+      WHERE sidebar_item_id = $1::uuid
+    `,
+    treasurySidebarItemId
+  );
+  const allowlistCount = Number(countRows?.[0]?.count || 0);
+  if (allowlistCount === 0) {
+    const err = new Error('Treasury approval is not assigned to any user. Assign users in Sidebar Management.');
+    err.statusCode = 403;
+    throw err;
+  }
+
+  const allowedRows = await prisma.$queryRawUnsafe(
+    `
+      SELECT 1
+      FROM public.sidebar_item_user_visibility
+      WHERE sidebar_item_id = $1::uuid
+        AND user_id = $2::uuid
+      LIMIT 1
+    `,
+    treasurySidebarItemId,
+    user.id
+  );
+  if (!Array.isArray(allowedRows) || allowedRows.length === 0) {
+    const err = new Error('You are not assigned to approve Treasury payments');
+    err.statusCode = 403;
+    throw err;
+  }
+};
+
 /**
  * @swagger
  * /api/v1/reports/properties:
@@ -285,6 +369,105 @@ router.get('/summary', protect, async (req, res) => {
   } catch (error) {
     logger.error(`Error fetching report summary: ${error.message}`);
     res.status(500).json({ error: 'Failed to fetch summary' });
+  }
+});
+
+router.get('/treasury-payments', protect, async (req, res) => {
+  try {
+    await assertTreasuryAssigned(req.user);
+
+    const page = Math.max(parseInt(String(req.query.page || '1'), 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit || '20'), 10) || 20, 1), 100);
+    const offset = (page - 1) * limit;
+
+    const { from, to, orderNumber, tdn, ownerName, municipalityCode, barangayCode } = req.query;
+
+    let whereClause = '1=1';
+    const params = [];
+
+    if (from) {
+      whereClause += ` AND t.paid_at >= $${params.length + 1}::timestamptz`;
+      params.push(String(from));
+    }
+    if (to) {
+      whereClause += ` AND t.paid_at <= $${params.length + 1}::timestamptz`;
+      params.push(String(to));
+    }
+    if (orderNumber) {
+      whereClause += ` AND t.order_number ILIKE $${params.length + 1}`;
+      params.push(`%${orderNumber}%`);
+    }
+    if (tdn) {
+      whereClause += ` AND t.tdn ILIKE $${params.length + 1}`;
+      params.push(`%${tdn}%`);
+    }
+    if (ownerName) {
+      whereClause += ` AND t.owner_name ILIKE $${params.length + 1}`;
+      params.push(`%${ownerName}%`);
+    }
+    if (municipalityCode) {
+      whereClause += ` AND t.municipality_code = $${params.length + 1}`;
+      params.push(String(municipalityCode));
+    }
+    if (barangayCode) {
+      whereClause += ` AND t.barangay_code = $${params.length + 1}`;
+      params.push(String(barangayCode));
+    }
+
+    const countQuery = `
+      SELECT COUNT(*)::int as count
+      FROM public.treasury_payment_exports t
+      WHERE ${whereClause}
+    `;
+    const countResult = await prisma.$queryRawUnsafe(countQuery, ...params);
+    const total = Number(countResult?.[0]?.count || 0);
+
+    const query = `
+      SELECT
+        t.id::text as id,
+        t.order_id::text as "orderId",
+        t.order_number as "orderNumber",
+        t.order_description as "orderDescription",
+        t.order_created_by::text as "orderCreatedBy",
+        t.order_created_at as "orderCreatedAt",
+        t.paid_at as "paidAt",
+        t.paid_by::text as "paidBy",
+        t.order_amount as "orderAmount",
+        t.property_id::text as "propertyId",
+        t.pin,
+        t.tdn,
+        t.tax_beg_yr as "taxBegYr",
+        t.municipality_code as "municipalityCode",
+        t.municipality_name as "municipalityName",
+        t.barangay_code as "barangayCode",
+        t.barangay_name as "barangayName",
+        t.owner_name as "ownerName",
+        t.owner_address as "ownerAddress",
+        t.total_market_value as "totalMarketValue",
+        t.total_assessed_value as "totalAssessedValue",
+        t.validation_errors as "validationErrors",
+        t.created_at as "createdAt",
+        t.updated_at as "updatedAt"
+      FROM public.treasury_payment_exports t
+      WHERE ${whereClause}
+      ORDER BY t.paid_at DESC
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+    `;
+    const rows = await prisma.$queryRawUnsafe(query, ...params, limit, offset);
+    const data = (rows || []).map((r) => ({
+      ...r,
+      orderAmount: r.orderAmount !== null ? Number(r.orderAmount) : null,
+      totalMarketValue: r.totalMarketValue !== null ? Number(r.totalMarketValue) : 0,
+      totalAssessedValue: r.totalAssessedValue !== null ? Number(r.totalAssessedValue) : 0,
+    }));
+
+    res.json({
+      data,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    });
+  } catch (error) {
+    logger.error(`Error fetching treasury payments report: ${error.message}`);
+    res.status(error.statusCode || 500).json({ error: error.message || 'Failed to fetch treasury payments report' });
   }
 });
 

@@ -66,12 +66,12 @@ exports.cancel = async (req, res, next) => {
 
 exports.markPaid = async (req, res, next) => {
   try {
-    const order = await oopService.markPaid({
+    const result = await oopService.markPaid({
       user: req.user,
       orderId: req.params.id,
       requestBody: req.body,
     });
-    return res.status(200).json({ success: true, data: order });
+    return res.status(200).json({ success: true, data: result.order, etl: result.etl });
   } catch (error) {
     logger.error('Error marking OOP paid:', error);
     return next(error);

@@ -157,11 +157,15 @@ const PropertyApproval: React.FC = () => {
 
     const nextStage = record.status === 'pending-municipal' ? 'Municipal' : 'Provincial';
     const nextStatus = record.status === 'pending-municipal' ? 'pending-provincial' : 'approved';
+    const actionLabel = nextStatus === 'pending-provincial' ? 'Forward to Provincial' : 'Approve';
 
     const isConfirmed = await showConfirm({
-        title: `Approve Property (${nextStage})`,
-        message: `Are you sure you want to approve this property assessment at the ${nextStage} level? ${nextStatus === 'approved' ? 'This will finalize the record.' : 'This will forward it to the Provincial Assessor.'}`,
-        confirmLabel: `Approve (${nextStage})`,
+        title: `${actionLabel} Property (${nextStage})`,
+        message:
+          nextStatus === 'approved'
+            ? `Are you sure you want to approve this property assessment at the Provincial level? This will finalize the record.`
+            : `Are you sure you want to forward this property assessment to the Provincial Assessor?`,
+        confirmLabel: nextStatus === 'approved' ? `Approve (${nextStage})` : 'Forward to Provincial',
         cancelLabel: 'Cancel'
     });
 
@@ -182,7 +186,7 @@ const PropertyApproval: React.FC = () => {
                 });
             }
             
-            toast.success(`Property approved (${nextStage}) successfully`);
+            toast.success(nextStatus === 'approved' ? 'Property approved successfully' : 'Property forwarded to Provincial successfully');
             fetchData(record.id); // Refresh
         } catch (error: any) {
             console.error('Approval failed:', error);
@@ -393,7 +397,7 @@ const PropertyApproval: React.FC = () => {
                         className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors flex items-center gap-2 shadow-md font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <CheckCircle size={16} />
-                        Approve ({record?.status === 'pending-municipal' ? 'Municipal' : 'Provincial'})
+                        {record?.status === 'pending-municipal' ? 'Forward to Provincial' : 'Approve (Provincial)'}
                     </button>
                 </>
             )}

@@ -256,6 +256,12 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({
   const [isSavingMemo, setIsSavingMemo] = useState(false);
   const [isSavingSworn, setIsSavingSworn] = useState(false);
 
+  React.useEffect(() => {
+    const name = user?.fullName || user?.name;
+    if (!name) return;
+    setDocumentationData(prev => (prev.preparedBy ? prev : { ...prev, preparedBy: name }));
+  }, [user?.fullName, user?.name]);
+
   const currentUser = user?.name || 'System';
   const role = (user?.role || '').toLowerCase();
   const canEdit = isEnabled || ['administrator', 'admin', 'dataentry', 'assessor'].includes(role);

@@ -12,6 +12,15 @@ jest.mock('crypto', () => ({
   randomBytes: () => Buffer.from('abcdef', 'hex'),
 }));
 
+jest.mock('../src/services/treasuryEtlService', () => ({
+  exportPaidOrder: jest.fn().mockResolvedValue({
+    etlRunId: 'run-1',
+    etlVersion: 1,
+    exportedCount: 2,
+    warningsCount: 0,
+  }),
+}));
+
 const oopService = require('../src/services/oopService');
 
 describe('OOP updates rpt_property payment status', () => {
@@ -160,7 +169,7 @@ describe('OOP updates rpt_property payment status', () => {
       requestBody: {},
     });
 
-    expect(res.status).toBe('paid');
+    expect(res.order.status).toBe('paid');
     expect(tx.$queryRawUnsafe).toHaveBeenCalledWith(
       expect.stringContaining('UPDATE public.rpt_property'),
       'paid',

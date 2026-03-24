@@ -4,6 +4,7 @@ import api from '@/services/api';
 interface User {
   id: string;
   name?: string;
+  fullName?: string;
   email: string;
   role: string;
   avatar?: string;
@@ -44,11 +45,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           .then(response => {
              if (response.data.status === 'success') {
                 const userData = response.data.data.user;
+                const resolvedFullName =
+                  userData.fullName || userData.displayName || userData.name || undefined;
+                const resolvedName =
+                  resolvedFullName || (userData.email ? userData.email.split('@')[0] : undefined);
                 const updatedUser: User = {
                     id: userData.id,
                     email: userData.email,
                     role: userData.role || 'user',
-                    name: userData.email.split('@')[0],
+                    name: resolvedName,
+                    fullName: resolvedFullName,
                     avatar: userData.avatarUrl 
                 };
                 setUser(updatedUser);
@@ -123,12 +129,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (response.data.status === 'success') {
         const userData = response.data.data.user;
         const token = response.data.token; // Get token from response
+        const resolvedFullName =
+          userData.fullName || userData.displayName || userData.name || undefined;
+        const resolvedName =
+          resolvedFullName || (userData.email ? userData.email.split('@')[0] : undefined);
 
         const user: User = {
             id: userData.id,
             email: userData.email,
             role: userData.role || 'user',
-            name: userData.email.split('@')[0] // Fallback name
+            name: resolvedName, // Display name
+            fullName: resolvedFullName,
         };
         
         setUser(user);

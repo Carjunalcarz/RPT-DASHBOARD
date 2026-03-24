@@ -1588,8 +1588,8 @@ const RealPropertyDataEntry: React.FC = () => {
                 effectivityDate: selectedRecord.pEffDate || selectedRecord.EFF_DATE || '',
                 declarationDate: selectedRecord.DEC_DATE || '',
               }}
-              assessmentRows={assessmentRecords.map(ass => ({
-                id: ass.uniqueId || ass.TDN || Math.random().toString(),
+              assessmentRows={assessmentRecords.map((ass, idx) => ({
+                id: ass.id || ass.uniqueId || `ass-${selectedRecord.id || selectedRecord.tdn || selectedRecord.TDN || 'rec'}-${idx}`,
                 kind: ass.KIND || '',
                 class: ass.CLASSIFICATION || '',
                 actualUse: ass.ACTUAL_USE || '',

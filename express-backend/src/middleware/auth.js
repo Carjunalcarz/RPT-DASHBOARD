@@ -116,7 +116,14 @@ async function processUser(req, next, decoded) {
       if (decoded.sub && supabasePrisma && supabasePrisma.user) {
         dbUser = await supabasePrisma.user.findUnique({
           where: { id: decoded.sub },
-          select: { role: true, email: true, municipalityCode: true }
+          select: {
+            role: true,
+            email: true,
+            municipalityCode: true,
+            fullName: true,
+            displayName: true,
+            avatarUrl: true,
+          }
         });
       }
     } catch (err) {
@@ -134,7 +141,11 @@ async function processUser(req, next, decoded) {
       ...decoded, 
       id: decoded.sub, // Ensure ID is accessible as req.user.id
       role: dbUser?.role || 'user', // Default to 'user' if DB role is missing
-      municipalityCode: dbUser?.municipalityCode || null
+      email: decoded?.email || dbUser?.email || null,
+      municipalityCode: dbUser?.municipalityCode || null,
+      fullName: dbUser?.fullName || null,
+      displayName: dbUser?.displayName || null,
+      avatarUrl: dbUser?.avatarUrl || null,
     };
     
     // Pass control to next middleware with context

@@ -1,9 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { useAuth } from '@/context/AuthContext';
 import { getPropertyReport, getTaxBegYears, PropertyReport } from '@/services/reportsService';
 import oopService from '@/services/oopService';
+import payorService from '@/services/payorService';
 import type { OrderOfPayment as OopOrder } from '@/types/oop';
+import type { Payor } from '@/types/payor';
+import { getPaymentBadgeClassName, getPaymentRowClassName, isPaymentSelectionDisabled } from '@/utils/paymentStatusColors';
 import { toast } from 'sonner';
 import { useReactToPrint } from 'react-to-print';
 import {
@@ -35,6 +39,7 @@ const makeReferenceNo = () => {
 const OrderOfPayment: React.FC = () => {
   const { headerColor } = useThemeColor();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement | null>(null);
 
   const [taxBegYrOptions, setTaxBegYrOptions] = useState<string[]>([]);
@@ -59,6 +64,10 @@ const OrderOfPayment: React.FC = () => {
 
   const [referenceNo, setReferenceNo] = useState<string>(() => makeReferenceNo());
   const [payerName, setPayerName] = useState('');
+  const [payerMatches, setPayerMatches] = useState<Payor[]>([]);
+  const [payerSearching, setPayerSearching] = useState(false);
+  const [payerPickerOpen, setPayerPickerOpen] = useState(false);
+  const payerSearchTimer = useRef<number | null>(null);
   const [preparedBy, setPreparedBy] = useState('');
   const [paymentDate, setPaymentDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
 
@@ -83,6 +92,47 @@ const OrderOfPayment: React.FC = () => {
   const isTreasurer = useMemo(() => String(user?.role || '').toLowerCase() === 'treasurer', [user?.role]);
 
   useEffect(() => {
+    if (preparedBy) return;
+    const name = user?.fullName || user?.name;
+    if (name) setPreparedBy(name);
+  }, [preparedBy, user?.fullName, user?.name]);
+
+  useEffect(() => {
+    const q = payerName.trim();
+    if (payerSearchTimer.current) window.clearTimeout(payerSearchTimer.current);
+    if (q.length < 2) {
+      setPayerMatches([]);
+      setPayerSearching(false);
+      return;
+    }
+    payerSearchTimer.current = window.setTimeout(async () => {
+      try {
+        setPayerSearching(true);
+        const res = await payorService.search(q, 8);
+        setPayerMatches(res.data || []);
+      } catch {
+        setPayerMatches([]);
+      } finally {
+        setPayerSearching(false);
+      }
+    }, 250);
+    return () => {
+      if (payerSearchTimer.current) window.clearTimeout(payerSearchTimer.current);
+    };
+  }, [payerName]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('oop_selected_payor');
+      if (!raw) return;
+      localStorage.removeItem('oop_selected_payor');
+      const p = JSON.parse(raw);
+      const name = [p?.firstName, p?.lastName].filter(Boolean).join(' ').trim();
+      if (name) setPayerName(name);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
     const init = async () => {
       const currentYear = new Date().getFullYear().toString();
       const initialFilters = { municipality: '', barangay: '', taxBegYr: currentYear };
@@ -104,7 +154,11 @@ const OrderOfPayment: React.FC = () => {
       setLoading(true);
       const response = await getPropertyReport({ ...nextFilters, page, limit: meta.limit });
       setRecords(response.data);
-      setMeta(response.meta);
+      setMeta({
+        ...response.meta,
+        page: Math.max(1, Number(response.meta?.page || 1)),
+        totalPages: Math.max(1, Number(response.meta?.totalPages || 0)),
+      });
       setRowStatusByAssessmentId((prev) => {
         const next = { ...prev };
         response.data.forEach((r) => {
@@ -134,7 +188,8 @@ const OrderOfPayment: React.FC = () => {
   };
 
   const handlePageChange = async (newPage: number) => {
-    if (newPage >= 1 && newPage <= meta.totalPages) {
+    const maxPages = Math.max(1, meta.totalPages);
+    if (newPage >= 1 && newPage <= maxPages) {
       await fetchData(newPage, filters);
     }
   };
@@ -155,8 +210,15 @@ const OrderOfPayment: React.FC = () => {
   }, [records, searchText]);
 
   const isSelected = (assessmentId: string) => !!selected[assessmentId];
+  
+  const isRowDisabled = (assessmentId: string) => {
+    const status = rowStatusByAssessmentId[assessmentId] || '';
+    return isPaymentSelectionDisabled(status);
+  };
 
   const toggleSelect = (record: PropertyReport) => {
+    if (isRowDisabled(record.assessmentId)) return;
+    
     setSelected(prev => {
       const next = { ...prev };
       if (next[record.assessmentId]) {
@@ -171,13 +233,17 @@ const OrderOfPayment: React.FC = () => {
   const toggleSelectAllVisible = () => {
     setSelected(prev => {
       const next = { ...prev };
-      const allSelected = visibleRecords.every(r => !!next[r.assessmentId]);
+      const selectableRecords = visibleRecords.filter(r => !isRowDisabled(r.assessmentId));
+      
+      if (selectableRecords.length === 0) return prev;
+      
+      const allSelected = selectableRecords.every(r => !!next[r.assessmentId]);
       if (allSelected) {
-        visibleRecords.forEach(r => {
+        selectableRecords.forEach(r => {
           delete next[r.assessmentId];
         });
       } else {
-        visibleRecords.forEach(r => {
+        selectableRecords.forEach(r => {
           next[r.assessmentId] = r;
         });
       }
@@ -586,13 +652,24 @@ const OrderOfPayment: React.FC = () => {
                     </tr>
                   ) : (
                     visibleRecords.map((r) => (
-                      <tr key={r.assessmentId} className="hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors">
+                      <tr
+                        key={r.assessmentId}
+                        className={`${getPaymentRowClassName(rowStatusByAssessmentId[r.assessmentId] || '')} ${
+                          isRowDisabled(r.assessmentId) 
+                            ? 'opacity-75 cursor-not-allowed' 
+                            : 'hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors'
+                        }`}
+                      >
                         <td className="px-4 py-3">
                           <input
                             type="checkbox"
                             checked={isSelected(r.assessmentId)}
                             onChange={() => toggleSelect(r)}
-                            className="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
+                            disabled={isRowDisabled(r.assessmentId)}
+                            aria-disabled={isRowDisabled(r.assessmentId)}
+                            className={`rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 ${
+                              isRowDisabled(r.assessmentId) ? 'opacity-50 cursor-not-allowed bg-slate-100 dark:bg-slate-800' : ''
+                            }`}
                             aria-label={`Select ${r.tdn || r.assessmentId}`}
                           />
                         </td>
@@ -622,16 +699,7 @@ const OrderOfPayment: React.FC = () => {
                         <td className="px-4 py-3 text-center whitespace-nowrap">
                           {(() => {
                             const s = rowStatusByAssessmentId[r.assessmentId] || '';
-                            const cls =
-                              s === 'Paid'
-                                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900'
-                                : s === 'Pending'
-                                  ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300 border-amber-200 dark:border-amber-900'
-                                  : s === 'Unpaid'
-                                    ? 'bg-slate-50 text-slate-700 dark:bg-slate-900/40 dark:text-slate-200 border-slate-200 dark:border-slate-700'
-                                  : s === 'Failed'
-                                    ? 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300 border-red-200 dark:border-red-900'
-                                    : 'bg-slate-50 text-slate-600 dark:bg-slate-900/40 dark:text-slate-300 border-slate-200 dark:border-slate-700';
+                            const cls = getPaymentBadgeClassName(s);
                             return (
                               <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded border text-xs font-semibold ${cls}`}>
                                 {s || '-'}
@@ -698,13 +766,67 @@ const OrderOfPayment: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Payer Name</label>
-                <input
-                  value={payerName}
-                  onChange={(e) => setPayerName(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter payer name"
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400">Payer Name</label>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/payments/payors', { state: { prefillQuery: payerName } })}
+                    className="text-xs text-blue-600 hover:text-blue-700 font-semibold"
+                  >
+                    Search/Register
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    value={payerName}
+                    onChange={(e) => setPayerName(e.target.value)}
+                    onFocus={() => setPayerPickerOpen(true)}
+                    onBlur={() => window.setTimeout(() => setPayerPickerOpen(false), 120)}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter payer name"
+                  />
+                  {payerPickerOpen && payerName.trim().length >= 2 ? (
+                    <div className="absolute z-30 mt-1 w-full rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 shadow-lg overflow-hidden">
+                      {payerSearching ? (
+                        <div className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300">Searching…</div>
+                      ) : payerMatches.length > 0 ? (
+                        <div className="max-h-60 overflow-auto">
+                          {payerMatches.map((p) => {
+                            const label = `${p.firstName} ${p.lastName}`.trim();
+                            const meta = [p.address, `${p.idType}: ${p.idNumber}`].filter(Boolean).join(' • ');
+                            return (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  setPayerName(label);
+                                  setPayerPickerOpen(false);
+                                }}
+                                className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                              >
+                                <div className="text-sm text-slate-900 dark:text-slate-100">{label}</div>
+                                {meta ? <div className="text-[11px] text-slate-500 dark:text-slate-400">{meta}</div> : null}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="px-3 py-2 text-xs text-slate-600 dark:text-slate-300">No payor found.</div>
+                      )}
+                      <div className="border-t border-slate-200 dark:border-slate-700">
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => navigate('/payments/payors', { state: { prefillQuery: payerName } })}
+                          className="w-full text-left px-3 py-2 text-xs text-blue-700 dark:text-blue-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 font-semibold"
+                        >
+                          Register new payor
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
               </div>
 
               <div>

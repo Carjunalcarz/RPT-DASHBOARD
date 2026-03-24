@@ -106,7 +106,7 @@ export const cancelFaasTransaction = async (id: string): Promise<void> => {
 
 export const updateFaasStatus = async (id: string, status: 'draft' | 'for-review' | 'approved' | 'rejected' | 'pending-municipal' | 'pending-provincial', remarks?: string): Promise<FaasRecord> => {
   try {
-    const response = await api.put(`/faas/${id}/status`, { status, remarks });
+    const response = await api.put(`/faas/${id}/status`, { status, remarks }, { timeout: 60000 });
     return response.data.data;
   } catch (error) {
     console.error('Error updating FAAS status:', error);
@@ -116,8 +116,22 @@ export const updateFaasStatus = async (id: string, status: 'draft' | 'for-review
 
 export const batchUpdateFaasStatus = async (ids: string[], status: 'draft' | 'for-review' | 'approved' | 'rejected' | 'pending-municipal' | 'pending-provincial', remarks?: string): Promise<{ success: string[], failed: { id: string, error: any }[] }> => {
   try {
-    const response = await api.post('/faas/batch-status', { ids, status, remarks });
-    return response.data.data;
+    const chunkSize = 50;
+    const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+    const chunks: string[][] = [];
+    for (let i = 0; i < uniqueIds.length; i += chunkSize) {
+      chunks.push(uniqueIds.slice(i, i + chunkSize));
+    }
+
+    const aggregate = { success: [] as string[], failed: [] as { id: string, error: any }[] };
+    for (const chunk of chunks) {
+      const response = await api.post('/faas/batch-status', { ids: chunk, status, remarks }, { timeout: 120000 });
+      const result = response.data.data;
+      aggregate.success.push(...(result?.success || []));
+      aggregate.failed.push(...(result?.failed || []));
+    }
+
+    return aggregate;
   } catch (error) {
     console.error('Error in batch update:', error);
     throw error;
@@ -126,7 +140,10 @@ export const batchUpdateFaasStatus = async (ids: string[], status: 'draft' | 'fo
 
 export const bulkMigrate = async (properties: any[], migrationType: string, skipExisting: boolean = false): Promise<any[]> => {
   try {
-    const response = await api.post('/faas/bulk-migrate', { properties, migrationType, skipExisting });
+    const response = await api.post('/faas/bulk-migrate', 
+      { properties, migrationType, skipExisting },
+      { timeout: 60000 } // Override default 15s timeout for large batch
+    );
     return response.data.data;
   } catch (error) {
     console.error('Error in bulk migration:', error);
