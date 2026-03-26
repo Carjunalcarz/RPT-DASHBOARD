@@ -224,12 +224,26 @@ WHERE
     AND m.OWNER_NO is not null
 `;
 
+      let countQuery = `
+SELECT COUNT(*) as total 
+FROM RPTAS_AGUSAN.dbo.RPTMAST m
+OUTER APPLY (
+    SELECT TOP 1 Owner_No, Name, Address, Tel_no 
+    FROM RPTAS_AGUSAN.dbo.Rptowner 
+    WHERE Owner_No = m.OWNER_NO
+) o
+WHERE 
+    m.TDN IS NOT NULL
+    AND m.OWNER_NO is not null
+`;
+
       // Apply Municipality Filter
       if (targetMunicipality) {
           // Use safe string interpolation or parameter if possible, but existing code uses template literals
           // Ideally use parameters, but sticking to existing pattern for consistency
           // Ensuring targetMunicipality is safe (it comes from DB or sanitized param)
           baseQuery += ` AND m.CITY = '${targetMunicipality.replace(/'/g, "''")}'`;
+          countQuery += ` AND m.CITY = '${targetMunicipality.replace(/'/g, "''")}'`;
       }
 
       // Dynamic Filter Logic
@@ -242,15 +256,19 @@ WHERE
           switch (searchField) {
             case 'TDN':
               baseQuery += ` AND m.TDN LIKE '%${sanitizedValue}%'`;
+              countQuery += ` AND m.TDN LIKE '%${sanitizedValue}%'`;
               break;
             case 'ARP':
               baseQuery += ` AND m.ARP LIKE '%${sanitizedValue}%'`;
+              countQuery += ` AND m.ARP LIKE '%${sanitizedValue}%'`;
               break;
             case 'PIN':
               baseQuery += ` AND m.PIN LIKE '%${sanitizedValue}%'`;
+              countQuery += ` AND m.PIN LIKE '%${sanitizedValue}%'`;
               break;
             case 'OWNER':
               baseQuery += ` AND o.Name LIKE '%${sanitizedValue}%'`;
+              countQuery += ` AND o.Name LIKE '%${sanitizedValue}%'`;
               break;
             default:
               break;
@@ -258,7 +276,14 @@ WHERE
         }
       }
 
-      baseQuery += ` ORDER BY m.TDN ASC;`;
+      // First get total count
+      logger.info('Executing RPTAS_AGUSAN migration count query...');
+      const countResult = await pool.request().query(countQuery);
+      const totalRecords = countResult.recordset[0].total;
+
+      // Then get paginated data
+      const startIndex = (page - 1) * limit;
+      baseQuery += ` ORDER BY m.TDN ASC OFFSET ${startIndex} ROWS FETCH NEXT ${limit} ROWS ONLY;`;
 
       logger.info('Executing RPTAS_AGUSAN migration query via MSSQL driver...');
 
@@ -282,20 +307,15 @@ WHERE
           };
       });
 
-      logger.info(`Query executed successfully. Records found: ${records.length}`);
-
-      // Calculate pagination
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const paginatedRecords = records.slice(startIndex, endIndex);
+      logger.info(`Query executed successfully. Records found: ${records.length} (Total: ${totalRecords})`);
 
       return {
-        data: paginatedRecords,
+        data: records,
         pagination: {
           page: Number(page),
           limit: Number(limit),
-          total: records.length,
-          totalPages: Math.ceil(records.length / limit)
+          total: totalRecords,
+          totalPages: Math.ceil(totalRecords / limit)
         }
       };
     } catch (error) {

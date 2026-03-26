@@ -98,9 +98,66 @@ exports.getMe = async (req, res, next) => {
 };
 
 /**
- * Update user details (Admin only)
- * @route PUT /api/v1/users/:id
+ * Create a new user (Admin only)
+ * @route POST /api/v1/users
  */
+exports.createUser = async (req, res, next) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return next(new AppError('Not authorized to create users', 403));
+    }
+
+    if (!supabase) {
+      return next(new AppError('Supabase client not initialized.', 500));
+    }
+
+    const { email, password, role, municipalityCode, fullName, contactNo } = req.body;
+
+    if (!email || !password) {
+      return next(new AppError('Email and password are required', 400));
+    }
+
+    // 1. Create user in Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true // auto-confirm for admin created users
+    });
+
+    if (authError) {
+      logger.error('Supabase createUser error:', authError);
+      return next(new AppError(authError.message, 400));
+    }
+
+    const newUserId = authData.user.id;
+
+    // 2. Create user profile in public.User table
+    const newUser = await supabasePrisma.user.create({
+      data: {
+        id: newUserId,
+        email,
+        role: role || 'user',
+        municipalityCode: municipalityCode || null,
+        fullName: fullName || null,
+        contactNo: contactNo || null
+      }
+    });
+
+    res.status(201).json({
+      status: 'success',
+      data: {
+        user: {
+          id: newUserId,
+          email,
+          ...newUser
+        }
+      }
+    });
+  } catch (error) {
+    logger.error('Error creating user:', error);
+    next(error);
+  }
+};
 exports.updateUser = async (req, res, next) => {
   try {
     // Only admin can update other users

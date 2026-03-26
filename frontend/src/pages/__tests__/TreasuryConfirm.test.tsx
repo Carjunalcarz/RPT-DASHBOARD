@@ -4,6 +4,7 @@ import { describe, it, expect, vi, type Mock } from 'vitest';
 import TreasuryConfirm from '@/pages/TreasuryConfirm';
 import { useAuth } from '@/context/AuthContext';
 import oopService from '@/services/oopService';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 vi.mock('@/context/ThemeColorContext', () => ({
   useThemeColor: () => ({ headerColor: '#0ea5e9' }),
@@ -15,6 +16,11 @@ vi.mock('react-router-dom', async () => {
 });
 
 vi.mock('@/context/AuthContext');
+vi.mock('@/context/AlertContext', () => ({
+  useAlert: () => ({
+    showConfirm: vi.fn().mockResolvedValue(true),
+  }),
+}));
 
 vi.mock('@/services/oopService', () => ({
   default: {
@@ -35,7 +41,12 @@ describe('TreasuryConfirm', () => {
     (oopService.listPending as any).mockRejectedValue({ response: { status: 403, data: { message: 'Not assigned' } } });
     (useAuth as Mock).mockReturnValue({ user: { id: 'u1', role: 'admin' } });
 
-    render(<TreasuryConfirm />);
+    const queryClient = new QueryClient();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TreasuryConfirm />
+      </QueryClientProvider>
+    );
     expect(await screen.findByText(/Signed in as/i)).toBeInTheDocument();
     expect(await screen.findByText('Not assigned')).toBeInTheDocument();
   });
@@ -48,7 +59,12 @@ describe('TreasuryConfirm', () => {
     });
     (useAuth as Mock).mockReturnValue({ user: { id: 'u2', role: 'user' } });
 
-    render(<TreasuryConfirm />);
+    const queryClient = new QueryClient();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <TreasuryConfirm />
+      </QueryClientProvider>
+    );
     expect(await screen.findByText(/Signed in as/i)).toBeInTheDocument();
     expect(screen.queryByText('Not assigned')).not.toBeInTheDocument();
   });

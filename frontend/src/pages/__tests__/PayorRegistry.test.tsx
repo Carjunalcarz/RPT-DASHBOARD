@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import PayorRegistry from '@/pages/PayorRegistry';
 import payorService from '@/services/payorService';
+import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('@/context/ThemeColorContext', () => ({
   useThemeColor: () => ({ headerColor: '#0ea5e9' }),
@@ -30,7 +31,11 @@ describe('PayorRegistry', () => {
 
   it('debounces search and calls API', async () => {
     (payorService.search as any).mockResolvedValue({ success: true, data: [] });
-    render(<PayorRegistry />);
+    render(
+      <MemoryRouter>
+        <PayorRegistry />
+      </MemoryRouter>
+    );
 
     fireEvent.change(screen.getByLabelText('Payor search'), { target: { value: 'juan' } });
     await new Promise((r) => setTimeout(r, 350));
@@ -41,14 +46,22 @@ describe('PayorRegistry', () => {
   });
 
   it('validates required fields on single register', async () => {
-    render(<PayorRegistry />);
+    render(
+      <MemoryRouter>
+        <PayorRegistry />
+      </MemoryRouter>
+    );
     fireEvent.click(screen.getByRole('button', { name: /Register/i }));
     expect(screen.getAllByText('Required')).toHaveLength(4);
   });
 
   it('submits bulk import', async () => {
     (payorService.bulkCreate as any).mockResolvedValue({ success: true, created: [], duplicates: [], failed: [] });
-    render(<PayorRegistry />);
+    render(
+      <MemoryRouter>
+        <PayorRegistry />
+      </MemoryRouter>
+    );
 
     fireEvent.click(screen.getByRole('button', { name: /Bulk Import/i }));
     await screen.findByText(/Bulk Register \(CSV\)/i);

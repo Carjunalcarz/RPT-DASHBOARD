@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { User, getUsers, updateUser } from '@/services/userService';
 import { useThemeColor } from '@/context/ThemeColorContext';
-import { Edit2, Save, X, RefreshCw } from 'lucide-react';
+import { Edit2, Save, X, RefreshCw, Shield, UserPlus, Search } from 'lucide-react';
 import { toast } from 'sonner';
+import sidebarService, { SidebarItem } from '@/services/sidebarService';
+import permissionsService from '@/services/permissionsService';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const UserManagement: React.FC = () => {
   const { user } = useAuth();
   const { headerColor } = useThemeColor();
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -17,6 +22,13 @@ const UserManagement: React.FC = () => {
     fullName: '',
     contactNo: ''
   });
+  const [permDialogOpen, setPermDialogOpen] = useState(false);
+  const [permUser, setPermUser] = useState<User | null>(null);
+  const [permLoading, setPermLoading] = useState(false);
+  const [sidebarItems, setSidebarItems] = useState<SidebarItem[]>([]);
+  const [selectedSidebarItemIds, setSelectedSidebarItemIds] = useState<string[]>([]);
+  const [permSearch, setPermSearch] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -32,14 +44,16 @@ const UserManagement: React.FC = () => {
   };
 
   useEffect(() => {
-    if (user?.role !== 'admin') {
+    const role = (user?.role || '').toLowerCase();
+    if (!['admin', 'administrator'].includes(role)) {
         toast.error('Access Denied. Admins only.');
         return;
     }
     fetchUsers();
   }, [user]);
 
-  if (user?.role !== 'admin') {
+  const isAdmin = ['admin', 'administrator'].includes(String(user?.role || '').toLowerCase());
+  if (!isAdmin) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
@@ -80,6 +94,76 @@ const UserManagement: React.FC = () => {
     }
   };
 
+  const computeTrail = (item: SidebarItem, byId: Record<string, SidebarItem>) => {
+    const parts: string[] = [];
+    let current: SidebarItem | undefined = item;
+    let guard = 0;
+    while (current && current.parentId && byId[current.parentId] && guard < 20) {
+      current = byId[current.parentId];
+      parts.unshift(current.label);
+      guard += 1;
+    }
+    return parts.length ? `${parts.join(' / ')} / ${item.label}` : item.label;
+  };
+
+  const openPermissions = async (target: User) => {
+    setPermUser(target);
+    setPermDialogOpen(true);
+    setPermSearch('');
+    setPermLoading(true);
+    try {
+      if (sidebarItems.length === 0) {
+        const manage = await sidebarService.getManagementSidebarItems();
+        setSidebarItems(manage.data || []);
+      }
+      const vis = await permissionsService.getUserSidebarVisibility(target.id);
+      setSelectedSidebarItemIds(vis.data.sidebarItemIds || []);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Failed to load user permissions');
+      setSelectedSidebarItemIds([]);
+    } finally {
+      setPermLoading(false);
+    }
+  };
+
+  const savePermissions = async () => {
+    if (!permUser) return;
+    setPermLoading(true);
+    try {
+      const byId: Record<string, SidebarItem> = {};
+      sidebarItems.forEach((i) => {
+        byId[i.id] = i;
+      });
+
+      const restrictedIds = sidebarItems
+        .filter((i) => i.path && i.path !== '#' && Array.isArray(i.visibleToUserIds) && i.visibleToUserIds.length > 0)
+        .map((i) => i.id);
+
+      const selectedRestricted = selectedSidebarItemIds.filter((id) => restrictedIds.includes(id));
+      await permissionsService.setUserSidebarVisibility(permUser.id, selectedRestricted);
+      toast.success('Permissions updated');
+      setPermDialogOpen(false);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Failed to update permissions');
+    } finally {
+      setPermLoading(false);
+    }
+  };
+
+  const toggleSelected = (id: string) => {
+    setSelectedSidebarItemIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const filteredUsers = users.filter(u => {
+    const search = searchTerm.toLowerCase();
+    return (
+      u.email.toLowerCase().includes(search) ||
+      (u.fullName || '').toLowerCase().includes(search) ||
+      (u.municipalityCode || '').toLowerCase().includes(search) ||
+      u.role.toLowerCase().includes(search)
+    );
+  });
+
   return (
     <div className="space-y-6 p-6">
       <div
@@ -90,15 +174,50 @@ const UserManagement: React.FC = () => {
       >
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold text-white">User List (Supabase Auth)</h1>
-          <button
-            onClick={fetchUsers}
-            className="p-2 text-white bg-white/20 hover:bg-white/30 rounded-full transition-colors"
-            title="Refresh Users"
-          >
-            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/admin/users/add')}
+              className="flex items-center px-3 py-2 bg-white text-blue-600 hover:bg-blue-50 text-sm font-medium rounded-lg transition-colors"
+            >
+              <UserPlus size={18} className="mr-2" />
+              Add User
+            </button>
+            <button
+              onClick={fetchUsers}
+              className="p-2 text-white bg-white/20 hover:bg-white/30 rounded-full transition-colors"
+              title="Refresh Users"
+            >
+              <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+            </button>
+          </div>
         </div>
         <p className="text-blue-100 text-sm mt-1">View all registered users from Supabase Backend</p>
+      </div>
+
+      <div className="flex items-center gap-4 bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700">
+        <div className="relative flex-1">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search size={18} className="text-slate-400" />
+          </div>
+          <input
+            type="text"
+            className="block w-full pl-10 pr-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md leading-5 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-sm"
+            placeholder="Search by name, email, role or municipality..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        {searchTerm && (
+          <button
+            onClick={() => setSearchTerm('')}
+            className="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 font-medium"
+          >
+            Clear
+          </button>
+        )}
+        <div className="text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+          {filteredUsers.length} of {users.length} users
+        </div>
       </div>
 
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden">
@@ -117,12 +236,14 @@ const UserManagement: React.FC = () => {
               <tr>
                 <td colSpan={5} className="px-6 py-4 text-center text-sm text-slate-500">Loading users...</td>
               </tr>
-            ) : users.length === 0 ? (
+            ) : filteredUsers.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-4 text-center text-sm text-slate-500">No users found.</td>
+                <td colSpan={5} className="px-6 py-4 text-center text-sm text-slate-500">
+                  {searchTerm ? `No users matching "${searchTerm}"` : 'No users found.'}
+                </td>
               </tr>
             ) : (
-              users.map((u) => (
+              filteredUsers.map((u) => (
                 <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     {editingUser?.id === u.id ? (
@@ -214,13 +335,22 @@ const UserManagement: React.FC = () => {
                         </button>
                       </div>
                     ) : (
-                      <button
-                        onClick={() => handleEdit(u)}
-                        className="text-blue-600 hover:text-blue-900 bg-blue-50 p-1.5 rounded-full hover:bg-blue-100 transition-colors"
-                        title="Edit"
-                      >
-                        <Edit2 size={16} />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => openPermissions(u)}
+                          className="text-indigo-600 hover:text-indigo-900 bg-indigo-50 p-1.5 rounded-full hover:bg-indigo-100 transition-colors"
+                          title="Permissions"
+                        >
+                          <Shield size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleEdit(u)}
+                          className="text-blue-600 hover:text-blue-900 bg-blue-50 p-1.5 rounded-full hover:bg-blue-100 transition-colors"
+                          title="Edit"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -229,6 +359,118 @@ const UserManagement: React.FC = () => {
           </tbody>
         </table>
       </div>
+
+      <Dialog open={permDialogOpen} onOpenChange={setPermDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Permissions</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="text-sm text-slate-700 dark:text-slate-300">
+              <div className="font-semibold">{permUser?.fullName || permUser?.email || 'User'}</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">{permUser?.id || ''}</div>
+            </div>
+
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              Only restricted pages can be toggled here. Pages marked “Everyone” remain visible to all users.
+            </div>
+
+            <input
+              value={permSearch}
+              onChange={(e) => setPermSearch(e.target.value)}
+              placeholder="Search pages by label or path..."
+              className="w-full px-3 py-2 text-sm rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900"
+            />
+
+            <div className="max-h-[420px] overflow-auto border border-slate-200 dark:border-slate-700 rounded-md">
+              <div className="divide-y divide-slate-200 dark:divide-slate-700">
+                {permLoading ? (
+                  <div className="p-4 text-sm text-slate-500 dark:text-slate-400">Loading...</div>
+                ) : (() => {
+                  const byId: Record<string, SidebarItem> = {};
+                  sidebarItems.forEach((i) => {
+                    byId[i.id] = i;
+                  });
+
+                  const role = String(permUser?.role || '').toLowerCase();
+                  const isTargetAdmin = ['admin', 'administrator'].includes(role);
+
+                  const rows = sidebarItems
+                    .filter((i) => i.path && i.path !== '#')
+                    .map((i) => ({
+                      ...i,
+                      trail: computeTrail(i, byId),
+                      isRestricted: Array.isArray(i.visibleToUserIds) && i.visibleToUserIds.length > 0,
+                      disabled: !!i.adminOnly && !isTargetAdmin,
+                    }))
+                    .filter((i) => {
+                      const q = permSearch.trim().toLowerCase();
+                      if (!q) return true;
+                      return String(i.trail).toLowerCase().includes(q) || String(i.path).toLowerCase().includes(q);
+                    })
+                    .sort((a, b) => String(a.trail).localeCompare(String(b.trail)));
+
+                  if (rows.length === 0) {
+                    return <div className="p-4 text-sm text-slate-500 dark:text-slate-400">No matching pages.</div>;
+                  }
+
+                  return rows.map((i) => {
+                    const checked = selectedSidebarItemIds.includes(i.id);
+                    const canToggle = i.isRestricted && !i.disabled;
+                    return (
+                      <div key={i.id} className="p-3 flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">{i.trail}</div>
+                          <div className="text-xs font-mono text-slate-500 dark:text-slate-400 truncate">{i.path}</div>
+                          <div className="mt-1 flex items-center gap-2">
+                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                              i.isRestricted
+                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-200'
+                                : 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200'
+                            }`}>
+                              {i.isRestricted ? 'Restricted' : 'Everyone'}
+                            </span>
+                            {i.adminOnly ? (
+                              <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-200">
+                                Admin only
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={!canToggle}
+                            onChange={() => toggleSelected(i.id)}
+                            className="h-4 w-4"
+                          />
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <button
+              onClick={() => setPermDialogOpen(false)}
+              className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800"
+              disabled={permLoading}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={savePermissions}
+              className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={permLoading}
+            >
+              Save
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

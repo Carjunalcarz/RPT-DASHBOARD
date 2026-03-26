@@ -23,6 +23,7 @@ const testTaskRoutes = require('./routes/testTasks');
 const batchRoutes = require('./routes/batchRoutes');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/users');
+const permissionsRoutes = require('./routes/permissionsRoutes');
 const rptMastRoutes = require('./routes/rptMastRoutes');
 const rptAssRoutes = require('./routes/rptAssRoutes');
 const bldgAdjRoutes = require('./routes/bldgAdjRoutes');
@@ -43,6 +44,7 @@ const buildingAppraisalRoutes = require('./routes/buildingAppraisalRoutes');
 const faasRoutes = require('./routes/faasRoutes');
 const pdfRoutes = require('./routes/pdfRoutes');
 const reportsRoutes = require('./routes/reportsRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
 const setupSignatoriesRoutes = require('./routes/setupSignatoriesRoutes');
 const setupSignatoryTemplatesRoutes = require('./routes/setupSignatoryTemplatesRoutes');
 const sidebarRoutes = require('./routes/sidebarRoutes');
@@ -50,6 +52,34 @@ const oopRoutes = require('./routes/oopRoutes');
 const payorRoutes = require('./routes/payorRoutes');
 
 const app = express();
+
+// --- DI and Plugin Manager Setup ---
+const container = require('./core/di/container');
+const PluginManager = require('./core/plugins/PluginManager');
+const HealthModule = require('./modules/health/HealthModule');
+const UserModule = require('./modules/users/UserModule');
+const FaasModule = require('./modules/rptas/faas/FaasModule');
+const PropertyModule = require('./modules/rptas/property/PropertyModule');
+const AssessmentModule = require('./modules/rptas/assessment/AssessmentModule');
+const OopModule = require('./modules/treasury/oop/OopModule');
+const PayorModule = require('./modules/treasury/payors/PayorModule');
+
+// Initialize Database Adapter
+const dbAdapter = container.resolve('dbAdapter');
+// We don't block the app startup, but we connect to the DB
+dbAdapter.connect().catch(err => logger.error('DB Connection error', err));
+
+const pluginManager = new PluginManager(container, app);
+pluginManager.registerModule(HealthModule);
+pluginManager.registerModule(UserModule);
+pluginManager.registerModule(FaasModule);
+pluginManager.registerModule(PropertyModule);
+pluginManager.registerModule(AssessmentModule);
+pluginManager.registerModule(OopModule);
+pluginManager.registerModule(PayorModule);
+// Initialize all v2 modules
+pluginManager.initializeModules();
+// -----------------------------------
 
 // Trust Proxy (for rate limiting and IP logging)
 app.set('trust proxy', 1);
@@ -156,6 +186,8 @@ app.use('/api/v1/batch', batchRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/users', userRoutes); // Alias for consistency if frontend uses /api/users directly
+app.use('/api/v1/permissions', permissionsRoutes);
+app.use('/api/permissions', permissionsRoutes);
 app.use('/api/rptmast', rptMastRoutes);
 app.use('/api/rpt-ass', rptAssRoutes);
 app.use('/api/bldg-adj', bldgAdjRoutes);
@@ -175,12 +207,15 @@ app.use('/api/v1/building-appraisals', buildingAppraisalRoutes);
 app.use('/api/v1/faas', faasRoutes);
 app.use('/api/v1/pdf', pdfRoutes);
 app.use('/api/v1/reports', reportsRoutes);
+app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/setup/signatories', setupSignatoriesRoutes);
 app.use('/api/v1/setup/signatory-templates', setupSignatoryTemplatesRoutes);
 app.use('/api/v1/sidebar', sidebarRoutes);
 app.use('/api/v1/oop', oopRoutes);
 app.use('/api/v1/payors', payorRoutes);
 // Legacy routes support if needed
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/sidebar', sidebarRoutes);
 app.use('/api/classifications', classificationRoutes);
 app.use('/api/actual-uses', actualUseRoutes);
 app.use('/api/subclasses', subClassRoutes);

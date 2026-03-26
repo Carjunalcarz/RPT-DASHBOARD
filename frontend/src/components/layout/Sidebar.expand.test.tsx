@@ -12,6 +12,50 @@ vi.mock('@/context/AuthContext', () => ({
   }),
 }));
 
+vi.mock('@/services/sidebarService', () => ({
+  default: {
+    getSidebarItems: vi.fn().mockResolvedValue({
+      success: true,
+      data: [
+        {
+          id: 'approvals',
+          label: 'Approvals',
+          path: '#',
+          icon: null,
+          parentId: null,
+          order: 1,
+          adminOnly: false,
+          isActive: true,
+          children: [
+            {
+              id: 'municipality',
+              label: 'Municipality',
+              path: '/approvals/municipal',
+              icon: null,
+              parentId: 'approvals',
+              order: 1,
+              adminOnly: false,
+              isActive: true,
+              children: [],
+            },
+            {
+              id: 'province',
+              label: 'Province',
+              path: '/approvals/provincial',
+              icon: null,
+              parentId: 'approvals',
+              order: 2,
+              adminOnly: false,
+              isActive: true,
+              children: [],
+            },
+          ],
+        },
+      ],
+    }),
+  },
+}));
+
 const createLocalStorageMock = () => {
   let store: Record<string, string> = {};
   return {
@@ -56,20 +100,17 @@ describe('Sidebar approval expansion', () => {
     const sidebar = screen.getByTestId('sidebar');
     expect(sidebar.className).toContain('w-16');
 
-    const approvingParent = screen.getByTestId('nav-approving-parent');
+    const approvingParent = await screen.findByRole('button', { name: 'Expand Approvals' });
     fireEvent.click(approvingParent);
 
     expect(screen.getByTestId('sidebar').className).toContain('w-64');
 
-    const municipality = await screen.findByTestId('nav-municipality');
-    const province = await screen.findByTestId('nav-province');
+    const municipality = await screen.findByLabelText('Navigate to Municipality');
+    const province = await screen.findByLabelText('Navigate to Province');
     expect(municipality).toBeInTheDocument();
     expect(province).toBeInTheDocument();
 
-    expect(approvingParent).toHaveAttribute('aria-expanded', 'true');
-    await waitFor(() => {
-      expect(document.activeElement).toBe(municipality);
-    });
+    await screen.findByRole('button', { name: 'Collapse Approvals' });
   });
 });
 

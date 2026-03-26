@@ -71,13 +71,23 @@ const SidebarManagement: React.FC = () => {
 
   useEffect(() => {
     if (user && !['admin', 'administrator'].includes(user.role.toLowerCase())) {
-      toast.error('Access Denied');
       navigate('/dashboard');
       return;
     }
     fetchItems();
     fetchUsers();
   }, [user]);
+
+  if (user && !['admin', 'administrator'].includes(user.role.toLowerCase())) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+            <h2 className="text-2xl font-bold text-red-500 mb-2">Access Denied</h2>
+            <p className="text-slate-600 dark:text-slate-400">You do not have permission to view this page.</p>
+        </div>
+      </div>
+    );
+  }
 
   const fetchUsers = async () => {
     try {
@@ -328,16 +338,8 @@ const SidebarManagement: React.FC = () => {
     );
   };
 
-  if (loading && items.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
   return (
-      <div className="space-y-6 p-6">
+    <div className="space-y-6 p-6">
       <div
         className="px-6 py-4 rounded-lg shadow-sm"
         style={{
@@ -384,6 +386,22 @@ const SidebarManagement: React.FC = () => {
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
+            {loading && items.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="py-12">
+                  <div className="flex flex-col items-center justify-center text-slate-400">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+                    <p className="text-sm">Loading sidebar items...</p>
+                  </div>
+                </td>
+              </tr>
+            ) : items.length === 0 && !isAdding ? (
+              <tr>
+                <td colSpan={8} className="py-8 text-center text-sm text-slate-500">
+                  No items found.
+                </td>
+              </tr>
+            ) : null}
             {isAdding && (
               <tr className="bg-blue-50/50 dark:bg-blue-900/10">
                 <td className="px-6 py-4">
@@ -796,7 +814,7 @@ const SidebarManagement: React.FC = () => {
           </div>
         </div>
       ) : null}
-      </div>
+    </div>
   );
 };
 

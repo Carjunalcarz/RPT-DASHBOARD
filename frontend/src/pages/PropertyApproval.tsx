@@ -6,9 +6,9 @@ import { useAlert } from '@/context/AlertContext';
 import { getRptMastDataDirect, updateSignatory } from '@/services/rptMastService';
 import { getRptAssByTdn } from '@/services/rptAssService';
 import { getFaasRecord, updateFaasStatus } from '@/services/faasService';
-import PropertyDetailsView from '@/components/RPT-management/faas/rpt_m_PropertyDetailsView';
+import PropertyDetailsView from '@/modules/rptas/shared/components/RPT-management/faas/rpt_m_PropertyDetailsView';
 import { toast } from 'sonner';
-import { CheckCircle, XCircle, MessageSquare, ArrowLeft, History, FileText, Send } from 'lucide-react';
+import { CheckCircle, XCircle, MessageSquare, ArrowLeft, History, FileText, Send, RefreshCw } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { PropertyRecord } from '@/components/RPT-management/faas/types';
 

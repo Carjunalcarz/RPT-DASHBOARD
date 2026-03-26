@@ -80,13 +80,36 @@ const Sidebar: React.FC = () => {
   };
 
   const filteredMenuItems = useMemo(() => {
-    return menuItems.filter(item => {
-      if (item.adminOnly) {
-        return user?.role && ['admin', 'administrator'].includes(user.role.toLowerCase());
+    const filterItem = (item: SidebarItem): SidebarItem | null => {
+      // Admin check
+      const isAdmin = user?.role && ['admin', 'administrator'].includes(user.role.toLowerCase());
+      if (item.adminOnly && !isAdmin) {
+        return null;
       }
-      return true;
-    });
-  }, [user?.role, menuItems]);
+
+      // User visibility check
+      if (item.visibleToUserIds && item.visibleToUserIds.length > 0 && !isAdmin) {
+        if (!user?.id || !item.visibleToUserIds.includes(user.id)) {
+          return null;
+        }
+      }
+
+      // Process children
+      if (item.children && item.children.length > 0) {
+        const filteredChildren = item.children
+          .map(child => filterItem(child))
+          .filter((child): child is SidebarItem => child !== null);
+          
+        return { ...item, children: filteredChildren };
+      }
+
+      return item;
+    };
+
+    return menuItems
+      .map(item => filterItem(item))
+      .filter((item): item is SidebarItem => item !== null);
+  }, [user?.role, user?.id, menuItems]);
 
   const NavItem: React.FC<{ item: SidebarItem; level: number }> = ({ item, level }) => {
     const Icon = (item.icon && iconMap[item.icon]) || Menu;
@@ -102,7 +125,7 @@ const Sidebar: React.FC = () => {
     }, [isActive, hasChildren, item.id]);
 
     return (
-      <div key={item.id} role="none">
+      <div role="none">
         {hasChildren ? (
           <button
             type="button"
@@ -166,8 +189,8 @@ const Sidebar: React.FC = () => {
             style={{ marginLeft: `${level * 4 + 4}px` }}
           >
             <div className="border-l-2 border-slate-100 dark:border-slate-800/50 ml-4 transition-colors duration-300">
-              {item.children?.map(child => (
-                <NavItem key={child.id} item={child} level={level + 1} />
+              {item.children?.map((child, idx) => (
+                <NavItem key={`${child.id}-${child.path || idx}`} item={child} level={level + 1} />
               ))}
             </div>
           </div>
@@ -183,7 +206,7 @@ const Sidebar: React.FC = () => {
 
   if (loadingMenu && menuItems.length === 0) {
     return (
-      <aside className={`fixed left-0 top-16 h-[calc(100%-4rem)] bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-64'}`}>
+      <aside data-testid="sidebar" className={`fixed left-0 top-16 h-[calc(100%-4rem)] bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-64'}`}>
         <div className="flex items-center justify-center h-full">
           <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
         </div>
@@ -202,7 +225,7 @@ const Sidebar: React.FC = () => {
         {/* Navigation Menu */}
         <nav className="flex-1 px-2 py-4 overflow-y-auto custom-scrollbar">
           {filteredMenuItems.map((item) => (
-            <NavItem key={item.id} item={item} level={0} />
+            <NavItem key={`${item.id}-${item.path || item.label}`} item={item} level={0} />
           ))}
         </nav>
         <div className="px-2 py-3 border-t border-slate-100 dark:border-slate-800">

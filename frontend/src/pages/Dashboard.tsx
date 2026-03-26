@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { TrendingUp, TrendingDown, DollarSign, Building2, CreditCard, AlertCircle } from 'lucide-react';
-import axios from 'axios';
-
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import api from '@/services/api';
 
 interface KPICardProps {
   title: string;
@@ -43,7 +40,7 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await axios.get(`${API}/dashboard/stats`);
+        const response = await api.get('/dashboard/stats', { timeout: 60000 });
         setStats(response.data);
       } catch (error) {
         console.error('Error fetching dashboard stats:', error);

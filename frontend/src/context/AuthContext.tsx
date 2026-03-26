@@ -27,6 +27,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isMockMode, setIsMockMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  const clearSidebarPermissionCache = () => {
+    try {
+      localStorage.removeItem('sidebarDbItemsCache');
+    } catch {
+    }
+  };
+
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     const storedToken = localStorage.getItem('token');
@@ -44,6 +51,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         api.get('/users/me')
           .then(response => {
              if (response.data.status === 'success') {
+                const previousRole = (() => {
+                  try {
+                    const raw = localStorage.getItem('user');
+                    const parsed = raw ? JSON.parse(raw) : null;
+                    return parsed?.role;
+                  } catch {
+                    return null;
+                  }
+                })();
                 const userData = response.data.data.user;
                 const resolvedFullName =
                   userData.fullName || userData.displayName || userData.name || undefined;
@@ -59,6 +75,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 };
                 setUser(updatedUser);
                 localStorage.setItem('user', JSON.stringify(updatedUser));
+
+                if (previousRole && updatedUser.role && previousRole !== updatedUser.role) {
+                  clearSidebarPermissionCache();
+                  window.dispatchEvent(new Event('auth:role_changed'));
+                }
              }
           })
           .catch(err => {
@@ -149,6 +170,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
         localStorage.removeItem('auth_mode'); // Clear mock mode if successful
         setIsMockMode(false);
+        
+        // Notify sidebar to refresh on login
+        window.dispatchEvent(new Event('auth:login'));
+        
         return { success: true };
       }
       return { success: false, message: response.data.message || 'Login failed' };
@@ -206,6 +231,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem('user');
     localStorage.removeItem('token');
     localStorage.removeItem('auth_mode');
+    clearSidebarPermissionCache();
+    window.dispatchEvent(new Event('auth:logout'));
     
     // Optional: Call logout endpoint
     // api.post('/auth/logout').catch(() => {});

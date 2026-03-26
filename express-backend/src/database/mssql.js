@@ -7,9 +7,11 @@ const config = {
   server: process.env.MSSQL_SERVER,
   database: process.env.MSSQL_DATABASE,
   port: parseInt(process.env.MSSQL_PORT || '1433'),
+  requestTimeout: 60000, // Increase request timeout to 60 seconds
   options: {
     encrypt: true, // Use this if you're on Windows Azure
-    trustServerCertificate: true // Change to false for production
+    trustServerCertificate: true, // Change to false for production
+    requestTimeout: 60000, // Ensure it's passed to tedious
   },
   pool: {
     min: parseInt(process.env.MSSQL_POOL_MIN || '10'),

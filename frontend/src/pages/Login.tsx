@@ -20,9 +20,7 @@ const Login: React.FC = () => {
     try {
       const result = await login(email, password);
       if (result.success) {
-        const lastPath = localStorage.getItem('last_visited_path');
-        const isValidPath = lastPath && lastPath.startsWith('/') && lastPath !== '/login' && lastPath !== '/';
-        navigate(isValidPath ? lastPath : '/dashboard');
+        navigate('/dashboard');
       } else {
         setError(result.message || 'Invalid email or password');
       }

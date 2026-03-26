@@ -1,5 +1,5 @@
 import React from 'react';
-import SignatorySetup from '@/components/RPT-management/setup/SignatorySetup';
+import SignatorySetup from '@/modules/rptas/shared/components/RPT-management/setup/SignatorySetup';
 
 const SignatorySetupPage: React.FC = () => {
   return (

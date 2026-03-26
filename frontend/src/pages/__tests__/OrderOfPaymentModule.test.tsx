@@ -7,6 +7,7 @@ import OrderOfPayment from '@/pages/OrderOfPayment';
 import { useAuth } from '@/context/AuthContext';
 import { getPropertyReport, getTaxBegYears } from '@/services/reportsService';
 import oopService from '@/services/oopService';
+import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('@/context/ThemeColorContext', () => ({
   useThemeColor: () => ({ headerColor: '#0ea5e9' }),
@@ -110,7 +111,11 @@ describe('Order of Payment module', () => {
       },
     });
 
-    render(<OrderOfPayment />);
+    render(
+      <MemoryRouter>
+        <OrderOfPayment />
+      </MemoryRouter>
+    );
 
     await screen.findByText('JUAN A. DELA CRUZ');
     expect(screen.queryByText('Validate')).not.toBeInTheDocument();
@@ -146,7 +151,11 @@ describe('Order of Payment module', () => {
   it('marks status as Failed when Create Payment fails', async () => {
     (oopService.create as Mock).mockResolvedValue({ success: false, message: 'Bad request' });
 
-    render(<OrderOfPayment />);
+    render(
+      <MemoryRouter>
+        <OrderOfPayment />
+      </MemoryRouter>
+    );
 
     await screen.findByText('JUAN A. DELA CRUZ');
     fireEvent.click(screen.getByLabelText(`Select ${record.tdn}`));
@@ -206,7 +215,11 @@ describe('Order of Payment module', () => {
       },
     });
 
-    render(<OrderOfPayment />);
+    render(
+      <MemoryRouter>
+        <OrderOfPayment />
+      </MemoryRouter>
+    );
 
     await screen.findByText('Treasury Confirmation');
     await screen.findByText('OOP-20260323-AAAAAA');

@@ -116,9 +116,9 @@ exports.getAllSidebarItems = async (req, res, next) => {
       const allowlistCountById = {};
       const allowlistedById = {};
       (rows || []).forEach((r) => {
-        const sid = r.sidebarItemId;
+        const sid = String(r.sidebarItemId);
         allowlistCountById[sid] = (allowlistCountById[sid] || 0) + 1;
-        if (r.userId === userId) allowlistedById[sid] = true;
+        if (String(r.userId) === String(userId)) allowlistedById[sid] = true;
       });
 
       attachVisibilityMeta(items, { allowlistCountById, allowlistedById });
@@ -164,8 +164,9 @@ exports.getManagementSidebarItems = async (req, res, next) => {
       );
       visibleByItemId = {};
       (rows || []).forEach((r) => {
-        if (!visibleByItemId[r.sidebarItemId]) visibleByItemId[r.sidebarItemId] = [];
-        visibleByItemId[r.sidebarItemId].push(r.userId);
+        const sid = String(r.sidebarItemId);
+        if (!visibleByItemId[sid]) visibleByItemId[sid] = [];
+        visibleByItemId[sid].push(String(r.userId));
       });
     }
 

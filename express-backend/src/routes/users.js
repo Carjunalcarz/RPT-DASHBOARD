@@ -58,6 +58,47 @@ router.get('/', protect, userController.getUsers);
 
 /**
  * @swagger
+ * /api/v1/users:
+ *   post:
+ *     summary: Create a new user (Admin only)
+ *     tags: [Users]
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *               role:
+ *                 type: string
+ *                 enum: [admin, user]
+ *               municipalityCode:
+ *                 type: string
+ *               fullName:
+ *                 type: string
+ *               contactNo:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: User created successfully
+ *       400:
+ *         description: Invalid input or user already exists
+ *       403:
+ *         description: Forbidden
+ */
+router.post('/', protect, userController.createUser);
+
+/**
+ * @swagger
  * /api/v1/users/me:
  *   get:
  *     summary: Get current user profile

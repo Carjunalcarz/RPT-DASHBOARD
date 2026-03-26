@@ -15,7 +15,7 @@ export interface SidebarItem {
 
 const sidebarService = {
   getSidebarItems: async () => {
-    const response = await api.get('/sidebar');
+    const response = await api.get('/sidebar', { timeout: 60000 });
     return response.data;
   },
 

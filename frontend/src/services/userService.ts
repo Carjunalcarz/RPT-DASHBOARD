@@ -45,3 +45,13 @@ export const updateUser = async (id: string, data: { role?: string; municipality
     throw error;
   }
 };
+
+export const createUser = async (data: { email: string; password?: string; role?: string; municipalityCode?: string; fullName?: string; contactNo?: string }): Promise<User> => {
+  try {
+    const response = await api.post<UpdateUserResponse>('/users', data);
+    return response.data.data.user;
+  } catch (error) {
+    console.error('Error creating user:', error);
+    throw error;
+  }
+};

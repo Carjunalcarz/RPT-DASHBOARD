@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 
 const navigate = vi.hoisted(() => vi.fn());
 
@@ -78,9 +79,14 @@ describe('Payor selection → OOP', () => {
 
   it('stores selected payor and navigates to OOP', async () => {
     const PayorRegistry = (await import('@/pages/PayorRegistry')).default;
-    render(<PayorRegistry />);
+    render(
+      <MemoryRouter>
+        <PayorRegistry />
+      </MemoryRouter>
+    );
 
     fireEvent.change(screen.getByLabelText('Payor search'), { target: { value: 'Aljun' } });
+    await new Promise((r) => setTimeout(r, 350));
     const useBtn = await screen.findByRole('button', { name: /Use in OOP/i });
     fireEvent.click(useBtn);
 
@@ -95,7 +101,11 @@ describe('Payor selection → OOP', () => {
     );
 
     const OrderOfPayment = (await import('@/pages/OrderOfPayment')).default;
-    render(<OrderOfPayment />);
+    render(
+      <MemoryRouter>
+        <OrderOfPayment />
+      </MemoryRouter>
+    );
 
     await waitFor(() => {
       expect(screen.getByPlaceholderText('Enter payer name')).toHaveValue('Aljun Cardona');
