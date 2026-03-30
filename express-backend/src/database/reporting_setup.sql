@@ -11,7 +11,7 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 CREATE EXTENSION IF NOT EXISTS unaccent;
 
 -- Owners table
-CREATE TABLE IF NOT EXISTS public.owner (
+CREATE TABLE IF NOT EXISTS rptas.owner (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     address TEXT,
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS public.owner (
 );
 
 -- Municipalities table
-CREATE TABLE IF NOT EXISTS public.municipality (
+CREATE TABLE IF NOT EXISTS rptas.municipality (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     code TEXT NOT NULL UNIQUE,
     description TEXT,
@@ -30,9 +30,9 @@ CREATE TABLE IF NOT EXISTS public.municipality (
 );
 
 -- Barangays table
-CREATE TABLE IF NOT EXISTS public.barangay (
+CREATE TABLE IF NOT EXISTS rptas.barangay (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    municipality_id UUID REFERENCES public.municipality(id) ON DELETE CASCADE,
+    municipality_id UUID REFERENCES rptas.municipality(id) ON DELETE CASCADE,
     code TEXT NOT NULL,
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -41,18 +41,18 @@ CREATE TABLE IF NOT EXISTS public.barangay (
 );
 
 -- RPT Property table
-CREATE TABLE IF NOT EXISTS public.rpt_property (
+CREATE TABLE IF NOT EXISTS rptas.rpt_property (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    source_record_id TEXT REFERENCES public.faas_records(id) ON DELETE SET NULL,
+    source_record_id TEXT REFERENCES rptas.faas_records(id) ON DELETE SET NULL,
     pin TEXT,
     tdn TEXT,
-    owner_id UUID REFERENCES public.owner(id) ON DELETE SET NULL,
+    owner_id UUID REFERENCES rptas.owner(id) ON DELETE SET NULL,
     owner_name_snapshot TEXT,
     owner_address_snapshot TEXT,
-    municipality_id UUID REFERENCES public.municipality(id) ON DELETE SET NULL,
+    municipality_id UUID REFERENCES rptas.municipality(id) ON DELETE SET NULL,
     municipality_code TEXT,
     municipality_name_snapshot TEXT,
-    barangay_id UUID REFERENCES public.barangay(id) ON DELETE SET NULL,
+    barangay_id UUID REFERENCES rptas.barangay(id) ON DELETE SET NULL,
     barangay_code TEXT,
     barangay_name_snapshot TEXT,
     muncode TEXT,
@@ -65,9 +65,9 @@ CREATE TABLE IF NOT EXISTS public.rpt_property (
 );
 
 -- RPT Assessment table
-CREATE TABLE IF NOT EXISTS public.rpt_assessment (
+CREATE TABLE IF NOT EXISTS rptas.rpt_assessment (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    property_id UUID REFERENCES public.rpt_property(id) ON DELETE CASCADE,
+    property_id UUID REFERENCES rptas.rpt_property(id) ON DELETE CASCADE,
     kind TEXT,
     ass_level NUMERIC,
     taxability TEXT,
@@ -83,30 +83,30 @@ CREATE TABLE IF NOT EXISTS public.rpt_assessment (
 
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'property_status' AND typnamespace = 'public'::regnamespace) THEN
-        CREATE TYPE public.property_status AS ENUM ('active','archived','split','merged');
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'property_status' AND typnamespace = 'rptas'::regnamespace) THEN
+        CREATE TYPE rptas.property_status AS ENUM ('active','archived','split','merged');
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'rpt_payment_status' AND typnamespace = 'public'::regnamespace) THEN
-        CREATE TYPE public.rpt_payment_status AS ENUM ('unpaid','pending','paid');
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'rpt_payment_status' AND typnamespace = 'rptas'::regnamespace) THEN
+        CREATE TYPE rptas.rpt_payment_status AS ENUM ('unpaid','pending','paid');
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'tdn_change_reason' AND typnamespace = 'public'::regnamespace) THEN
-        CREATE TYPE public.tdn_change_reason AS ENUM ('new','general_revision','correction','split','merge','other');
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'tdn_change_reason' AND typnamespace = 'rptas'::regnamespace) THEN
+        CREATE TYPE rptas.tdn_change_reason AS ENUM ('new','general_revision','correction','split','merge','other');
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'owner_change_reason' AND typnamespace = 'public'::regnamespace) THEN
-        CREATE TYPE public.owner_change_reason AS ENUM ('new','transfer','inheritance','correction','other');
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'owner_change_reason' AND typnamespace = 'rptas'::regnamespace) THEN
+        CREATE TYPE rptas.owner_change_reason AS ENUM ('new','transfer','inheritance','correction','other');
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'lineage_event' AND typnamespace = 'public'::regnamespace) THEN
-        CREATE TYPE public.lineage_event AS ENUM ('split','merge');
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'lineage_event' AND typnamespace = 'rptas'::regnamespace) THEN
+        CREATE TYPE rptas.lineage_event AS ENUM ('split','merge');
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'review_status' AND typnamespace = 'public'::regnamespace) THEN
-        CREATE TYPE public.review_status AS ENUM ('queued','in_progress','resolved','dismissed');
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'review_status' AND typnamespace = 'rptas'::regnamespace) THEN
+        CREATE TYPE rptas.review_status AS ENUM ('queued','in_progress','resolved','dismissed');
     END IF;
 END
 $$;
 
-CREATE TABLE IF NOT EXISTS public.properties (
+CREATE TABLE IF NOT EXISTS rptas.properties (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    status public.property_status NOT NULL DEFAULT 'active',
+    status rptas.property_status NOT NULL DEFAULT 'active',
     municipality_code TEXT NOT NULL,
     barangay_code TEXT NOT NULL,
     pin TEXT,
@@ -117,53 +117,53 @@ CREATE TABLE IF NOT EXISTS public.properties (
     current_owner_history_id UUID,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    created_from_source_record_id TEXT REFERENCES public.faas_records(id) ON DELETE SET NULL,
-    last_source_record_id TEXT REFERENCES public.faas_records(id) ON DELETE SET NULL
+    created_from_source_record_id TEXT REFERENCES rptas.faas_records(id) ON DELETE SET NULL,
+    last_source_record_id TEXT REFERENCES rptas.faas_records(id) ON DELETE SET NULL
 );
 
-CREATE TABLE IF NOT EXISTS public.property_tdn_history (
+CREATE TABLE IF NOT EXISTS rptas.property_tdn_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    property_id UUID NOT NULL REFERENCES public.properties(id) ON DELETE CASCADE,
+    property_id UUID NOT NULL REFERENCES rptas.properties(id) ON DELETE CASCADE,
     tdn TEXT NOT NULL,
     old_tdn TEXT,
     tax_beg_year INT,
     effective_from DATE NOT NULL DEFAULT CURRENT_DATE,
     effective_to DATE,
     is_current BOOLEAN NOT NULL DEFAULT TRUE,
-    change_reason public.tdn_change_reason NOT NULL DEFAULT 'new',
-    source_record_id TEXT REFERENCES public.faas_records(id) ON DELETE SET NULL,
+    change_reason rptas.tdn_change_reason NOT NULL DEFAULT 'new',
+    source_record_id TEXT REFERENCES rptas.faas_records(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS public.property_owner_history (
+CREATE TABLE IF NOT EXISTS rptas.property_owner_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    property_id UUID NOT NULL REFERENCES public.properties(id) ON DELETE CASCADE,
+    property_id UUID NOT NULL REFERENCES rptas.properties(id) ON DELETE CASCADE,
     owner_name TEXT NOT NULL,
     owner_address TEXT,
     is_current BOOLEAN NOT NULL DEFAULT TRUE,
     effective_from DATE NOT NULL DEFAULT CURRENT_DATE,
     effective_to DATE,
-    change_reason public.owner_change_reason NOT NULL DEFAULT 'new',
-    source_record_id TEXT REFERENCES public.faas_records(id) ON DELETE SET NULL,
+    change_reason rptas.owner_change_reason NOT NULL DEFAULT 'new',
+    source_record_id TEXT REFERENCES rptas.faas_records(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS public.property_lineage (
+CREATE TABLE IF NOT EXISTS rptas.property_lineage (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    event public.lineage_event NOT NULL,
+    event rptas.lineage_event NOT NULL,
     effective_date DATE NOT NULL DEFAULT CURRENT_DATE,
-    from_property_id UUID NOT NULL REFERENCES public.properties(id) ON DELETE RESTRICT,
-    to_property_id UUID NOT NULL REFERENCES public.properties(id) ON DELETE RESTRICT,
+    from_property_id UUID NOT NULL REFERENCES rptas.properties(id) ON DELETE RESTRICT,
+    to_property_id UUID NOT NULL REFERENCES rptas.properties(id) ON DELETE RESTRICT,
     notes TEXT,
-    source_record_id TEXT REFERENCES public.faas_records(id) ON DELETE SET NULL,
+    source_record_id TEXT REFERENCES rptas.faas_records(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     CONSTRAINT property_lineage_no_self_ref CHECK (from_property_id <> to_property_id)
 );
 
-CREATE TABLE IF NOT EXISTS public.manual_review_queue (
+CREATE TABLE IF NOT EXISTS rptas.manual_review_queue (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    submission_id TEXT NOT NULL REFERENCES public.faas_records(id) ON DELETE CASCADE,
-    status public.review_status NOT NULL DEFAULT 'queued',
+    submission_id TEXT NOT NULL REFERENCES rptas.faas_records(id) ON DELETE CASCADE,
+    status rptas.review_status NOT NULL DEFAULT 'queued',
     reason TEXT NOT NULL,
     confidence_score NUMERIC(5,2),
     candidate_property_ids UUID[],
@@ -172,16 +172,16 @@ CREATE TABLE IF NOT EXISTS public.manual_review_queue (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     resolved_at TIMESTAMP WITH TIME ZONE,
     resolution TEXT,
-    resolved_property_id UUID REFERENCES public.properties(id) ON DELETE SET NULL
+    resolved_property_id UUID REFERENCES rptas.properties(id) ON DELETE SET NULL
 );
 
-ALTER TABLE public.rpt_property
+ALTER TABLE rptas.rpt_property
     ADD COLUMN IF NOT EXISTS master_property_id UUID;
 
-ALTER TABLE public.rpt_property
-    ADD COLUMN IF NOT EXISTS payment_status public.rpt_payment_status NOT NULL DEFAULT 'unpaid';
+ALTER TABLE rptas.rpt_property
+    ADD COLUMN IF NOT EXISTS payment_status rptas.rpt_payment_status NOT NULL DEFAULT 'unpaid';
 
-UPDATE public.rpt_property
+UPDATE rptas.rpt_property
 SET payment_status = 'unpaid'
 WHERE payment_status IS NULL;
 
@@ -192,71 +192,71 @@ BEGIN
         FROM pg_constraint
         WHERE conname = 'rpt_property_master_property_id_fkey'
     ) THEN
-        ALTER TABLE public.rpt_property
+        ALTER TABLE rptas.rpt_property
             ADD CONSTRAINT rpt_property_master_property_id_fkey
             FOREIGN KEY (master_property_id)
-            REFERENCES public.properties(id)
+            REFERENCES rptas.properties(id)
             ON DELETE SET NULL;
     END IF;
 END
 $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS property_tdn_history_one_current_per_property
-    ON public.property_tdn_history(property_id)
+    ON rptas.property_tdn_history(property_id)
     WHERE is_current;
 
 CREATE UNIQUE INDEX IF NOT EXISTS property_tdn_history_unique_current_tdn
-    ON public.property_tdn_history(tdn)
+    ON rptas.property_tdn_history(tdn)
     WHERE is_current;
 
 CREATE UNIQUE INDEX IF NOT EXISTS property_tdn_history_property_tdn_unique
-    ON public.property_tdn_history(property_id, tdn);
+    ON rptas.property_tdn_history(property_id, tdn);
 
 CREATE UNIQUE INDEX IF NOT EXISTS property_owner_history_one_current_per_property
-    ON public.property_owner_history(property_id)
+    ON rptas.property_owner_history(property_id)
     WHERE is_current;
 
 CREATE INDEX IF NOT EXISTS properties_muni_brgy_idx
-    ON public.properties(municipality_code, barangay_code);
+    ON rptas.properties(municipality_code, barangay_code);
 
 CREATE INDEX IF NOT EXISTS properties_pin_idx
-    ON public.properties(pin);
+    ON rptas.properties(pin);
 
 CREATE INDEX IF NOT EXISTS properties_arp_idx
-    ON public.properties(arp_no);
+    ON rptas.properties(arp_no);
 
 CREATE INDEX IF NOT EXISTS properties_lot_block_idx
-    ON public.properties(municipality_code, barangay_code, lot_no, block_no);
+    ON rptas.properties(municipality_code, barangay_code, lot_no, block_no);
 
 CREATE INDEX IF NOT EXISTS property_tdn_history_tdn_idx
-    ON public.property_tdn_history(tdn);
+    ON rptas.property_tdn_history(tdn);
 
 CREATE INDEX IF NOT EXISTS property_tdn_history_old_tdn_idx
-    ON public.property_tdn_history(old_tdn);
+    ON rptas.property_tdn_history(old_tdn);
 
 CREATE INDEX IF NOT EXISTS property_owner_history_owner_trgm
-    ON public.property_owner_history
-    USING gin ((lower(owner_name)) gin_trgm_ops);
+    ON rptas.property_owner_history
+    USING gin ((lower(owner_name)) public.gin_trgm_ops);
 
 CREATE INDEX IF NOT EXISTS manual_review_status_idx
-    ON public.manual_review_queue(status, created_at DESC);
+    ON rptas.manual_review_queue(status, created_at DESC);
 
 CREATE UNIQUE INDEX IF NOT EXISTS manual_review_one_open_per_submission
-    ON public.manual_review_queue(submission_id)
+    ON rptas.manual_review_queue(submission_id)
     WHERE status IN ('queued','in_progress');
 
-CREATE OR REPLACE FUNCTION public.tdn_history_enforce_current()
+CREATE OR REPLACE FUNCTION rptas.tdn_history_enforce_current()
 RETURNS TRIGGER AS $$
 BEGIN
     IF NEW.is_current THEN
-        UPDATE public.property_tdn_history
+        UPDATE rptas.property_tdn_history
         SET is_current = FALSE,
             effective_to = COALESCE(effective_to, NEW.effective_from - INTERVAL '1 day')
         WHERE property_id = NEW.property_id
           AND is_current = TRUE
           AND id <> NEW.id;
 
-        UPDATE public.properties
+        UPDATE rptas.properties
         SET current_tdn_history_id = NEW.id,
             updated_at = NOW()
         WHERE id = NEW.property_id;
@@ -266,23 +266,23 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_tdn_history_enforce_current ON public.property_tdn_history;
+DROP TRIGGER IF EXISTS trg_tdn_history_enforce_current ON rptas.property_tdn_history;
 CREATE TRIGGER trg_tdn_history_enforce_current
-BEFORE INSERT OR UPDATE OF is_current ON public.property_tdn_history
-FOR EACH ROW EXECUTE FUNCTION public.tdn_history_enforce_current();
+BEFORE INSERT OR UPDATE OF is_current ON rptas.property_tdn_history
+FOR EACH ROW EXECUTE FUNCTION rptas.tdn_history_enforce_current();
 
-CREATE OR REPLACE FUNCTION public.owner_history_enforce_current()
+CREATE OR REPLACE FUNCTION rptas.owner_history_enforce_current()
 RETURNS TRIGGER AS $$
 BEGIN
     IF NEW.is_current THEN
-        UPDATE public.property_owner_history
+        UPDATE rptas.property_owner_history
         SET is_current = FALSE,
             effective_to = COALESCE(effective_to, NEW.effective_from - INTERVAL '1 day')
         WHERE property_id = NEW.property_id
           AND is_current = TRUE
           AND id <> NEW.id;
 
-        UPDATE public.properties
+        UPDATE rptas.properties
         SET current_owner_history_id = NEW.id,
             updated_at = NOW()
         WHERE id = NEW.property_id;
@@ -292,12 +292,12 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_owner_history_enforce_current ON public.property_owner_history;
+DROP TRIGGER IF EXISTS trg_owner_history_enforce_current ON rptas.property_owner_history;
 CREATE TRIGGER trg_owner_history_enforce_current
-BEFORE INSERT OR UPDATE OF is_current ON public.property_owner_history
-FOR EACH ROW EXECUTE FUNCTION public.owner_history_enforce_current();
+BEFORE INSERT OR UPDATE OF is_current ON rptas.property_owner_history
+FOR EACH ROW EXECUTE FUNCTION rptas.owner_history_enforce_current();
 
-CREATE OR REPLACE VIEW public.v_properties_current AS
+CREATE OR REPLACE VIEW rptas.v_properties_current AS
 SELECT
     p.id AS property_id,
     p.status,
@@ -315,16 +315,16 @@ SELECT
     o.effective_from AS owner_effective_from,
     p.created_at,
     p.updated_at
-FROM public.properties p
-LEFT JOIN public.property_tdn_history t ON t.id = p.current_tdn_history_id
-LEFT JOIN public.property_owner_history o ON o.id = p.current_owner_history_id;
+FROM rptas.properties p
+LEFT JOIN rptas.property_tdn_history t ON t.id = p.current_tdn_history_id
+LEFT JOIN rptas.property_owner_history o ON o.id = p.current_owner_history_id;
 
 --------------------------------------------------------------------------------
 -- 2. ETL Logic (Incremental and Batch)
 --------------------------------------------------------------------------------
 
 -- Function to process a single record
-CREATE OR REPLACE FUNCTION public.sync_faas_to_reporting(v_faas_record_id TEXT)
+CREATE OR REPLACE FUNCTION rptas.sync_faas_to_reporting(v_faas_record_id TEXT)
 RETURNS void AS $$
 DECLARE
     v_rec RECORD;
@@ -351,15 +351,15 @@ DECLARE
     v_owner_best_sim REAL;
     v_owner_second_sim REAL;
     v_existing_current_owner TEXT;
-    v_tdn_reason public.tdn_change_reason;
+    v_tdn_reason rptas.tdn_change_reason;
     v_tax_beg_year_int INT;
     v_assessment_rec JSONB;
 BEGIN
-    SELECT * INTO v_rec FROM public.faas_records WHERE id = v_faas_record_id;
+    SELECT * INTO v_rec FROM rptas.faas_records WHERE id = v_faas_record_id;
     
     -- If the record is NOT approved, we remove it from reporting
     IF v_rec IS NULL OR v_rec.status != 'approved' THEN
-        DELETE FROM public.rpt_property WHERE source_record_id = v_faas_record_id;
+        DELETE FROM rptas.rpt_property WHERE source_record_id = v_faas_record_id;
         RETURN;
     END IF;
 
@@ -422,20 +422,20 @@ BEGIN
 
     IF v_pin IS NOT NULL AND v_muncode IS NOT NULL AND v_barangay_code IS NOT NULL THEN
         SELECT COUNT(*) INTO v_candidate_count
-        FROM public.properties p
+        FROM rptas.properties p
         WHERE p.municipality_code = v_muncode
           AND p.barangay_code = v_barangay_code
           AND p.pin = v_pin;
 
         IF v_candidate_count = 1 THEN
             SELECT p.id INTO v_master_property_id
-            FROM public.properties p
+            FROM rptas.properties p
             WHERE p.municipality_code = v_muncode
               AND p.barangay_code = v_barangay_code
               AND p.pin = v_pin
             LIMIT 1;
         ELSIF v_candidate_count > 1 THEN
-            INSERT INTO public.manual_review_queue (submission_id, reason, confidence_score)
+            INSERT INTO rptas.manual_review_queue (submission_id, reason, confidence_score)
             VALUES (v_faas_record_id, 'Multiple properties match the submitted PIN', 60.00)
             ON CONFLICT DO NOTHING;
             RETURN;
@@ -444,17 +444,17 @@ BEGIN
 
     IF v_master_property_id IS NULL AND v_old_tdn IS NOT NULL THEN
         SELECT COUNT(*) INTO v_candidate_count
-        FROM public.property_tdn_history h
+        FROM rptas.property_tdn_history h
         WHERE h.tdn = v_old_tdn;
 
         IF v_candidate_count = 1 THEN
             SELECT h.property_id INTO v_master_property_id
-            FROM public.property_tdn_history h
+            FROM rptas.property_tdn_history h
             WHERE h.tdn = v_old_tdn
             ORDER BY h.created_at DESC
             LIMIT 1;
         ELSIF v_candidate_count > 1 THEN
-            INSERT INTO public.manual_review_queue (submission_id, reason, confidence_score)
+            INSERT INTO rptas.manual_review_queue (submission_id, reason, confidence_score)
             VALUES (v_faas_record_id, 'Multiple properties match the submitted OLD TDN', 55.00)
             ON CONFLICT DO NOTHING;
             RETURN;
@@ -463,17 +463,17 @@ BEGIN
 
     IF v_master_property_id IS NULL AND v_new_tdn IS NOT NULL THEN
         SELECT COUNT(*) INTO v_candidate_count
-        FROM public.property_tdn_history h
+        FROM rptas.property_tdn_history h
         WHERE h.tdn = v_new_tdn AND h.is_current = TRUE;
 
         IF v_candidate_count = 1 THEN
             SELECT h.property_id INTO v_master_property_id
-            FROM public.property_tdn_history h
+            FROM rptas.property_tdn_history h
             WHERE h.tdn = v_new_tdn AND h.is_current = TRUE
             ORDER BY h.created_at DESC
             LIMIT 1;
         ELSIF v_candidate_count > 1 THEN
-            INSERT INTO public.manual_review_queue (submission_id, reason, confidence_score)
+            INSERT INTO rptas.manual_review_queue (submission_id, reason, confidence_score)
             VALUES (v_faas_record_id, 'TDN is already current for multiple properties', 40.00)
             ON CONFLICT DO NOTHING;
             RETURN;
@@ -482,7 +482,7 @@ BEGIN
 
     IF v_master_property_id IS NULL AND v_muncode IS NOT NULL AND v_barangay_code IS NOT NULL AND v_lot_no IS NOT NULL AND v_block_no IS NOT NULL THEN
         SELECT COUNT(*) INTO v_candidate_count
-        FROM public.properties p
+        FROM rptas.properties p
         WHERE p.municipality_code = v_muncode
           AND p.barangay_code = v_barangay_code
           AND p.lot_no = v_lot_no
@@ -490,7 +490,7 @@ BEGIN
 
         IF v_candidate_count = 1 THEN
             SELECT p.id INTO v_master_property_id
-            FROM public.properties p
+            FROM rptas.properties p
             WHERE p.municipality_code = v_muncode
               AND p.barangay_code = v_barangay_code
               AND p.lot_no = v_lot_no
@@ -501,14 +501,14 @@ BEGIN
 
     IF v_master_property_id IS NULL AND v_muncode IS NOT NULL AND v_barangay_code IS NOT NULL AND v_arp_no IS NOT NULL THEN
         SELECT COUNT(*) INTO v_candidate_count
-        FROM public.properties p
+        FROM rptas.properties p
         WHERE p.municipality_code = v_muncode
           AND p.barangay_code = v_barangay_code
           AND p.arp_no = v_arp_no;
 
         IF v_candidate_count = 1 THEN
             SELECT p.id INTO v_master_property_id
-            FROM public.properties p
+            FROM rptas.properties p
             WHERE p.municipality_code = v_muncode
               AND p.barangay_code = v_barangay_code
               AND p.arp_no = v_arp_no
@@ -519,8 +519,8 @@ BEGIN
     IF v_master_property_id IS NULL AND v_owner_name IS NOT NULL AND v_muncode IS NOT NULL AND v_barangay_code IS NOT NULL THEN
         SELECT p.id, similarity(unaccent(lower(oh.owner_name)), unaccent(lower(v_owner_name)))::REAL
           INTO v_owner_best_property_id, v_owner_best_sim
-        FROM public.properties p
-        JOIN public.property_owner_history oh ON oh.id = p.current_owner_history_id
+        FROM rptas.properties p
+        JOIN rptas.property_owner_history oh ON oh.id = p.current_owner_history_id
         WHERE p.municipality_code = v_muncode
           AND p.barangay_code = v_barangay_code
         ORDER BY similarity(unaccent(lower(oh.owner_name)), unaccent(lower(v_owner_name))) DESC
@@ -528,8 +528,8 @@ BEGIN
 
         SELECT similarity(unaccent(lower(oh.owner_name)), unaccent(lower(v_owner_name)))::REAL
           INTO v_owner_second_sim
-        FROM public.properties p
-        JOIN public.property_owner_history oh ON oh.id = p.current_owner_history_id
+        FROM rptas.properties p
+        JOIN rptas.property_owner_history oh ON oh.id = p.current_owner_history_id
         WHERE p.municipality_code = v_muncode
           AND p.barangay_code = v_barangay_code
         ORDER BY similarity(unaccent(lower(oh.owner_name)), unaccent(lower(v_owner_name))) DESC
@@ -542,14 +542,14 @@ BEGIN
     END IF;
 
     IF v_muncode IS NULL OR v_barangay_code IS NULL THEN
-        INSERT INTO public.manual_review_queue (submission_id, reason, confidence_score)
+        INSERT INTO rptas.manual_review_queue (submission_id, reason, confidence_score)
         VALUES (v_faas_record_id, 'Missing municipality or barangay code; cannot resolve property identity', 10.00)
         ON CONFLICT DO NOTHING;
         RETURN;
     END IF;
 
     IF v_master_property_id IS NULL THEN
-        INSERT INTO public.properties (
+        INSERT INTO rptas.properties (
             municipality_code, barangay_code, pin, arp_no, lot_no, block_no,
             created_from_source_record_id, last_source_record_id
         ) VALUES (
@@ -558,7 +558,7 @@ BEGIN
         )
         RETURNING id INTO v_master_property_id;
     ELSE
-        UPDATE public.properties
+        UPDATE rptas.properties
         SET pin = COALESCE(pin, v_pin),
             arp_no = COALESCE(arp_no, v_arp_no),
             lot_no = COALESCE(lot_no, v_lot_no),
@@ -570,18 +570,18 @@ BEGIN
 
     IF v_owner_name IS NOT NULL THEN
         SELECT oh.owner_name INTO v_existing_current_owner
-        FROM public.properties p
-        JOIN public.property_owner_history oh ON oh.id = p.current_owner_history_id
+        FROM rptas.properties p
+        JOIN rptas.property_owner_history oh ON oh.id = p.current_owner_history_id
         WHERE p.id = v_master_property_id;
 
         IF v_existing_current_owner IS NULL OR unaccent(lower(v_existing_current_owner)) <> unaccent(lower(v_owner_name)) THEN
-            INSERT INTO public.property_owner_history (
+            INSERT INTO rptas.property_owner_history (
                 property_id, owner_name, owner_address, is_current, effective_from, change_reason, source_record_id
             ) VALUES (
                 v_master_property_id, v_owner_name, v_owner_address, TRUE, CURRENT_DATE,
                 CASE
-                    WHEN v_existing_current_owner IS NULL THEN 'new'::public.owner_change_reason
-                    ELSE 'transfer'::public.owner_change_reason
+                    WHEN v_existing_current_owner IS NULL THEN 'new'::rptas.owner_change_reason
+                    ELSE 'transfer'::rptas.owner_change_reason
                 END,
                 v_faas_record_id
             );
@@ -589,7 +589,7 @@ BEGIN
     END IF;
 
     IF v_new_tdn IS NOT NULL THEN
-        IF EXISTS (SELECT 1 FROM public.property_tdn_history h WHERE h.property_id = v_master_property_id) THEN
+        IF EXISTS (SELECT 1 FROM rptas.property_tdn_history h WHERE h.property_id = v_master_property_id) THEN
             IF v_old_tdn IS NOT NULL AND v_old_tdn <> '' AND v_old_tdn <> v_new_tdn THEN
                 v_tdn_reason := 'general_revision';
             ELSE
@@ -599,7 +599,7 @@ BEGIN
             v_tdn_reason := 'new';
         END IF;
 
-        INSERT INTO public.property_tdn_history (
+        INSERT INTO rptas.property_tdn_history (
             property_id, tdn, old_tdn, tax_beg_year, effective_from, is_current, change_reason, source_record_id
         ) VALUES (
             v_master_property_id, v_new_tdn, v_old_tdn, v_tax_beg_year_int, CURRENT_DATE, TRUE, v_tdn_reason, v_faas_record_id
@@ -615,7 +615,7 @@ BEGIN
 
     -- 1. Upsert Owner
     IF v_owner_name IS NOT NULL THEN
-        INSERT INTO public.owner (name, address)
+        INSERT INTO rptas.owner (name, address)
         VALUES (v_owner_name, v_owner_address)
         ON CONFLICT (name, address) DO UPDATE SET updated_at = NOW()
         RETURNING id INTO v_owner_id;
@@ -625,7 +625,7 @@ BEGIN
 
     -- 2. Upsert Municipality
     IF v_muncode IS NOT NULL THEN
-        INSERT INTO public.municipality (code, description)
+        INSERT INTO rptas.municipality (code, description)
         VALUES (v_muncode, v_muncode)
         ON CONFLICT (code) DO UPDATE SET updated_at = NOW()
         RETURNING id INTO v_municipality_id;
@@ -635,7 +635,7 @@ BEGIN
 
     -- 3. Upsert Barangay
     IF v_barangay_code IS NOT NULL AND v_municipality_id IS NOT NULL THEN
-        INSERT INTO public.barangay (municipality_id, code, description)
+        INSERT INTO rptas.barangay (municipality_id, code, description)
         VALUES (v_municipality_id, v_barangay_code, v_barangay_name)
         ON CONFLICT (municipality_id, code) DO UPDATE SET description = EXCLUDED.description, updated_at = NOW()
         RETURNING id INTO v_barangay_id;
@@ -644,7 +644,7 @@ BEGIN
     END IF;
 
     -- 4. Upsert Property
-    INSERT INTO public.rpt_property (
+    INSERT INTO rptas.rpt_property (
         source_record_id, master_property_id, pin, tdn, owner_id, owner_name_snapshot, owner_address_snapshot,
         municipality_id, municipality_code, municipality_name_snapshot,
         barangay_id, barangay_code, barangay_name_snapshot,
@@ -688,10 +688,10 @@ BEGIN
     RETURNING id INTO v_property_id;
 
     -- 5. Clear and Re-insert Assessments for this property
-    DELETE FROM public.rpt_assessment WHERE property_id = v_property_id;
+    DELETE FROM rptas.rpt_assessment WHERE property_id = v_property_id;
     
     IF v_rec.data ? 'assessments' AND jsonb_typeof(v_rec.data->'assessments') = 'array' THEN
-        INSERT INTO public.rpt_assessment (
+        INSERT INTO rptas.rpt_assessment (
             property_id, kind, ass_level, taxability, classification, subclass, 
             area, measurement, market_value, ass_value
         )
@@ -712,13 +712,13 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- 6. Batch Refresh Function
-CREATE OR REPLACE FUNCTION public.refresh_reporting_data()
+CREATE OR REPLACE FUNCTION rptas.refresh_reporting_data()
 RETURNS void AS $$
 DECLARE
     v_rec RECORD;
 BEGIN
-    FOR v_rec IN SELECT id FROM public.faas_records WHERE status = 'approved' LOOP
-        PERFORM public.sync_faas_to_reporting(v_rec.id);
+    FOR v_rec IN SELECT id FROM rptas.faas_records WHERE status = 'approved' LOOP
+        PERFORM rptas.sync_faas_to_reporting(v_rec.id);
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;
@@ -727,33 +727,33 @@ $$ LANGUAGE plpgsql;
 -- 3. Automation (Triggers)
 --------------------------------------------------------------------------------
 
-CREATE OR REPLACE FUNCTION public.trg_sync_faas_to_reporting()
+CREATE OR REPLACE FUNCTION rptas.trg_sync_faas_to_reporting()
 RETURNS TRIGGER AS $$
 BEGIN
     -- Only sync if status changed to approved or if already approved and data changed
     IF (TG_OP = 'INSERT' AND NEW.status = 'approved') OR
        (TG_OP = 'UPDATE' AND (NEW.status = 'approved' OR OLD.status = 'approved')) THEN
-        PERFORM public.sync_faas_to_reporting(NEW.id);
+        PERFORM rptas.sync_faas_to_reporting(NEW.id);
     END IF;
     
     IF TG_OP = 'DELETE' THEN
-        DELETE FROM public.rpt_property WHERE source_record_id = OLD.id;
+        DELETE FROM rptas.rpt_property WHERE source_record_id = OLD.id;
     END IF;
     
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_faas_records_reporting_sync ON public.faas_records;
+DROP TRIGGER IF EXISTS trg_faas_records_reporting_sync ON rptas.faas_records;
 CREATE TRIGGER trg_faas_records_reporting_sync
-    AFTER INSERT OR UPDATE OR DELETE ON public.faas_records
-    FOR EACH ROW EXECUTE FUNCTION public.trg_sync_faas_to_reporting();
+    AFTER INSERT OR UPDATE OR DELETE ON rptas.faas_records
+    FOR EACH ROW EXECUTE FUNCTION rptas.trg_sync_faas_to_reporting();
 
 --------------------------------------------------------------------------------
 -- 7. Treasury Payment Export (ETL Target)
 --------------------------------------------------------------------------------
 
-CREATE TABLE IF NOT EXISTS public.treasury_payment_exports (
+CREATE TABLE IF NOT EXISTS rptas.treasury_payment_exports (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     etl_run_id UUID NOT NULL,
     etl_version INT NOT NULL DEFAULT 1,
@@ -783,10 +783,10 @@ CREATE TABLE IF NOT EXISTS public.treasury_payment_exports (
     UNIQUE(order_id, property_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_treasury_payment_exports_paid_at ON public.treasury_payment_exports(paid_at);
-CREATE INDEX IF NOT EXISTS idx_treasury_payment_exports_order_id ON public.treasury_payment_exports(order_id);
-CREATE INDEX IF NOT EXISTS idx_treasury_payment_exports_property_id ON public.treasury_payment_exports(property_id);
+CREATE INDEX IF NOT EXISTS idx_treasury_payment_exports_paid_at ON rptas.treasury_payment_exports(paid_at);
+CREATE INDEX IF NOT EXISTS idx_treasury_payment_exports_order_id ON rptas.treasury_payment_exports(order_id);
+CREATE INDEX IF NOT EXISTS idx_treasury_payment_exports_property_id ON rptas.treasury_payment_exports(property_id);
 
 
 -- To run the ETL:
--- SELECT public.refresh_reporting_data();
+-- SELECT rptas.refresh_reporting_data();

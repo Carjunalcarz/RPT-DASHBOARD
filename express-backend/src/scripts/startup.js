@@ -68,7 +68,7 @@ async function runReportingSetup(client) {
     const shouldRefresh = process.env.REFRESH_REPORTING_ON_STARTUP === 'true';
     if (shouldRefresh) {
       logger.info('[Startup] Triggering initial reporting data refresh...');
-      await client.$executeRawUnsafe('SELECT public.refresh_reporting_data();');
+      await client.$executeRawUnsafe('SELECT rptas.refresh_reporting_data();');
       logger.info('[Startup] Reporting data refresh completed.');
     }
 
@@ -139,7 +139,7 @@ async function runHealthCheck(client, name) {
       const tablesCheck = await client.$queryRaw`
         SELECT count(*) 
         FROM information_schema.tables 
-        WHERE table_schema = 'public' 
+        WHERE table_schema = 'rptas' 
         AND table_name IN ('owner', 'municipality', 'barangay', 'rpt_property', 'rpt_assessment')
       `;
       const tableCount = Number(tablesCheck[0].count);
@@ -149,11 +149,11 @@ async function runHealthCheck(client, name) {
         logger.warn(`[Startup] Warning: Some reporting tables are missing. Reporting features may be degraded.`);
       } else {
         // Check if any data exists in reporting
-        const propCheck = await client.$queryRaw`SELECT count(*) FROM public.rpt_property`;
+        const propCheck = await client.$queryRaw`SELECT count(*) FROM rptas.rpt_property`;
         const propCount = Number(propCheck[0].count);
         if (propCount === 0 && faasCount > 0) {
           logger.info('[Startup] Health check: Reporting data is empty but FAAS records exist. Triggering initial refresh...');
-          await client.$executeRawUnsafe('SELECT public.refresh_reporting_data();');
+          await client.$executeRawUnsafe('SELECT rptas.refresh_reporting_data();');
           logger.info('[Startup] Reporting data refresh completed.');
         }
       }
