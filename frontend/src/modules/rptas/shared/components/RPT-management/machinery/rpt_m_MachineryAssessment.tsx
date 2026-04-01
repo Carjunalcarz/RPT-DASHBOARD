@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, Settings, ArrowDownUp } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { useAlert } from '@/context/AlertContext';
-import { RptAssRecord } from '@/services/rptAssService';
-import { getClassifications, getActualUses, getSubClasses, Classification, ActualUse, SubClass } from '@/services/classificationService';
+import { RptAssRecord } from '@/modules/rptas/shared/services/rptAssService';
+import { getClassifications, getActualUses, getSubClasses, Classification, ActualUse, SubClass } from '@/modules/rptas/shared/services/classificationService';
 import MachineryItemsModal from './rpt_m_MachineryItemsModal';
 
 interface MachineryAssessmentProps {

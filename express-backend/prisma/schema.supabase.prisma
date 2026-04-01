@@ -223,6 +223,7 @@ model OrderOfPayment {
   status       String       @default("pending")
   dateCreated  DateTime     @default(now()) @map("date_created")
   dateModified DateTime     @updatedAt @map("date_modified")
+  propertyIds  Json         @default("[]") @map("property_ids")
 
   history OopHistory[]
 

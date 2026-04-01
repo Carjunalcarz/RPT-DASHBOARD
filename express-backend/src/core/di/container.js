@@ -1,13 +1,12 @@
 const { createContainer, InjectionMode, asValue, asClass } = require('awilix');
 const logger = require('../../utils/logger');
-const ConfigManager = require('../config/ConfigManager');
 const PrismaDatabaseAdapter = require('../adapters/PrismaDatabaseAdapter');
-const { supabasePrisma, mssqlPrisma } = require('../../database/prisma');
-const { supabase } = require('../../database/supabase');
+const { supabasePrisma, mssqlPrisma } = require('../../modules/rptas/database/prisma');
+const { supabase } = require('../../modules/rptas/database/supabase');
 
 // Legacy services
-const rptMastService = require('../../services/rptMastService');
-const rptAssService = require('../../services/rptAssService');
+const rptMastService = require('../../modules/rptas/services/rptMastService');
+const rptAssService = require('../../modules/rptas/services/rptAssService');
 
 // Create the DI container
 const container = createContainer({
@@ -17,8 +16,7 @@ const container = createContainer({
 // Register core dependencies
 container.register({
   logger: asValue(logger),
-  configManager: asClass(ConfigManager).singleton(),
-  dbAdapter: asClass(PrismaDatabaseAdapter).singleton(),
+    dbAdapter: asClass(PrismaDatabaseAdapter).singleton(),
   
   // Legacy or Direct Clients
   supabasePrisma: asValue(supabasePrisma),

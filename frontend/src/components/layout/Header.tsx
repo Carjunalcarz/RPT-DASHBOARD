@@ -5,7 +5,7 @@ import { useThemeColor } from '@/context/ThemeColorContext';
 import { useAuth } from '@/context/AuthContext';
 import { Menu, Search, Bell, Sun, Moon, User, Settings, LogOut, Palette } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { listFaasRecords } from '@/services/faasService';
+import { listFaasRecords } from '@/modules/rptas/shared/services/faasService';
 import { toast } from 'sonner';
 
 const Header: React.FC = () => {

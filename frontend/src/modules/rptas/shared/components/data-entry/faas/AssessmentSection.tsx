@@ -3,9 +3,10 @@ import { Building2, TreePine, Cog } from 'lucide-react';
 import { BuildingAssessment } from '../building';
 import { LandAssessment } from '../land';
 import { MachineryAssessment } from '../machinery';
-import { RptAssRecord } from '@/services/rptAssService';
+import { RptAssRecord } from '@/modules/rptas/shared/services/rptAssService';
 
 interface AssessmentSectionProps {
+  dataSource?: 'mssql' | 'supabase';
   isEnabled?: boolean;
   assessmentRecords?: RptAssRecord[];
   isLoading?: boolean;
@@ -17,7 +18,7 @@ interface AssessmentSectionProps {
 
 type AssessmentType = 'land' | 'building' | 'machinery';
 
-const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assessmentRecords = [], isLoading = false, onUpdate, onPrint }) => {
+const AssessmentSection: React.FC<AssessmentSectionProps> = ({ dataSource = 'mssql',  isEnabled, assessmentRecords = [], isLoading = false, onUpdate, onPrint }) => {
   const [activeType, setActiveType] = useState<AssessmentType>('land'); // Default to land as it's often the base
 
   // Filter records by type
@@ -112,7 +113,7 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assess
       {/* Assessment Content */}
       <div>
         {activeType === 'land' && (
-          <LandAssessment
+          <LandAssessment dataSource={dataSource}
             records={landRecords}
             isEnabled={isEnabled}
             onUpdate={handleLandUpdate}
@@ -121,7 +122,7 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assess
         )}
 
         {activeType === 'building' && (
-          <BuildingAssessment 
+          <BuildingAssessment dataSource={dataSource} 
             records={buildingRecords}
             isEnabled={isEnabled}
             onPrint={onPrint}
@@ -129,7 +130,7 @@ const AssessmentSection: React.FC<AssessmentSectionProps> = ({ isEnabled, assess
         )}
 
         {activeType === 'machinery' && (
-          <MachineryAssessment
+          <MachineryAssessment dataSource={dataSource}
             records={machineryRecords}
             isEnabled={isEnabled}
             onPrint={onPrint}

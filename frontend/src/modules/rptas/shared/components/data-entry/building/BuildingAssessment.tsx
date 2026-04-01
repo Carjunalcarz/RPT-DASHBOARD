@@ -2,10 +2,10 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, Building2, ArrowDownUp, Hammer, ChevronDown, Sparkles } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { useAlert } from '@/context/AlertContext';
-import { RptAssRecord } from '@/services/rptAssService';
-import { getBldgAdjByTdn, BldgAdjRecord } from '@/services/bldgAdjService';
-import { getBldgStrucByTdn, BldgStrucRecord } from '@/services/bldgStrucService';
-import { getBuildingTypes, getBuildingAppraisals, BuildingType, BuildingAppraisal } from '@/services/buildingService';
+import { RptAssRecord } from '@/modules/rptas/shared/services/rptAssService';
+import { getBldgAdjByTdn, BldgAdjRecord } from '@/modules/rptas/shared/services/bldgAdjService';
+import { getBldgStrucByTdn, BldgStrucRecord } from '@/modules/rptas/shared/services/bldgStrucService';
+import { getBuildingTypes, getBuildingAppraisals, BuildingType, BuildingAppraisal } from '@/modules/rptas/shared/services/buildingService';
 import BuildingStructureModal from './BuildingStructureModal';
 import BuildingAdjustmentModal from './BuildingAdjustmentModal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,6 +31,7 @@ interface BuildingRecord {
 }
 
 interface BuildingAssessmentProps {
+  dataSource?: 'mssql' | 'supabase';
   records?: RptAssRecord[];
   isEnabled?: boolean;
   onPrint?: () => void;
@@ -60,7 +61,7 @@ const defaultFormData: FormData = {
   idleLand: false,
 };
 
-const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ records: apiRecords, isEnabled = true, onPrint }) => {
+const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({ dataSource = 'mssql',  records: apiRecords, isEnabled = true, onPrint }) => {
   // State for records table
   const [records, setRecords] = useState<BuildingRecord[]>([]);
   const { showConfirm } = useAlert();

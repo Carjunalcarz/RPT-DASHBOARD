@@ -1,16 +1,16 @@
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { AuthProvider } from '@/context/AuthContext';
-import { SidebarProvider } from '@/context/SidebarContext';
-import { ThemeProvider } from '@/context/ThemeContext';
-import { ThemeColorProvider } from '@/context/ThemeColorContext';
-import { AlertProvider } from '@/context/AlertContext';
-import { MigrationCartProvider } from '@/context/MigrationCartContext';
-import CustomAlert from '@/modules/rptas/shared/components/common/CustomAlert';
-import ErrorBoundary from '@/modules/rptas/shared/components/common/ErrorBoundary';
-import AppRouter from '@/router/AppRouter';
-import { Toaster } from '@/components/ui/sonner';
+import { AuthProvider } from './context/AuthContext';
+import { SidebarProvider } from './context/SidebarContext';
+import { ThemeProvider } from './context/ThemeContext';
+import { ThemeColorProvider } from './context/ThemeColorContext';
+import { AlertProvider } from './context/AlertContext';
+import { MigrationCartProvider } from './context/MigrationCartContext';
+import CustomAlert from './modules/rptas/shared/components/common/CustomAlert';
+import ErrorBoundary from './modules/rptas/shared/components/common/ErrorBoundary';
+import AppRouter from './router/AppRouter';
+import { Toaster } from './components/ui/sonner';
 import '@/App.css';
 import '@/styles/print.css';
 

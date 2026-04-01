@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, TreePine, ArrowDownUp, Trees, Loader2, Sparkles } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { useAlert } from '@/context/AlertContext';
-import { RptAssRecord } from '@/services/rptAssService';
+import { RptAssRecord } from '@/modules/rptas/shared/services/rptAssService';
 import { getLandClassifications, getLandMarketValues, getMunicipalities, getAgriculturalTypes, LandClassification, LandMarketValue, Municipality } from '@/services/landTaxService';
 import LandAdjustmentModal, { LandAdjustment } from './LandAdjustmentModal';
 import TreesModal, { TreePlant } from './TreesModal';
@@ -10,6 +10,7 @@ import { dummyLandFormData } from '../faas/dummyData';
 import { toast } from 'sonner';
 
 interface LandAssessmentProps {
+  dataSource?: 'mssql' | 'supabase';
   records?: RptAssRecord[];
   isEnabled?: boolean;
   onUpdate?: (updatedRecords: any[]) => void;
@@ -71,7 +72,7 @@ const defaultFormData: FormData = {
   idleLand: false,
 };
 
-const LandAssessment: React.FC<LandAssessmentProps> = ({ records: apiRecords, isEnabled, onUpdate, onPrint }) => {
+const LandAssessment: React.FC<LandAssessmentProps> = ({ dataSource = 'mssql',  records: apiRecords, isEnabled, onUpdate, onPrint }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const { showConfirm } = useAlert();
   const [records, setRecords] = useState<LandRecord[]>([]);

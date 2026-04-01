@@ -9,8 +9,8 @@ import {
 import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { useAlert } from '@/context/AlertContext';
-import { BldgAdjRecord, createBldgAdj, updateBldgAdj, deleteBldgAdj } from '@/services/bldgAdjService';
-import { BldgStrucRecord } from '@/services/bldgStrucService';
+import { BldgAdjRecord, createBldgAdj, updateBldgAdj, deleteBldgAdj } from '@/modules/rptas/shared/services/bldgAdjService';
+import { BldgStrucRecord } from '@/modules/rptas/shared/services/bldgStrucService';
 
 interface BuildingAdjustmentModalProps {
   open: boolean;

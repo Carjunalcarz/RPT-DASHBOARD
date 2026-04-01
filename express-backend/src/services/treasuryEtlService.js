@@ -1,5 +1,7 @@
 const crypto = require('crypto');
 const logger = require('../utils/logger');
+const { DB_SCHEMA } = require('../modules/rptas/config/database');
+
 
 const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
 
@@ -35,7 +37,7 @@ const loadPropertyOwnerRows = async (tx, propertyIds) => {
         rp.barangay_name_snapshot as "barangayName",
         COALESCE(o.name, rp.owner_name_snapshot) as "ownerName",
         COALESCE(o.address, rp.owner_address_snapshot) as "ownerAddress"
-      FROM public.rpt_property rp
+      FROM ${DB_SCHEMA}.rpt_property rp
       LEFT JOIN public.owner o ON o.id = rp.owner_id
       WHERE rp.id = ANY($1::uuid[])
     `,
@@ -50,7 +52,7 @@ const loadAssessmentAggregates = async (tx, propertyIds) => {
         property_id::text as "propertyId",
         COALESCE(SUM(market_value), 0)::numeric as "marketValue",
         COALESCE(SUM(ass_value), 0)::numeric as "assessedValue"
-      FROM public.rpt_assessment
+      FROM ${DB_SCHEMA}.rpt_assessment
       WHERE property_id = ANY($1::uuid[])
       GROUP BY property_id
     `,
@@ -66,7 +68,7 @@ const loadAssessmentAggregates = async (tx, propertyIds) => {
 const upsertExportRow = async (tx, row) => {
   await tx.$executeRawUnsafe(
     `
-      INSERT INTO public.treasury_payment_exports (
+      INSERT INTO ${DB_SCHEMA}.treasury_payment_exports (
         etl_run_id,
         etl_version,
         order_id,

@@ -4,9 +4,9 @@ import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vite
 import PropertyApproval from './PropertyApproval';
 import { useAuth } from '@/context/AuthContext';
 import { useAlert } from '@/context/AlertContext';
-import { getRptMastDataDirect, updateSignatory } from '@/services/rptMastService';
-import { getRptAssByTdn } from '@/services/rptAssService';
-import { getFaasRecord, updateFaasStatus } from '@/services/faasService';
+import { getRptMastDataDirect, updateSignatory } from '@/modules/rptas/shared/services/rptMastService';
+import { getRptAssByTdn } from '@/modules/rptas/shared/services/rptAssService';
+import { getFaasRecord, updateFaasStatus } from '@/modules/rptas/shared/services/faasService';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 // Mock hooks
@@ -17,12 +17,12 @@ vi.mock('@/context/ThemeColorContext', () => ({
 }));
 
 // Mock services
-vi.mock('@/services/rptMastService');
-vi.mock('@/services/rptAssService');
-vi.mock('@/services/faasService');
+vi.mock('@/modules/rptas/shared/services/rptMastService');
+vi.mock('@/modules/rptas/shared/services/rptAssService');
+vi.mock('@/modules/rptas/shared/services/faasService');
 
 // Mock child components to avoid deep rendering issues
-vi.mock('@/components/RPT-management/faas/rpt_m_PropertyDetailsView', () => {
+vi.mock('@/components/data-entry/faas/PropertyDetailsView', () => {
   return {
     default: function DummyPropertyDetailsView() {
       return <div data-testid="property-details-view">Property Details</div>;

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, TreePine, ArrowDownUp, Trees, Loader2 } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { useAlert } from '@/context/AlertContext';
-import { RptAssRecord } from '@/services/rptAssService';
+import { RptAssRecord } from '@/modules/rptas/shared/services/rptAssService';
 import { getLandClassifications, getLandMarketValues, getMunicipalities, getAgriculturalTypes, LandClassification, LandMarketValue, Municipality } from '@/services/landTaxService';
 import LandAdjustmentModal, { LandAdjustment } from './rpt_m_LandAdjustmentModal';
 import TreesModal, { TreePlant } from './rpt_m_TreesModal';

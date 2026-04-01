@@ -18,7 +18,7 @@ vi.mock('@/context/AuthContext', () => ({
   useAuth: () => ({ user: { id: 'u1', role: 'user', email: 'user@example.com' } }),
 }));
 
-vi.mock('@/services/reportsService', () => ({
+vi.mock('@/modules/rptas/shared/services/reportsService', () => ({
   getTaxBegYears: vi.fn().mockResolvedValue(['2026']),
   getPropertyReport: vi.fn().mockResolvedValue({ data: [], meta: { total: 0, page: 1, limit: 10, totalPages: 0 } }),
 }));

@@ -2,7 +2,7 @@ import React, { lazy } from 'react';
 import { RouteObject } from 'react-router-dom';
 
 const RPTASDashboardPage = lazy(() => import('../domains/dashboard/pages/DashboardPage'));
-const FaasRecordsPage = lazy(() => import('@/modules/rptas/domains/faas/pages/FaasRecordsPage'));
+const FaasRecordsPage = lazy(() => import('../domains/faas/pages/FaasRecordsPage'));
 const PropertiesPage = lazy(() => import('../domains/property/pages/PropertiesPage'));
 const TaxAssessmentPage = lazy(() => import('../domains/assessment/pages/TaxAssessmentPage'));
 const RPTASReportsPage = lazy(() => import('../domains/reports/pages/RPTASReportsPage'));

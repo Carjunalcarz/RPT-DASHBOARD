@@ -4,7 +4,7 @@ import { Building2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useThemeColor } from '@/context/ThemeColorContext';
 
-import RptBreadcrumb from '@/modules/rptas/shared/components/RPT-management/rpt_m_Breadcrumb';
+import RptBreadcrumb from '@/modules/rptas/shared/components/data-entry/Breadcrumb';
 
 const DataEntry: React.FC = () => {
   const { headerColor, headerColorDark } = useThemeColor();

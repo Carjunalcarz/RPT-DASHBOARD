@@ -9,7 +9,7 @@ import {
 import { Plus, Edit2, Trash2, Save, X, RefreshCw, Calculator } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { useAlert } from '@/context/AlertContext';
-import { RptMachRecord, getMachineryByTdn } from '@/services/rptMachService';
+import { RptMachRecord, getMachineryByTdn } from '@/modules/rptas/shared/services/rptMachService';
 
 interface MachineryItemsModalProps {
   open: boolean;

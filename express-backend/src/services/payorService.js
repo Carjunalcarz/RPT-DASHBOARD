@@ -1,4 +1,4 @@
-const { supabasePrisma } = require('../database/prisma');
+const { supabasePrisma } = require('../modules/rptas/database/prisma');
 const { AppError } = require('../middleware/errorHandler');
 const { validatePayorPayload, normalizeIdKey } = require('./payorValidation');
 const { verifyPayorIdentity } = require('./identityVerificationService');
@@ -8,14 +8,14 @@ const normalize = (s) => String(s || '').trim();
 const hasPayorsTable = async () => {
   try {
     const rows = await supabasePrisma.$queryRawUnsafe(
-      `
-        SELECT 1
-        FROM information_schema.tables
-        WHERE table_schema = 'public'
-          AND table_name = 'payors'
-        LIMIT 1
-      `
-    );
+        `
+         SELECT 1
+         FROM information_schema.tables
+         WHERE table_schema = 'rptas'
+           AND table_name = 'payors'
+         LIMIT 1
+        `
+      );
     return Array.isArray(rows) && rows.length > 0;
   } catch {
     return false;
@@ -116,9 +116,9 @@ const createPayor = async ({ user, payload }) => {
     const created = await supabasePrisma.$queryRawUnsafe(
       `
         INSERT INTO public.payors
-          (first_name, last_name, address, id_type, id_number, contact, created_by)
+          (id, first_name, last_name, address, id_type, id_number, contact, created_by, created_at, updated_at)
         VALUES
-          ($1, $2, $3, $4, $5, $6::jsonb, $7::uuid)
+          (gen_random_uuid(), $1, $2, $3, $4, $5, $6::jsonb, $7::uuid, NOW(), NOW())
         RETURNING
           id::text as id,
           first_name as "firstName",
@@ -204,9 +204,9 @@ const bulkCreatePayors = async ({ user, rows }) => {
       const inserted = await supabasePrisma.$queryRawUnsafe(
         `
           INSERT INTO public.payors
-            (first_name, last_name, address, id_type, id_number, contact, created_by)
+            (id, first_name, last_name, address, id_type, id_number, contact, created_by, created_at, updated_at)
           VALUES
-            ($1, $2, $3, $4, $5, $6::jsonb, $7::uuid)
+            (gen_random_uuid(), $1, $2, $3, $4, $5, $6::jsonb, $7::uuid, NOW(), NOW())
           RETURNING
             id::text as id,
             first_name as "firstName",

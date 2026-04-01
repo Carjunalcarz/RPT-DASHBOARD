@@ -9,8 +9,8 @@ import { dummyPropertyRecord, dummyAssessmentRecords } from './dummyData';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { useAlert } from '@/context/AlertContext';
 import { cleanPin } from '../utils';
-import { getRptMastDataDirect, RptMastRecord, getMastExtn } from '@/services/rptMastService';
-import { getRptAssByTdn, RptAssRecord } from '@/services/rptAssService';
+import { getRptMastDataDirect, RptMastRecord, getMastExtn } from '@/modules/rptas/shared/services/rptMastService';
+import { getRptAssByTdn, RptAssRecord } from '@/modules/rptas/shared/services/rptAssService';
 import PropertyInformationSection from './PropertyInformationSection';
 import PropertyOwnerSection from './PropertyOwnerSection';
 import PropertyBoundariesSection from './PropertyBoundariesSection';
@@ -30,7 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { saveDraft, submitForReview, listFaasRecords } from '@/services/faasService';
+import { saveDraft, submitForReview, listFaasRecords } from '@/modules/rptas/shared/services/faasService';
 import { useIdempotency } from '@/hooks/useIdempotency';
 import { useMigrationCart } from '@/context/MigrationCartContext';
 import MigrationCartIndicator from '@/components/migration/MigrationCartIndicator';
@@ -125,7 +125,11 @@ interface PropertyRecord {
 } // Add new field for display
 
 
-const RealPropertyDataEntry: React.FC = () => {
+interface RealPropertyDataEntryProps {
+  dataSource?: 'mssql' | 'supabase';
+}
+
+const RealPropertyDataEntry: React.FC<RealPropertyDataEntryProps> = ({ dataSource = 'mssql' }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const { showConfirm } = useAlert();
   const { addToCart, removeFromCart, isInCart } = useMigrationCart();
@@ -391,8 +395,8 @@ const RealPropertyDataEntry: React.FC = () => {
 
   // SWR Data Fetching
   const { data: apiData, error, isLoading: isSwrLoading, isValidating, mutate } = useSWR(
-    ['rpt-mast', pagination.page, pagination.limit, appliedFilter.field, appliedFilter.value],
-    ([_, page, limit, searchField, filterValue]) => getRptMastDataDirect({ page, limit, searchField, filterValue }),
+    [dataSource, pagination.page, pagination.limit, appliedFilter.field, appliedFilter.value],
+    ([_, page, limit, searchField, filterValue]) => dataSource === 'supabase' ? listFaasRecords({ page, limit, searchField, filterValue }) : getRptMastDataDirect({ page, limit, searchField, filterValue }),
     {
       keepPreviousData: true,
       revalidateOnFocus: false,
@@ -1392,7 +1396,7 @@ const RealPropertyDataEntry: React.FC = () => {
             )}
 
             {activeTab === 'assessment' && (
-              <AssessmentSection
+              <AssessmentSection dataSource={dataSource}
                 isEnabled={isFormEnabled}
                 assessmentRecords={assessmentRecords}
                 isLoading={isAssessmentLoading}

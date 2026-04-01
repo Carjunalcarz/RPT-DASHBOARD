@@ -7,7 +7,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Plus, Trash2, Save } from 'lucide-react';
-import { getTreesByTdn, getTreeLibrary, TreeLibraryRecord, RptTreeRecord } from '@/services/rptTreeService';
+import { getTreesByTdn, getTreeLibrary, TreeLibraryRecord, RptTreeRecord } from '@/modules/rptas/shared/services/rptTreeService';
 
 export interface TreePlant {
   id: string;

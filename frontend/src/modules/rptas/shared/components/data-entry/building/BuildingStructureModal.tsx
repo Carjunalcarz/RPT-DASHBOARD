@@ -9,12 +9,12 @@ import {
 import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { useAlert } from '@/context/AlertContext';
-import { BldgStrucRecord, createBldgStruc, updateBldgStruc, deleteBldgStruc } from '@/services/bldgStrucService';
-import { getBuildingTypes, getBuildingAppraisals, BuildingType, BuildingAppraisal } from '@/services/buildingService';
-import { getBldgUnitCosts, BldgUnitCostRecord } from '@/services/bldgUnitCostService';
+import { BldgStrucRecord, createBldgStruc, updateBldgStruc, deleteBldgStruc } from '@/modules/rptas/shared/services/bldgStrucService';
+import { getBuildingTypes, getBuildingAppraisals, BuildingType, BuildingAppraisal } from '@/modules/rptas/shared/services/buildingService';
+import { getBldgUnitCosts, BldgUnitCostRecord } from '@/modules/rptas/shared/services/bldgUnitCostService';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import { getOrdinanceValues, OrdinanceValueRecord } from '@/services/ordinanceService';
+import { getOrdinanceValues, OrdinanceValueRecord } from '@/modules/rptas/shared/services/ordinanceService';
 
 interface BuildingStructureModalProps {
   open: boolean;

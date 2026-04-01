@@ -27,7 +27,7 @@ import {
   Attachment,
   AuditEntry,
 } from './signatoriesCrud';
-import { updateSignatory } from '@/services/rptMastService';
+import { updateSignatory } from '@/modules/rptas/shared/services/rptMastService';
 
 interface DocumentationData {
   preparedBy: string;

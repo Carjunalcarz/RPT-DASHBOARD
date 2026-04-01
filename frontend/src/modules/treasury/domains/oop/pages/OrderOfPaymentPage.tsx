@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { useAuth } from '@/context/AuthContext';
-import { getPropertyReport, getTaxBegYears, PropertyReport } from '@/services/reportsService';
+import { getPropertyReport, getTaxBegYears, PropertyReport } from '@/modules/rptas/shared/services/reportsService';
 import oopService from '@/services/oopService';
 import payorService from '@/services/payorService';
 import type { OrderOfPayment as OopOrder } from '@/types/oop';

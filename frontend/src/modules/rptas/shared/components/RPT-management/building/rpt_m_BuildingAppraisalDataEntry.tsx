@@ -12,7 +12,7 @@ import {
   updateBuildingAppraisal, 
   deleteBuildingAppraisal,
   BuildingAppraisal 
-} from '@/services/buildingService';
+} from '@/modules/rptas/shared/services/buildingService';
 import { toast } from 'sonner';
 import {
   Dialog,

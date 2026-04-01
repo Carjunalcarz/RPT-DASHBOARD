@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useSWR from 'swr';
-import { listFaasRecords, batchUpdateFaasStatus } from '@/services/faasService';
+import { listFaasRecords, batchUpdateFaasStatus } from '@/modules/rptas/shared/services/faasService';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { FileText, User, Calendar, ArrowRight, CheckCircle, Clock, FileEdit, Loader2, AlertCircle } from 'lucide-react';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';

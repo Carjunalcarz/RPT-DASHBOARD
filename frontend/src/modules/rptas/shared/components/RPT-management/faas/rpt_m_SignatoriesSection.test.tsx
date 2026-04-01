@@ -18,7 +18,7 @@ vi.mock('@/context/AuthContext', () => ({
 }));
 
 // Mock the services
-vi.mock('@/services/setupSignatoryTemplatesService', () => ({
+vi.mock('@/modules/rptas/shared/services/setupSignatoryTemplatesService', () => ({
   listTemplates: vi.fn().mockResolvedValue({
     data: [
       {
@@ -32,7 +32,7 @@ vi.mock('@/services/setupSignatoryTemplatesService', () => ({
   }),
 }));
 
-vi.mock('@/services/setupSignatoriesService', () => ({
+vi.mock('@/modules/rptas/shared/services/setupSignatoriesService', () => ({
   listSetupSignatories: vi.fn().mockResolvedValue({
     data: [],
     meta: { totalPages: 1 },

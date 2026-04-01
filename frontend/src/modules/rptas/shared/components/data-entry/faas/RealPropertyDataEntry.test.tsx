@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import RealPropertyDataEntry from './RealPropertyDataEntry';
 import { useAuth } from '@/context/AuthContext';
 import { useAlert } from '@/context/AlertContext';
-import { listFaasRecords, saveDraft } from '@/services/faasService';
+import { listFaasRecords, saveDraft } from '@/modules/rptas/shared/services/faasService';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { MigrationCartProvider } from '@/context/MigrationCartContext';
 import { MemoryRouter } from 'react-router-dom';
@@ -61,14 +61,14 @@ vi.mock('swr', () => ({
 }));
 
 // Mock services
-vi.mock('@/services/rptMastService', () => ({
+vi.mock('@/modules/rptas/shared/services/rptMastService', () => ({
     getRptMastDataDirect: vi.fn(),
     getMastExtn: vi.fn(),
 }));
-vi.mock('@/services/rptAssService', () => ({
+vi.mock('@/modules/rptas/shared/services/rptAssService', () => ({
     getRptAssByTdn: vi.fn(),
 }));
-vi.mock('@/services/faasService', () => ({
+vi.mock('@/modules/rptas/shared/services/faasService', () => ({
     listFaasRecords: vi.fn(),
     saveDraft: vi.fn(),
     submitForReview: vi.fn(),

@@ -5,7 +5,7 @@ import {
   CreditCard, MapPin, Building, ArrowUpDown
 } from 'lucide-react';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
-import { getTreasuryPaymentsReport, TreasuryPaymentExportRow } from '@/services/reportsService';
+import { getTreasuryPaymentsReport, TreasuryPaymentExportRow } from '@/modules/rptas/shared/services/reportsService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';

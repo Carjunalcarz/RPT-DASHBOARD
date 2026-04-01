@@ -1,4 +1,4 @@
-const { supabasePrisma } = require('../database/prisma');
+const { supabasePrisma } = require('../modules/rptas/database/prisma');
 const logger = require('../utils/logger');
 
 const idempotency = async (req, res, next) => {

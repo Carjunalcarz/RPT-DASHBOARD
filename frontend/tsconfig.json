@@ -18,7 +18,8 @@
     "baseUrl": "src",
     "types": ["vite/client"],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["src/*"],
+      "@/modules/rptas/*": ["src/modules/rptas/*"]
     }
   },
   "include": ["src"],

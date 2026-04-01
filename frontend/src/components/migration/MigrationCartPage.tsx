@@ -17,7 +17,7 @@ import { useThemeColor } from '@/context/ThemeColorContext';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAlert } from '@/context/AlertContext';
-import { bulkMigrate, checkExistingTdns } from '@/services/faasService';
+import { bulkMigrate, checkExistingTdns } from '@/modules/rptas/shared/services/faasService';
 
 const MigrationCartPage: React.FC = () => {
   const { selectedProperties, removeFromCart, clearCart, count } = useMigrationCart();

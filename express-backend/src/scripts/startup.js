@@ -9,6 +9,8 @@ const logger = require('../utils/logger');
 const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
+const { DB_SCHEMA } = require('../modules/rptas/config/database');
+
 
 async function runReportingSetup(client) {
   logger.info('[Startup] Setting up reporting schema and ETL...');
@@ -19,7 +21,7 @@ async function runReportingSetup(client) {
       return true;
     }
 
-    const sqlContent = fs.readFileSync(sqlPath, 'utf8');
+    const sqlContent = fs.readFileSync(sqlPath, 'utf8').replace(/__DB_SCHEMA__/g, DB_SCHEMA);
     
     // Split the SQL into individual statements while handling $$ blocks for functions
     const statements = [];
@@ -68,7 +70,7 @@ async function runReportingSetup(client) {
     const shouldRefresh = process.env.REFRESH_REPORTING_ON_STARTUP === 'true';
     if (shouldRefresh) {
       logger.info('[Startup] Triggering initial reporting data refresh...');
-      await client.$executeRawUnsafe('SELECT rptas.refresh_reporting_data();');
+      await client.$executeRawUnsafe(`SELECT ${DB_SCHEMA}.refresh_reporting_data();`);
       logger.info('[Startup] Reporting data refresh completed.');
     }
 
@@ -85,9 +87,9 @@ async function verifyDatabaseConnectivity(client, name) {
     await client.$connect();
     // Simple query to verify
     if (name === 'Supabase') {
-      await client.$queryRaw`SELECT 1`;
+      await client.$queryRawUnsafe(`SELECT 1`);
     } else {
-      await client.$queryRaw`SELECT 1 as result`;
+      await client.$queryRawUnsafe(`SELECT 1 as result`);
     }
     logger.info(`[Startup] Successfully connected to ${name}.`);
     return true;
@@ -136,12 +138,12 @@ async function runHealthCheck(client, name) {
       logger.info(`[Startup] Health check: Found ${faasCount} FAAS records.`);
       
       // Check if reporting tables exist (using raw SQL as they might not be in Prisma schema yet)
-      const tablesCheck = await client.$queryRaw`
+      const tablesCheck = await client.$queryRawUnsafe(`
         SELECT count(*) 
         FROM information_schema.tables 
-        WHERE table_schema = 'rptas' 
+        WHERE table_schema = '${DB_SCHEMA}' 
         AND table_name IN ('owner', 'municipality', 'barangay', 'rpt_property', 'rpt_assessment')
-      `;
+      `);
       const tableCount = Number(tablesCheck[0].count);
       logger.info(`[Startup] Health check: Found ${tableCount}/5 reporting tables.`);
       
@@ -149,17 +151,17 @@ async function runHealthCheck(client, name) {
         logger.warn(`[Startup] Warning: Some reporting tables are missing. Reporting features may be degraded.`);
       } else {
         // Check if any data exists in reporting
-        const propCheck = await client.$queryRaw`SELECT count(*) FROM rptas.rpt_property`;
+        const propCheck = await client.$queryRawUnsafe(`SELECT count(*) FROM ${DB_SCHEMA}.rpt_property`);
         const propCount = Number(propCheck[0].count);
         if (propCount === 0 && faasCount > 0) {
           logger.info('[Startup] Health check: Reporting data is empty but FAAS records exist. Triggering initial refresh...');
-          await client.$executeRawUnsafe('SELECT rptas.refresh_reporting_data();');
+          await client.$executeRawUnsafe(`SELECT ${DB_SCHEMA}.refresh_reporting_data();`);
           logger.info('[Startup] Reporting data refresh completed.');
         }
       }
     } else {
       // MSSQL specific check
-      const result = await client.$queryRaw`SELECT TOP 1 * FROM RPTMAST`;
+      const result = await client.$queryRawUnsafe(`SELECT TOP 1 * FROM RPTMAST`);
       logger.info(`[Startup] Health check: RPTMAST accessible.`);
     }
     return true;

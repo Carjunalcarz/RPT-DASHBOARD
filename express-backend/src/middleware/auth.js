@@ -9,13 +9,17 @@ const logger = require('../utils/logger');
 const getProjectRef = () => {
   const url = process.env.SUPABASE_URL;
   if (!url) return null;
+  // Handle formats like http://supabasekong-ref.180.232.187.222.sslip.io
+  const match = url.match(/supabasekong-([^.]+)\./);
+  if (match) return match[1];
+  
   // Handle formats like https://ref.supabase.co
-  const match = url.match(/https:\/\/([^.]+)\.supabase\.co/);
-  return match ? match[1] : null;
+  const cloudMatch = url.match(/https:\/\/([^.]+)\.supabase\.co/);
+  return cloudMatch ? cloudMatch[1] : null;
 };
 
 const projectRef = getProjectRef();
-const jwksUri = projectRef ? `https://${projectRef}.supabase.co/auth/v1/.well-known/jwks.json` : null;
+const jwksUri = process.env.SUPABASE_URL ? `${process.env.SUPABASE_URL}/auth/v1/.well-known/jwks.json` : null;
 
 const client = jwksClient({
   jwksUri: jwksUri,
@@ -38,7 +42,9 @@ function getKey(header, callback) {
   });
 }
 
-const { supabasePrisma } = require('../database/prisma');
+const { supabasePrisma } = require('../modules/rptas/database/prisma');
+
+const { supabase } = require('../modules/rptas/database/supabase');
 
 const protect = async (req, res, next) => {
   let token;
@@ -70,31 +76,28 @@ const protect = async (req, res, next) => {
     await processUser(req, next, decoded);
   };
 
-  // If alg is ES256, use JWKS. If HS256, use Secret.
-  // Note: jwksUri might be null if not configured, leading to ES256 failure.
-  // We should also check if we have a jwksUri before trying ES256.
-  if (decodedToken.header.alg === 'ES256') {
-    // If JWKS URI is available, use it
-    if (jwksUri) {
-      jwt.verify(token, getKey, { algorithms: ['ES256'] }, async (err, decoded) => {
-        if (err) {
-          logger.error(`JWT Verification Failed: ${err.message}`);
-          return next(new AppError('Invalid token. Please log in again.', 401));
-        }
-        await processUser(req, next, decoded);
-      });
-    } else {
-      return next(new AppError('Server configuration error: ES256 token received but SUPABASE_URL (for JWKS) is not configured.', 500));
-    }
-  } else {
-    // Fallback to HS256 (Legacy)
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      await processUser(req, next, decoded);
-    } catch (err) {
-      logger.error(`JWT Verification (HS256) Failed: ${err.message}`);
+  // For Self-hosted Supabase with unknown JWT Secret, we can verify via the GoTrue API directly
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
+      logger.error(`Supabase Auth Verification Failed: ${error?.message || 'No user found'}`);
       return next(new AppError('Invalid token. Please log in again.', 401));
     }
+    
+    // We construct a mock decoded token object to maintain compatibility with existing processUser
+    const decoded = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      user_metadata: user.user_metadata,
+      app_metadata: user.app_metadata
+    };
+    
+    await processUser(req, next, decoded);
+  } catch (err) {
+    logger.error(`Auth Middleware Error: ${err.message}`);
+    return next(new AppError('Authentication failed.', 401));
   }
 };
 

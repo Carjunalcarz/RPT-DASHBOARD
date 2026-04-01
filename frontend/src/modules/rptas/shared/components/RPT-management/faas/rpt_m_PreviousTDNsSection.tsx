@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { FileText } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
-import { getFaasTdnHistory, FaasTdnHistoryRow } from '@/services/faasService';
+import { getFaasTdnHistory, FaasTdnHistoryRow } from '@/modules/rptas/shared/services/faasService';
 import { PropertyRecord } from './types';
 
 interface PreviousTDN {

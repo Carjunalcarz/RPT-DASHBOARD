@@ -1,0 +1,86 @@
+const express = require('express');
+const router = express.Router();
+
+const healthRoutes = require('./healthRoutes');
+const itemRoutes = require('./items');
+const auditRoutes = require('./auditRoutes');
+const testTaskRoutes = require('./testTasks');
+const batchRoutes = require('./batchRoutes');
+const authRoutes = require('./authRoutes');
+const userRoutes = require('./users');
+const permissionsRoutes = require('./permissionsRoutes');
+const rptMastRoutes = require('./rptMastRoutes');
+const rptAssRoutes = require('./rptAssRoutes');
+const bldgAdjRoutes = require('./bldgAdjRoutes');
+const bldgStrucRoutes = require('./bldgStrucRoutes');
+const mastExtnRoutes = require('./mastExtnRoutes');
+const rptTreeRoutes = require('./rptTreeRoutes');
+const rptMachRoutes = require('./rptMachRoutes');
+const bldgUnitCostRoutes = require('./bldgUnitCostRoutes');
+const bldgStrucTypeRoutes = require('./bldgStrucTypeRoutes');
+const ordinanceRoutes = require('./ordinanceRoutes');
+const classificationRoutes = require('./classificationRoutes');
+const actualUseRoutes = require('./actualUseRoutes');
+const subClassRoutes = require('./subClassRoutes');
+const treesRoutes = require('./treesRoutes');
+const landTaxRoutes = require('./landTaxRoutes');
+const buildingRoutes = require('./buildingRoutes');
+const buildingAppraisalRoutes = require('./buildingAppraisalRoutes');
+const faasRoutes = require('./faasRoutes');
+const pdfRoutes = require('./pdfRoutes');
+const reportsRoutes = require('./reportsRoutes');
+const dashboardRoutes = require('./dashboardRoutes');
+const setupSignatoriesRoutes = require('./setupSignatoriesRoutes');
+const setupSignatoryTemplatesRoutes = require('./setupSignatoryTemplatesRoutes');
+const sidebarRoutes = require('./sidebarRoutes');
+const oopRoutes = require('./oopRoutes');
+const payorRoutes = require('./payorRoutes');
+
+// Mount routes to maintain exact backward compatibility with server.js paths
+router.use('/health', healthRoutes);
+router.use('/api/v1/items', itemRoutes);
+router.use('/api/v1/audit', auditRoutes);
+router.use('/api/v1/test-tasks', testTaskRoutes);
+router.use('/api/v1/batch', batchRoutes);
+router.use('/api/auth', authRoutes);
+router.use('/api/v1/users', userRoutes);
+router.use('/api/users', userRoutes); // Alias
+router.use('/api/v1/permissions', permissionsRoutes);
+router.use('/api/permissions', permissionsRoutes);
+router.use('/api/rptmast', rptMastRoutes);
+router.use('/api/rpt-ass', rptAssRoutes);
+router.use('/api/bldg-adj', bldgAdjRoutes);
+router.use('/api/bldg-struc', bldgStrucRoutes);
+router.use('/api/mastextn', mastExtnRoutes);
+router.use('/api/v1/rpt-tree', rptTreeRoutes);
+router.use('/api/v1/rpt-mach', rptMachRoutes);
+router.use('/api/bldg-unit-cost', bldgUnitCostRoutes);
+router.use('/api/bldg-struc-type', bldgStrucTypeRoutes);
+router.use('/api/ordinance', ordinanceRoutes);
+router.use('/api/v1/classifications', classificationRoutes);
+router.use('/api/v1/actual-uses', actualUseRoutes);
+router.use('/api/v1/subclasses', subClassRoutes);
+router.use('/api/v1/trees', treesRoutes);
+router.use('/api/v1/buildings', buildingRoutes);
+router.use('/api/v1/building-appraisals', buildingAppraisalRoutes);
+router.use('/api/v1/faas', faasRoutes);
+router.use('/api/v1/pdf', pdfRoutes);
+router.use('/api/v1/reports', reportsRoutes);
+router.use('/api/v1/dashboard', dashboardRoutes);
+router.use('/api/v1/setup/signatories', setupSignatoriesRoutes);
+router.use('/api/v1/setup/signatory-templates', setupSignatoryTemplatesRoutes);
+router.use('/api/v1/sidebar', sidebarRoutes);
+router.use('/api/v1/oop', oopRoutes);
+router.use('/api/v1/payors', payorRoutes);
+
+// Legacy routes support
+router.use('/api/dashboard', dashboardRoutes);
+router.use('/api/sidebar', sidebarRoutes);
+router.use('/api/classifications', classificationRoutes);
+router.use('/api/actual-uses', actualUseRoutes);
+router.use('/api/subclasses', subClassRoutes);
+router.use('/api/trees', treesRoutes);
+router.use('/api/land-tax', landTaxRoutes);
+router.use('/api/v1/land-tax', landTaxRoutes);
+
+module.exports = router;

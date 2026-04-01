@@ -3,7 +3,7 @@ import { Building2, TreePine, Cog } from 'lucide-react';
 import { BuildingAssessment } from '../building';
 import { LandAssessment } from '../land';
 import { MachineryAssessment } from '../machinery';
-import { RptAssRecord } from '@/services/rptAssService';
+import { RptAssRecord } from '@/modules/rptas/shared/services/rptAssService';
 
 interface AssessmentSectionProps {
   isEnabled?: boolean;

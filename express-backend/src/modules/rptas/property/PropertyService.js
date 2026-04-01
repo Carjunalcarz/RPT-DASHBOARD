@@ -1,4 +1,4 @@
-const { poolPromise } = require('../../../database/mssql');
+const { poolPromise } = require('../database/mssql');
 const { AppError } = require('../../../middleware/errorHandler');
 
 

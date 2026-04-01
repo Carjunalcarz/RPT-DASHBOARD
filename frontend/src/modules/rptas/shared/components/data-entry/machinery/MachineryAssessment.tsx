@@ -2,13 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X, RefreshCw, Printer, Settings, ArrowDownUp, Sparkles, Loader2 } from 'lucide-react';
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { useAlert } from '@/context/AlertContext';
-import { RptAssRecord } from '@/services/rptAssService';
-import { getClassifications, getActualUses, getSubClasses, Classification, ActualUse, SubClass } from '@/services/classificationService';
+import { RptAssRecord } from '@/modules/rptas/shared/services/rptAssService';
+import { getClassifications, getActualUses, getSubClasses, Classification, ActualUse, SubClass } from '@/modules/rptas/shared/services/classificationService';
 import MachineryItemsModal from './MachineryItemsModal';
 import { dummyMachineryFormData } from '../faas/dummyData';
 import { toast } from 'sonner';
 
 interface MachineryAssessmentProps {
+  dataSource?: 'mssql' | 'supabase';
   records?: RptAssRecord[];
   isEnabled?: boolean;
   onPrint?: () => void;
@@ -57,7 +58,7 @@ const defaultFormData: FormData = {
   idleLand: false,
 };
 
-const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ records: apiRecords, isEnabled, onPrint }) => {
+const MachineryAssessment: React.FC<MachineryAssessmentProps> = ({ dataSource = 'mssql',  records: apiRecords, isEnabled, onPrint }) => {
   const { headerColor, headerColorDark } = useThemeColor();
   const { showConfirm } = useAlert();
   const [records, setRecords] = useState<MachineryRecord[]>([]);

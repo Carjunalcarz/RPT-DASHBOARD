@@ -1,5 +1,7 @@
 const crypto = require('crypto');
 const treasuryEtlService = require('../../../services/treasuryEtlService');
+const { DB_SCHEMA } = require('../../rptas/config/database');
+
 
 class OopService {
   constructor({ supabasePrisma, logger }) {
@@ -21,7 +23,7 @@ class OopService {
       `
         SELECT 1
         FROM information_schema.tables
-        WHERE table_schema = 'public'
+        WHERE table_schema = '${DB_SCHEMA}'
           AND table_name = 'sidebar_item_user_visibility'
         LIMIT 1
       `
@@ -36,7 +38,7 @@ class OopService {
   const rows = await prisma.$queryRawUnsafe(
     `
       SELECT id::text as id
-      FROM public.sidebar_items
+      FROM ${DB_SCHEMA}.sidebar_items
       WHERE path = $1
       LIMIT 1
     `,
@@ -64,7 +66,7 @@ class OopService {
     const visibility = await this.supabasePrisma.$queryRawUnsafe(
       `
         SELECT is_visible
-        FROM public.sidebar_item_user_visibility
+        FROM ${DB_SCHEMA}.sidebar_item_user_visibility
         WHERE user_id = $1::uuid AND item_id = $2::uuid
         LIMIT 1
       `,
@@ -125,7 +127,7 @@ class OopService {
   if (!propertyIds.length) return [];
   return tx.$queryRawUnsafe(
     `SELECT id::text as id, payment_status::text as "paymentStatus"
-     FROM public.rpt_property
+     FROM ${DB_SCHEMA}.rpt_property
      WHERE id = ANY($1::uuid[])`,
     propertyIds
   );
@@ -134,10 +136,10 @@ class OopService {
   setRptPropertyPaymentStatus = async (tx, { propertyIds, fromStatus, toStatus }) => {
   if (!propertyIds.length) return [];
   return tx.$queryRawUnsafe(
-    `UPDATE public.rpt_property
-     SET payment_status = $1::public.rpt_payment_status
+    `UPDATE ${DB_SCHEMA}.rpt_property
+     SET payment_status = $1::${DB_SCHEMA}.rpt_payment_status
      WHERE id = ANY($2::uuid[])
-       AND payment_status = $3::public.rpt_payment_status
+       AND payment_status = $3::${DB_SCHEMA}.rpt_payment_status
      RETURNING id::text as id`,
     toStatus,
     propertyIds,
@@ -147,7 +149,7 @@ class OopService {
 
   persistOrderPropertyIds = async (tx, { orderId, propertyIds }) => {
   await tx.$executeRawUnsafe(
-    `UPDATE public.orders_of_payment
+    `UPDATE ${DB_SCHEMA}.orders_of_payment
      SET property_ids = $1::jsonb
      WHERE id = $2::uuid`,
     JSON.stringify(propertyIds || []),
@@ -295,7 +297,7 @@ class OopService {
 
     const rows = await tx.$queryRawUnsafe(
       `SELECT COALESCE(property_ids, '[]'::jsonb) as "propertyIds"
-       FROM public.orders_of_payment
+       FROM ${DB_SCHEMA}.orders_of_payment
        WHERE id = $1::uuid`,
       orderId
     );
@@ -339,7 +341,7 @@ class OopService {
 
     const rows = await tx.$queryRawUnsafe(
       `SELECT COALESCE(property_ids, '[]'::jsonb) as "propertyIds"
-       FROM public.orders_of_payment
+       FROM ${DB_SCHEMA}.orders_of_payment
        WHERE id = $1::uuid`,
       orderId
     );

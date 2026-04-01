@@ -1,4 +1,6 @@
 const { AppError } = require('../../../middleware/errorHandler');
+const { DB_SCHEMA } = require('../config/database');
+
 
 class FaasService {
   constructor({ supabasePrisma, logger, rptMastService, rptAssService }) {
@@ -487,7 +489,7 @@ class FaasService {
                 if (status === 'pending-provincial') {
                     await tx.$executeRawUnsafe(
                         `
-                        UPDATE public.faas_records
+                        UPDATE ${DB_SCHEMA}.faas_records
                         SET
                           status = $1,
                           updated_at = NOW(),
@@ -525,7 +527,7 @@ class FaasService {
                 } else if (status === 'approved') {
                     await tx.$executeRawUnsafe(
                         `
-                        UPDATE public.faas_records
+                        UPDATE ${DB_SCHEMA}.faas_records
                         SET
                           status = $1,
                           updated_at = NOW(),
@@ -568,7 +570,7 @@ class FaasService {
                 } else {
                     await tx.$executeRawUnsafe(
                         `
-                        UPDATE public.faas_records
+                        UPDATE ${DB_SCHEMA}.faas_records
                         SET
                           status = $1,
                           updated_at = NOW(),
@@ -640,7 +642,7 @@ class FaasService {
     try {
       const rp = await this.supabasePrisma.$queryRawUnsafe(
         `SELECT master_property_id
-         FROM public.rpt_property
+         FROM ${DB_SCHEMA}.rpt_property
          WHERE source_record_id = $1
          LIMIT 1`,
         id
@@ -673,7 +675,7 @@ class FaasService {
         if (pin) {
           const matches = await this.supabasePrisma.$queryRawUnsafe(
             `SELECT id
-             FROM public.properties
+             FROM ${DB_SCHEMA}.properties
              WHERE municipality_code = $1
                AND barangay_code = $2
                AND pin = $3
@@ -688,7 +690,7 @@ class FaasService {
         if (!masterPropertyId && oldTdn) {
           const matches = await this.supabasePrisma.$queryRawUnsafe(
             `SELECT property_id
-             FROM public.property_tdn_history
+             FROM ${DB_SCHEMA}.property_tdn_history
              WHERE tdn = $1
              ORDER BY created_at DESC
              LIMIT 2`,
@@ -700,7 +702,7 @@ class FaasService {
         if (!masterPropertyId && newTdn) {
           const matches = await this.supabasePrisma.$queryRawUnsafe(
             `SELECT property_id
-             FROM public.property_tdn_history
+             FROM ${DB_SCHEMA}.property_tdn_history
              WHERE tdn = $1 AND is_current = TRUE
              ORDER BY created_at DESC
              LIMIT 2`,
@@ -712,7 +714,7 @@ class FaasService {
         if (!masterPropertyId && lotNo && blockNo) {
           const matches = await this.supabasePrisma.$queryRawUnsafe(
             `SELECT id
-             FROM public.properties
+             FROM ${DB_SCHEMA}.properties
              WHERE municipality_code = $1
                AND barangay_code = $2
                AND lot_no = $3
@@ -729,7 +731,7 @@ class FaasService {
         if (!masterPropertyId && arpNo) {
           const matches = await this.supabasePrisma.$queryRawUnsafe(
             `SELECT id
-             FROM public.properties
+             FROM ${DB_SCHEMA}.properties
              WHERE municipality_code = $1
                AND barangay_code = $2
                AND arp_no = $3
@@ -761,10 +763,10 @@ class FaasService {
            h.tax_beg_year as "taxBegYear",
            h.is_current as "isCurrent",
            h.change_reason as "changeReason"
-         FROM public.property_tdn_history h
-         LEFT JOIN public.rpt_property rp
+         FROM ${DB_SCHEMA}.property_tdn_history h
+         LEFT JOIN ${DB_SCHEMA}.rpt_property rp
            ON rp.source_record_id = h.source_record_id
-         LEFT JOIN public.rpt_assessment ra
+         LEFT JOIN ${DB_SCHEMA}.rpt_assessment ra
            ON ra.property_id = rp.id
          WHERE h.property_id = $1::uuid
          GROUP BY
@@ -828,9 +830,9 @@ class FaasService {
             
             // Clean PIN if present in propertyData
             if (propertyData.PIN) {
-              propertyData.PIN = propertyData.PIN.replace(/\s+/g, '');
+              propertyData.PIN = propertyData.PIN.replace(/s+/g, '');
             } else if (propertyData.pin) {
-              propertyData.pin = propertyData.pin.replace(/\s+/g, '');
+              propertyData.pin = propertyData.pin.replace(/s+/g, '');
             }
             
             if (!tdn) {

@@ -16,40 +16,6 @@ const rateLimiter = require('./middleware/rateLimiter');
 const requestLogger = require('./middleware/requestLogger');
 const idempotency = require('./middleware/idempotency');
 const logger = require('./utils/logger');
-const healthRoutes = require('./routes/healthRoutes');
-const itemRoutes = require('./routes/items');
-const auditRoutes = require('./routes/auditRoutes');
-const testTaskRoutes = require('./routes/testTasks');
-const batchRoutes = require('./routes/batchRoutes');
-const authRoutes = require('./routes/authRoutes');
-const userRoutes = require('./routes/users');
-const permissionsRoutes = require('./routes/permissionsRoutes');
-const rptMastRoutes = require('./routes/rptMastRoutes');
-const rptAssRoutes = require('./routes/rptAssRoutes');
-const bldgAdjRoutes = require('./routes/bldgAdjRoutes');
-const bldgStrucRoutes = require('./routes/bldgStrucRoutes');
-const mastExtnRoutes = require('./routes/mastExtnRoutes');
-const rptTreeRoutes = require('./routes/rptTreeRoutes');
-const rptMachRoutes = require('./routes/rptMachRoutes');
-const bldgUnitCostRoutes = require('./routes/bldgUnitCostRoutes');
-const bldgStrucTypeRoutes = require('./routes/bldgStrucTypeRoutes');
-const ordinanceRoutes = require('./routes/ordinanceRoutes');
-const classificationRoutes = require('./routes/classificationRoutes');
-const actualUseRoutes = require('./routes/actualUseRoutes');
-const subClassRoutes = require('./routes/subClassRoutes');
-const treesRoutes = require('./routes/treesRoutes');
-const landTaxRoutes = require('./routes/landTaxRoutes');
-const buildingRoutes = require('./routes/buildingRoutes');
-const buildingAppraisalRoutes = require('./routes/buildingAppraisalRoutes');
-const faasRoutes = require('./routes/faasRoutes');
-const pdfRoutes = require('./routes/pdfRoutes');
-const reportsRoutes = require('./routes/reportsRoutes');
-const dashboardRoutes = require('./routes/dashboardRoutes');
-const setupSignatoriesRoutes = require('./routes/setupSignatoriesRoutes');
-const setupSignatoryTemplatesRoutes = require('./routes/setupSignatoryTemplatesRoutes');
-const sidebarRoutes = require('./routes/sidebarRoutes');
-const oopRoutes = require('./routes/oopRoutes');
-const payorRoutes = require('./routes/payorRoutes');
 
 const app = express();
 
@@ -154,7 +120,7 @@ const swaggerOptions = {
       },
     ],
   },
-  apis: [path.join(__dirname, './routes/*.js').replace(/\\/g, '/')], // Path to the API docs (normalized for Windows)
+  apis: [path.join(__dirname, './modules/rptas/routes/*.js').replace(/\\/g, '/')], // Path to the API docs (normalized for Windows)
 };
 const swaggerDocs = swaggerJsdoc(swaggerOptions);
 logger.info(`Swagger Docs loaded: ${Object.keys(swaggerDocs.paths || {}).length} paths found`);
@@ -178,50 +144,10 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs, {
 }));
 
 // Routes
-app.use('/health', healthRoutes);
-app.use('/api/v1/items', itemRoutes);
-app.use('/api/v1/audit', auditRoutes);
-app.use('/api/v1/test-tasks', testTaskRoutes);
-app.use('/api/v1/batch', batchRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/v1/users', userRoutes);
-app.use('/api/users', userRoutes); // Alias for consistency if frontend uses /api/users directly
-app.use('/api/v1/permissions', permissionsRoutes);
-app.use('/api/permissions', permissionsRoutes);
-app.use('/api/rptmast', rptMastRoutes);
-app.use('/api/rpt-ass', rptAssRoutes);
-app.use('/api/bldg-adj', bldgAdjRoutes);
-app.use('/api/bldg-struc', bldgStrucRoutes);
-app.use('/api/mastextn', mastExtnRoutes);
-app.use('/api/v1/rpt-tree', rptTreeRoutes);
-app.use('/api/v1/rpt-mach', rptMachRoutes);
-app.use('/api/bldg-unit-cost', bldgUnitCostRoutes);
-app.use('/api/bldg-struc-type', bldgStrucTypeRoutes);
-app.use('/api/ordinance', ordinanceRoutes);
-app.use('/api/v1/classifications', classificationRoutes);
-app.use('/api/v1/actual-uses', actualUseRoutes);
-app.use('/api/v1/subclasses', subClassRoutes);
-app.use('/api/v1/trees', treesRoutes);
-app.use('/api/v1/buildings', buildingRoutes);
-app.use('/api/v1/building-appraisals', buildingAppraisalRoutes);
-app.use('/api/v1/faas', faasRoutes);
-app.use('/api/v1/pdf', pdfRoutes);
-app.use('/api/v1/reports', reportsRoutes);
-app.use('/api/v1/dashboard', dashboardRoutes);
-app.use('/api/v1/setup/signatories', setupSignatoriesRoutes);
-app.use('/api/v1/setup/signatory-templates', setupSignatoryTemplatesRoutes);
-app.use('/api/v1/sidebar', sidebarRoutes);
-app.use('/api/v1/oop', oopRoutes);
-app.use('/api/v1/payors', payorRoutes);
+const rptasRoutes = require('./modules/rptas/routes');
+app.use('/', rptasRoutes);
+
 // Legacy routes support if needed
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/sidebar', sidebarRoutes);
-app.use('/api/classifications', classificationRoutes);
-app.use('/api/actual-uses', actualUseRoutes);
-app.use('/api/subclasses', subClassRoutes);
-app.use('/api/trees', treesRoutes);
-app.use('/api/land-tax', landTaxRoutes);
-app.use('/api/v1/land-tax', landTaxRoutes);
 
 // Error Handler
 app.use(errorHandler);

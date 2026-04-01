@@ -1,8 +1,8 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
-const rptMastService = require('../services/rptMastService');
-const { supabasePrisma } = require('../database/prisma');
+const rptMastService = require('../modules/rptas/services/rptMastService');
+const { supabasePrisma } = require('../modules/rptas/database/prisma');
 const { transformTdn, transformPin } = require('../utils/dataTransformation');
 const logger = require('../utils/logger');
 

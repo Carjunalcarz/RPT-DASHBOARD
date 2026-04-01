@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { FileText, Download, Calendar, Filter, Loader2, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
-import { getPropertyReport, getReportSummary, getTaxBegYears, PropertyReport, ReportSummary } from '../services/reportsService';
+import { getPropertyReport, getReportSummary, getTaxBegYears, PropertyReport, ReportSummary } from '@/modules/rptas/shared/services/reportsService';
 
 const Reports: React.FC = () => {
   const [summary, setSummary] = useState<ReportSummary | null>(null);

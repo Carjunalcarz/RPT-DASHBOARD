@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { AssessmentRow, AssessmentSummary } from './types';
+import { AssessmentRow, AssessmentSummary } from '@/modules/rptas/shared/types/dataEntryTypes';
 import TableToolbar from './TableToolbar';
 import EditableCell from './EditableCell';
 import PrintDocument from './PrintDocument';

@@ -9,14 +9,14 @@ import { dummyPropertyRecord, dummyAssessmentRecords } from '@/modules/rptas/sha
 import { useThemeColor } from '@/context/ThemeColorContext';
 import { useAuth } from '@/context/AuthContext';
 import { useAlert } from '@/context/AlertContext';
-import { getRptMastDataDirect, RptMastRecord, getMastExtn } from '@/services/rptMastService';
-import { getRptAssByTdn, RptAssRecord } from '@/services/rptAssService';
+import { getRptMastDataDirect, RptMastRecord, getMastExtn } from '@/modules/rptas/shared/services/rptMastService';
+import { getRptAssByTdn, RptAssRecord } from '@/modules/rptas/shared/services/rptAssService';
 import PropertyDetailsView from './rpt_m_PropertyDetailsView';
 import PrintDocument from '../rpt_m_PrintDocument';
 import PrintBuildingDocument from '../rpt_m_PrintBuildingDocument';
 import PrintEmptyFormsDropdown from '../rpt_m_PrintEmptyFormsDropdown';
-import { getBldgStrucByTdn, BldgStrucRecord } from '@/services/bldgStrucService';
-import { getBldgAdjByTdn, BldgAdjRecord } from '@/services/bldgAdjService';
+import { getBldgStrucByTdn, BldgStrucRecord } from '@/modules/rptas/shared/services/bldgStrucService';
+import { getBldgAdjByTdn, BldgAdjRecord } from '@/modules/rptas/shared/services/bldgAdjService';
 import { toast } from 'sonner';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import useSWR from 'swr';
@@ -26,7 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { saveDraft, submitForReview, listFaasRecords, getFaasRecord, deleteFaasRecord, cancelFaasTransaction } from '@/services/faasService';
+import { saveDraft, submitForReview, listFaasRecords, getFaasRecord, deleteFaasRecord, cancelFaasTransaction } from '@/modules/rptas/shared/services/faasService';
 import { PropertyRecord } from './types';
 import { cleanPin } from '@/modules/rptas/shared/components/data-entry/utils';
 

@@ -122,9 +122,9 @@ class PayorService {
     const created = await this.supabasePrisma.$queryRawUnsafe(
       `
         INSERT INTO public.payors
-          (first_name, last_name, address, id_type, id_number, contact, created_by)
+          (id, first_name, last_name, address, id_type, id_number, contact, created_by, created_at, updated_at)
         VALUES
-          ($1, $2, $3, $4, $5, $6::jsonb, $7::uuid)
+          (gen_random_uuid(), $1, $2, $3, $4, $5, $6::jsonb, $7::uuid, NOW(), NOW())
         RETURNING
           id::text as id,
           first_name as "firstName",
@@ -210,9 +210,9 @@ class PayorService {
       const inserted = await this.supabasePrisma.$queryRawUnsafe(
         `
           INSERT INTO public.payors
-            (first_name, last_name, address, id_type, id_number, contact, created_by)
+            (id, first_name, last_name, address, id_type, id_number, contact, created_by, created_at, updated_at)
           VALUES
-            ($1, $2, $3, $4, $5, $6::jsonb, $7::uuid)
+            (gen_random_uuid(), $1, $2, $3, $4, $5, $6::jsonb, $7::uuid, NOW(), NOW())
           RETURNING
             id::text as id,
             first_name as "firstName",

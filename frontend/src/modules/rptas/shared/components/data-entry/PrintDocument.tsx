@@ -1,5 +1,5 @@
 import React from 'react';
-import { AssessmentRow } from './types';
+import { AssessmentRow } from '@/modules/rptas/shared/types/dataEntryTypes';
 
 interface PropertyInfo {
   ownerName: string;

@@ -5,7 +5,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
 import OrderOfPayment from '@/pages/OrderOfPayment';
 import { useAuth } from '@/context/AuthContext';
-import { getPropertyReport, getTaxBegYears } from '@/services/reportsService';
+import { getPropertyReport, getTaxBegYears } from '@/modules/rptas/shared/services/reportsService';
 import oopService from '@/services/oopService';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -13,7 +13,7 @@ vi.mock('@/context/ThemeColorContext', () => ({
   useThemeColor: () => ({ headerColor: '#0ea5e9' }),
 }));
 
-vi.mock('@/services/reportsService');
+vi.mock('@/modules/rptas/shared/services/reportsService');
 vi.mock('@/context/AuthContext');
 vi.mock('@/services/oopService', () => ({
   default: {
