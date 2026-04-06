@@ -20,7 +20,7 @@ const darkenColor = (hex: string, percent: number = 40): string => {
 export const ThemeColorProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [headerColor, setHeaderColor] = useState<string>(() => {
     const saved = localStorage.getItem('headerColor');
-    return saved || '#2563eb'; // default blue-600
+    return saved || '#7a1a1a'; // default maroon
   });
 
   const headerColorDark = darkenColor(headerColor);

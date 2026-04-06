@@ -18,6 +18,7 @@ router.post('/:id/cancel-transaction', protect, restrictToAdmin, faasController.
 router.get('/:id/tdn-history', protect, faasController.getTdnHistory);
 router.get('/:id', protect, faasController.getRecord);
 router.delete('/:id', protect, restrictToAdmin, faasController.deleteRecord);
+router.get('/distinct/tax-beg-years', protect, faasController.getDistinctTaxBegYears);
 router.get('/', protect, faasController.listRecords);
 
 module.exports = router;

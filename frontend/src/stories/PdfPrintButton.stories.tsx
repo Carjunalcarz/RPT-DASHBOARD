@@ -1,6 +1,6 @@
 
 import type { Meta, StoryObj } from '@storybook/react';
-import { PdfPrintButton } from '../components/common/PdfPrintButton';
+import { PdfPrintButton } from '../modules/rptas-standalone/shared/components/common/PdfPrintButton';
 import React, { useRef } from 'react';
 
 const meta: Meta<typeof PdfPrintButton> = {

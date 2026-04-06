@@ -4,7 +4,10 @@ const logger = require('../../../utils/logger');
 const normalizeRole = (role) => String(role || '').toLowerCase();
 const isAdminRole = (role) => ['admin', 'administrator'].includes(normalizeRole(role));
 
+let hasVisibilityTableCached = null;
+
 const hasVisibilityTable = async (prisma) => {
+  if (hasVisibilityTableCached !== null) return hasVisibilityTableCached;
   try {
     const rows = await prisma.$queryRawUnsafe(
       `
@@ -15,9 +18,13 @@ const hasVisibilityTable = async (prisma) => {
         LIMIT 1
       `
     );
-    return Array.isArray(rows) && rows.length > 0;
+    hasVisibilityTableCached = Array.isArray(rows) && rows.length > 0;
+    return hasVisibilityTableCached;
   } catch (err) {
     logger.error('Error checking for visibility table in sidebarController:', err);
+    if (err?.code === 'P1001' || err?.code === 'P2024' || String(err?.message).includes('reach database server') || String(err?.message).includes('Timed out')) {
+      throw err;
+    }
     return false;
   }
 };

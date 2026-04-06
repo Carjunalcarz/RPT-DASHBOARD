@@ -102,6 +102,7 @@ const protect = require('../../../middleware/auth');
  *                   type: string
  *                   example: "Database query failed: Invalid object name 'RPTAS_AGUSAN.dbo.RPTMAST'."
  */
+router.get('/distinct/tax-beg-years', protect, (req, res, next) => rptMastController.getDistinctTaxBegYears(req, res, next));
 router.get('/RPTAS_AGUSAN', protect, (req, res, next) => rptMastController.getAgusanMigrationData(req, res, next));
 
 /**

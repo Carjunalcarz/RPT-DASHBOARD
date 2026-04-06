@@ -6,6 +6,7 @@ import { SidebarProvider } from './context/SidebarContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ThemeColorProvider } from './context/ThemeColorContext';
 import { AlertProvider } from './context/AlertContext';
+import { LayoutToggleProvider } from './context/LayoutToggleContext';
 import { MigrationCartProvider } from './context/MigrationCartContext';
 import CustomAlert from './modules/rptas/shared/components/common/CustomAlert';
 import ErrorBoundary from './modules/rptas/shared/components/common/ErrorBoundary';
@@ -32,13 +33,15 @@ function App() {
           <ThemeColorProvider>
             <AlertProvider>
               <MigrationCartProvider>
-                <CustomAlert />
-                <AuthProvider>
-                  <SidebarProvider>
-                    <AppRouter />
-                    <Toaster position="top-right" richColors expand={true} closeButton offset={90} />
-                  </SidebarProvider>
-                </AuthProvider>
+                <LayoutToggleProvider>
+                  <CustomAlert />
+                  <AuthProvider>
+                    <SidebarProvider>
+                      <AppRouter />
+                      <Toaster position="top-right" richColors expand={true} closeButton offset={90} />
+                    </SidebarProvider>
+                  </AuthProvider>
+                </LayoutToggleProvider>
               </MigrationCartProvider>
             </AlertProvider>
           </ThemeColorProvider>

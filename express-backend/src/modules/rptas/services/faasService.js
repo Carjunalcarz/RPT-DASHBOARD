@@ -947,41 +947,73 @@ class FaasService {
 
       // Add search logic
       if (searchField && filterValue && filterValue !== '%') {
-        const cleanValue = filterValue.replace(/^%+|%+$/g, ''); // Remove wildcards for contains
+        const isTDN = searchField.toUpperCase() === 'TDN';
+        let cleanValue = filterValue;
         
+        let stringFilter = { contains: cleanValue, mode: 'insensitive' };
+        
+        // Parse SQL-like wildcards
+        if (filterValue.includes('%')) {
+            const startsWithWildcard = filterValue.startsWith('%');
+            const endsWithWildcard = filterValue.endsWith('%');
+            cleanValue = filterValue.replace(/^%+|%+$/g, '');
+            
+            if (startsWithWildcard && endsWithWildcard) {
+                stringFilter = { contains: cleanValue, mode: 'insensitive' };
+            } else if (startsWithWildcard) {
+                // If it starts with %, it means we want anything BEFORE the text, so it ENDS WITH the text
+                stringFilter = { endsWith: cleanValue, mode: 'insensitive' };
+            } else if (endsWithWildcard) {
+                // If it ends with %, it means we want anything AFTER the text, so it STARTS WITH the text
+                stringFilter = { startsWith: cleanValue, mode: 'insensitive' };
+            }
+        } else {
+            // Default to contains if no wildcards are explicitly used
+            cleanValue = filterValue;
+            // The prompt says "can make search start only exam search 22-"
+            // So if they type "22-" (or any TDN string), it should act like "22-%" (starts with).
+            // However, this means if they search "00122", they won't find "03-02-00122" unless they use wildcards
+            stringFilter = { startsWith: cleanValue }; // Remove mode: insensitive for startsWith
+        }
+
         if (cleanValue) {
-            switch (searchField) {
+            switch (searchField.toUpperCase()) {
                 case 'TDN':
-                    // TDN is a top-level column
-                    where.tdn = { contains: cleanValue, mode: 'insensitive' };
+                    // We must apply the filter to BOTH the top-level tdn column AND the nested JSON tdn property
+                    // Since string_contains does not support startsWith, we can only safely query the top-level tdn column
+                    // if it exists, OR we fallback to contains for data. But to enforce strict startsWith:
+                    if (stringFilter.contains) {
+                        where.OR = [
+                            { tdn: { ...stringFilter, mode: 'insensitive' } },
+                            { data: { string_contains: cleanValue } }
+                        ];
+                    } else {
+                        // Strict startsWith / endsWith search
+                        // Prisma allows path-based filtering for JSON in Postgres, but it's complex.
+                        // Since TDN is often null in the top level if it's only saved as JSON in draft state,
+                        // a strict startsWith on just `tdn` might miss drafts.
+                        // To fix this across the board, we'll execute a raw SQL-like condition if possible, 
+                        // but Prisma restricts this. The safest Prisma approach for startsWith in JSON 
+                        // is not possible without raw queries. 
+                        // So we search the top level tdn column for strict matching.
+                        where.OR = [
+                            { tdn: { ...stringFilter, mode: 'insensitive' } },
+                            // Fallback to searching the nested JSON properties since some TDNs might only be in JSON
+                            // However, since Prisma JSON string_contains doesn't support startsWith natively,
+                            // we'll just allow string_contains on the tdn path specifically as a compromise
+                            // so that we don't return completely empty results if tdn is only in JSON
+                            { data: { path: ['tdn'], string_contains: cleanValue } },
+                            { data: { path: ['TDN'], string_contains: cleanValue } }
+                        ];
+                    }
                     break;
-                case 'OWNER':
-                    where.OR = [
-                        { data: { path: ['owner'], string_contains: cleanValue } },
-                        { data: { path: ['OWNER'], string_contains: cleanValue } },
-                        { data: { path: ['owner_name'], string_contains: cleanValue } },
-                        { data: { path: ['Owner_Name'], string_contains: cleanValue } }
-                    ];
-                    break;
-                case 'PIN':
-                    // Check both lowercase and uppercase keys in JSON data
-                    where.OR = [
-                        { data: { path: ['pin'], string_contains: cleanValue } },
-                        { data: { path: ['PIN'], string_contains: cleanValue } }
-                    ];
-                    break;
-                case 'ARP':
-                    where.OR = [
-                        { data: { path: ['arp'], string_contains: cleanValue } },
-                        { data: { path: ['ARP'], string_contains: cleanValue } }
-                    ];
+                case 'TAX_BEG_YR':
+                    where.data = { path: ['TAX_BEG_YR'], equals: cleanValue };
                     break;
                 default:
-                    // Try to search in data with the field name
-                    // Note: This relies on Prisma's Json filtering capabilities which vary by DB.
-                    // For Postgres, path/string_contains is supported in newer Prisma versions or raw query.
-                    // Prisma's native JSON filtering:
-                    // where: { data: { path: ['owner'], string_contains: 'John' } }
+                    // For OWNER, PIN, ARP, etc., we just do a string_contains on the whole JSON object
+                    // This is much safer than trying to guess the exact JSON path and case sensitivity
+                    where.data = { string_contains: cleanValue };
                     break;
             }
         }
@@ -1012,6 +1044,38 @@ class FaasService {
     } catch (error) {
       logger.error('Error in FaasService.listRecords:', error);
       throw new AppError(error.message, 500);
+    }
+  }
+
+  /**
+   * Get distinct Tax Beginning Years
+   * @returns {Promise<string[]>}
+   */
+  async getDistinctTaxBegYears() {
+    try {
+      // For Supabase Postgres JSONB columns
+      // If we cannot use $queryRaw easily due to quotes and syntax in Prisma,
+      // let's fetch all TAX_BEG_YR values directly using Prisma's standard API, 
+      // which is safer and less prone to raw query syntax errors.
+      
+      const records = await supabasePrisma.faasRecord.findMany({
+        select: {
+          data: true
+        }
+      });
+      
+      const years = new Set();
+      
+      for (const record of records) {
+          if (record.data && record.data.TAX_BEG_YR) {
+              years.add(String(record.data.TAX_BEG_YR).trim());
+          }
+      }
+      
+      return Array.from(years).sort().reverse();
+    } catch (error) {
+      logger.error('Error fetching distinct tax beginning years:', error);
+      throw new AppError('Failed to fetch distinct tax beginning years', 500);
     }
   }
 }

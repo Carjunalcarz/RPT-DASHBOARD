@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useSidebar } from '@/context/SidebarContext';
-import Layout from '@/components/layout/Layout';
+import DynamicLayout from '@/components/layout/DynamicLayout';
 import Login from '@/pages/Login';
 import Dashboard from '@/pages/Dashboard';
 import MigrationCartPage from '@/components/migration/MigrationCartPage';
@@ -12,26 +12,15 @@ import Tasks from '@/pages/Tasks';
 import UserManagement from '@/pages/admin/UserManagement';
 import AddUserPage from '@/pages/admin/AddUserPage';
 import SidebarManagement from '@/pages/admin/SidebarManagement';
-import PropertyApproval from '@/pages/PropertyApproval';
-import PendingApprovals from '@/pages/PendingApprovals';
 import SignatorySetupPage from '@/pages/setup/SignatorySetupPage';
 import Profile from '@/pages/Profile';
 import RouteRestorer from '@/components/layout/RouteRestorer';
 // Import New RPTAS Module
-import { rptasRoutes } from '@/modules/rptas';
-import { treasuryRoutes } from '@/modules/treasury';
+import { rptasRoutes } from '@/modules/rptas-standalone';
 
 // Legacy components mapping for database sidebar paths
-import DataEntryPage from '@/modules/rptas/domains/faas/pages/DataEntryPage';
-import DataEntryV2Page from '@/modules/rptas/domains/faas/pages/DataEntryV2Page';
-import PropertiesPage from '@/modules/rptas/domains/property/pages/PropertiesPage';
-import TaxAssessmentPage from '@/modules/rptas/domains/assessment/pages/TaxAssessmentPage';
-import RPTASReportsPage from '@/modules/rptas/domains/reports/pages/RPTASReportsPage';
-import PaymentsPage from '@/modules/treasury/domains/payments/pages/PaymentsPage';
-import OrderOfPaymentPage from '@/modules/treasury/domains/oop/pages/OrderOfPaymentPage';
-import TreasuryConfirmPage from '@/modules/treasury/domains/payments/pages/TreasuryConfirmPage';
-import TreasuryPaymentsReportPage from '@/modules/treasury/domains/reports/pages/TreasuryPaymentsReportPage';
-import PayorRegistryPage from '@/modules/treasury/domains/payors/pages/PayorRegistryPage';
+import DataEntryPage from '@/modules/rptas-standalone/domains/faas/pages/DataEntryPage';
+import DataEntryV2Page from '@/modules/rptas-standalone/domains/faas/pages/DataEntryV2Page';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -76,8 +65,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Allow system routes
-  if (systemRoutes.includes(currentPath) || adminRoutes.includes(currentPath)) {
+  // Allow system routes and rptas-standalone module
+  if (systemRoutes.includes(currentPath) || adminRoutes.includes(currentPath) || currentPath.startsWith('/rptas')) {
     return <>{children}</>;
   }
 
@@ -149,9 +138,9 @@ const AppRouter: React.FC = () => {
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <Layout>
+              <DynamicLayout>
                 <Dashboard />
-              </Layout>
+              </DynamicLayout>
             </ProtectedRoute>
           }
         />
@@ -159,9 +148,9 @@ const AppRouter: React.FC = () => {
           path="/migration-cart"
           element={
             <ProtectedRoute>
-              <Layout>
+              <DynamicLayout>
                 <MigrationCartPage />
-              </Layout>
+              </DynamicLayout>
             </ProtectedRoute>
           }
         />
@@ -169,9 +158,9 @@ const AppRouter: React.FC = () => {
           path="/audit-trail"
           element={
             <ProtectedRoute>
-              <Layout>
+              <DynamicLayout>
                 <AuditTrail />
-              </Layout>
+              </DynamicLayout>
             </ProtectedRoute>
           }
         />
@@ -179,9 +168,9 @@ const AppRouter: React.FC = () => {
           path="/items"
           element={
             <ProtectedRoute>
-              <Layout>
+              <DynamicLayout>
                 <Items />
-              </Layout>
+              </DynamicLayout>
             </ProtectedRoute>
           }
         />
@@ -189,59 +178,35 @@ const AppRouter: React.FC = () => {
           path="/tasks"
           element={
             <ProtectedRoute>
-              <Layout>
+              <DynamicLayout>
                 <Tasks />
-              </Layout>
+              </DynamicLayout>
             </ProtectedRoute>
           }
         />
         <Route
           path="/approvals"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <PendingApprovals />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/rptas/pending-approvals" replace />}
         />
         <Route
           path="/approvals/municipal"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <PendingApprovals fixedStatus="pending-municipal" />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/rptas/approvals/municipal" replace />}
         />
         <Route
           path="/approvals/provincial"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <PendingApprovals fixedStatus="pending-provincial" />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/rptas/approvals/provincial" replace />}
         />
         <Route
           path="/property-approval/:id"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <PropertyApproval />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/rptas/property-approval/:id" replace />}
         />
         <Route
           path="/admin/users"
           element={
             <ProtectedRoute>
-              <Layout>
+              <DynamicLayout>
                 <UserManagement />
-              </Layout>
+              </DynamicLayout>
             </ProtectedRoute>
           }
         />
@@ -249,9 +214,9 @@ const AppRouter: React.FC = () => {
           path="/admin/users/add"
           element={
             <ProtectedRoute>
-              <Layout>
+              <DynamicLayout>
                 <AddUserPage />
-              </Layout>
+              </DynamicLayout>
             </ProtectedRoute>
           }
         />
@@ -259,9 +224,9 @@ const AppRouter: React.FC = () => {
           path="/admin/sidebar"
           element={
             <ProtectedRoute>
-              <Layout>
+              <DynamicLayout>
                 <SidebarManagement />
-              </Layout>
+              </DynamicLayout>
             </ProtectedRoute>
           }
         />
@@ -269,9 +234,9 @@ const AppRouter: React.FC = () => {
           path="/setup/signatory"
           element={
             <ProtectedRoute>
-              <Layout>
+              <DynamicLayout>
                 <SignatorySetupPage />
-              </Layout>
+              </DynamicLayout>
             </ProtectedRoute>
           }
         />
@@ -279,9 +244,9 @@ const AppRouter: React.FC = () => {
           path="/profile"
           element={
             <ProtectedRoute>
-              <Layout>
+              <DynamicLayout>
                 <Profile />
-              </Layout>
+              </DynamicLayout>
             </ProtectedRoute>
           }
         />
@@ -291,9 +256,9 @@ const AppRouter: React.FC = () => {
           path="/rpt-management"
           element={
             <ProtectedRoute>
-              <Layout>
+              <DynamicLayout>
                 <DataEntryV2Page />
-              </Layout>
+              </DynamicLayout>
             </ProtectedRoute>
           }
         />
@@ -301,91 +266,31 @@ const AppRouter: React.FC = () => {
           path="/data-entry"
           element={
             <ProtectedRoute>
-              <Layout>
+              <DynamicLayout>
                 <DataEntryPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/properties"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <PropertiesPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/assessment"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <TaxAssessmentPage />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/reports"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <RPTASReportsPage />
-              </Layout>
+              </DynamicLayout>
             </ProtectedRoute>
           }
         />
         <Route
           path="/payments"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <PaymentsPage />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/rptas/treasury" replace />}
         />
         <Route
           path="/payments/order"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <OrderOfPaymentPage />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/rptas/treasury/order" replace />}
         />
         <Route
           path="/payments/treasury"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <TreasuryConfirmPage />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/rptas/treasury/confirm" replace />}
         />
         <Route
           path="/payments/payors"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <PayorRegistryPage />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/rptas/treasury/payors" replace />}
         />
         <Route
           path="/reports/treasury-payments"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <TreasuryPaymentsReportPage />
-              </Layout>
-            </ProtectedRoute>
-          }
+          element={<Navigate to="/rptas/treasury/reports" replace />}
         />
 
         {/* RPTAS Module Routes */}
@@ -395,13 +300,15 @@ const AppRouter: React.FC = () => {
             path={route.path}
             element={
               <ProtectedRoute>
-                <Layout>
-                  <Outlet />
-                </Layout>
+                <DynamicLayout>
+                  <React.Suspense fallback={<div className="flex h-full items-center justify-center p-8 text-slate-500">Loading module...</div>}>
+                    <Outlet />
+                  </React.Suspense>
+                </DynamicLayout>
               </ProtectedRoute>
             }
           >
-            {route.children?.map((child, cIdx) => (
+            {route.children?.map((child: any, cIdx: number) => (
               <Route
                 key={`rptas-child-${cIdx}`}
                 index={child.index}
@@ -412,31 +319,7 @@ const AppRouter: React.FC = () => {
           </Route>
         ))}
 
-        {/* Treasury Module Routes */}
-        {treasuryRoutes.map((route, idx) => (
-          <Route
-            key={`treasury-${idx}`}
-            path={route.path}
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <Outlet />
-                </Layout>
-              </ProtectedRoute>
-            }
-          >
-            {route.children?.map((child, cIdx) => (
-              <Route
-                key={`treasury-child-${cIdx}`}
-                index={child.index}
-                path={child.path}
-                element={child.element}
-              />
-            ))}
-          </Route>
-        ))}
-
-        {/* Default Route */}
+        {/* Legacy / Direct paths for database sidebar mapping */}
         <Route path="/" element={<AuthRedirect />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

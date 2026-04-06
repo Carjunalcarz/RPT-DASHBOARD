@@ -62,13 +62,22 @@ export const rptasNavigation = [
         order: 6,
       },
       {
+        key: "rptas-profile",
+        label: "My Profile",
+        path: "/rptas/profile",
+        icon: "User",
+        permissionCode: "rptas.profile.view",
+        showInSidebar: true,
+        order: 7,
+      },
+      {
         key: "rptas-data-entry",
         label: "Data Entry",
         path: "/rptas/data-entry",
         icon: "ClipboardEdit",
         permissionCode: "rptas.data_entry.view",
         showInSidebar: true,
-        order: 7,
+        order: 8,
       },
       {
         key: "rptas-data-entry-v2",
@@ -77,7 +86,7 @@ export const rptasNavigation = [
         icon: "ClipboardEdit",
         permissionCode: "rptas.data_entry.view",
         showInSidebar: true,
-        order: 8,
+        order: 9,
       }
     ]
   }

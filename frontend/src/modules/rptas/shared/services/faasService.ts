@@ -170,3 +170,15 @@ export const listFaasRecords = async (params?: { status?: string; page?: number;
     throw error;
   }
 };
+
+export const getDistinctTaxBegYears = async (): Promise<string[]> => {
+  try {
+    const envUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
+    const API_BASE = envUrl ? envUrl.replace('/v1', '') : 'http://localhost:3000/api';
+    const response = await api.get('/rptmast/distinct/tax-beg-years', { baseURL: API_BASE });
+    return response.data.data;
+  } catch (error) {
+    console.error('Error fetching distinct tax beginning years:', error);
+    return [];
+  }
+};

@@ -3,6 +3,8 @@ const treasuryEtlService = require('../../../services/treasuryEtlService');
 const { DB_SCHEMA } = require('../../rptas/config/database');
 
 
+const isUuid = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+
 class OopService {
   constructor({ supabasePrisma, logger }) {
     this.supabasePrisma = supabasePrisma;
@@ -99,7 +101,7 @@ class OopService {
     data: {
       orderId,
       action,
-      performedBy,
+      performedBy: (performedBy && isUuid(performedBy)) ? performedBy : '00000000-0000-0000-0000-000000000000',
       payload,
     },
   });
@@ -191,7 +193,7 @@ class OopService {
           created = await tx.orderOfPayment.create({
             data: {
               orderNumber: this.generateOrderNumber(),
-              createdBy: user.id,
+              createdBy: (user.id && isUuid(user.id)) ? user.id : '00000000-0000-0000-0000-000000000000',
               amount,
               description,
               status: 'pending',

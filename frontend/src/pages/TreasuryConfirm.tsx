@@ -1,2 +1,2 @@
-export { default } from '@/modules/treasury/domains/payments/pages/TreasuryConfirmPage';
+export { default } from '@/modules/rptas-standalone/domains/treasury/domains/payments/pages/TreasuryConfirmPage';
 

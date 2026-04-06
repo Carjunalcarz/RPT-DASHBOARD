@@ -6,6 +6,8 @@ const treasuryEtlService = require('./treasuryEtlService');
 
 const normalizeRole = (role) => (role || '').toString().toLowerCase();
 
+const isUuid = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+
 const canManageOrder = (user, order) => {
   const role = normalizeRole(user?.role);
   if (role === 'admin' || role === 'administrator') return true;
@@ -90,7 +92,7 @@ const assertTreasuryAssigned = async (user) => {
       LIMIT 1
     `,
     treasurySidebarItemId,
-    user.id
+    (user.id && isUuid(user.id)) ? user.id : '00000000-0000-0000-0000-000000000000'
   );
   if (!Array.isArray(allowedRows) || allowedRows.length === 0) {
     // Disable strict treasury assignment block for now to allow data fetch
@@ -116,7 +118,7 @@ const createHistory = async ({ prisma, orderId, action, performedBy, payload }) 
     data: {
       orderId,
       action,
-      performedBy,
+      performedBy: (performedBy && isUuid(performedBy)) ? performedBy : '00000000-0000-0000-0000-000000000000',
       payload,
     },
   });
@@ -208,7 +210,7 @@ const createOrder = async ({ user, amount, description, requestBody }) => {
         created = await tx.orderOfPayment.create({
           data: {
             orderNumber: generateOrderNumber(),
-            createdBy: user.id,
+            createdBy: (user.id && isUuid(user.id)) ? user.id : '00000000-0000-0000-0000-000000000000',
             amount,
             description,
             status: 'pending',

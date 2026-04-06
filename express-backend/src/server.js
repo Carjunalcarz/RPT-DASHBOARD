@@ -112,12 +112,22 @@ const swaggerOptions = {
           in: 'cookie',
           name: 'access_token',
         },
+        ApiKeyAuth: {
+          type: 'apiKey',
+          in: 'header',
+          name: 'x-api-key',
+        },
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
       },
     },
     security: [
-      {
-        cookieAuth: [],
-      },
+      { cookieAuth: [] },
+      { ApiKeyAuth: [] },
+      { bearerAuth: [] },
     ],
   },
   apis: [path.join(__dirname, './modules/rptas/routes/*.js').replace(/\\/g, '/')], // Path to the API docs (normalized for Windows)
@@ -140,8 +150,23 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs, {
     tryItOutEnabled: true,
   },
   customSiteTitle: "RPT Dashboard API Docs",
-  customCss: '.swagger-ui .topbar { display: block }'
+  customCss: '.swagger-ui .topbar { display: block }',
+  customJs: '/swagger-init.js'
 }));
+
+// Serve custom JS file for Swagger UI injection
+app.get('/swagger-init.js', (req, res) => {
+  res.type('application/javascript');
+  res.send(`
+    window.addEventListener('load', function() {
+      setTimeout(function() {
+        if (window.ui) {
+          window.ui.preauthorizeApiKey("ApiKeyAuth", "${process.env.API_ACCESS_KEY || ''}");
+        }
+      }, 500);
+    });
+  `);
+});
 
 // Routes
 const rptasRoutes = require('./modules/rptas/routes');

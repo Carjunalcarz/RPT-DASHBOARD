@@ -5,7 +5,12 @@ const prisma = new PrismaClient();
 const logger = require('../../../utils/logger');
 const protect = require('../../../middleware/auth');
 
+let hasTreasuryVisibilityTableCached = null;
+
 const hasTreasuryVisibilityTable = async () => {
+  if (hasTreasuryVisibilityTableCached !== null) {
+    return hasTreasuryVisibilityTableCached;
+  }
   try {
     const rows = await prisma.$queryRawUnsafe(`
         SELECT 1
@@ -14,14 +19,26 @@ const hasTreasuryVisibilityTable = async () => {
           AND table_name = 'sidebar_item_user_visibility'
         LIMIT 1
     `);
-    return Array.isArray(rows) && rows.length > 0;
+    const exists = Array.isArray(rows) && rows.length > 0;
+    hasTreasuryVisibilityTableCached = exists;
+    return exists;
   } catch (err) {
     logger.error('Error checking for visibility table in reportsRoutes:', err);
+    // Do not cache the error state, maybe DB is temporarily down
+    if (err?.code === 'P1001' || err?.code === 'P2024' || String(err?.message).includes('reach database server') || String(err?.message).includes('Timed out')) {
+      throw err; // Re-throw connection issues so we don't misinterpret as missing table
+    }
     return false;
   }
 };
 
+let treasurySidebarItemIdCached = null;
+
 const getSidebarItemIdByPath = async (path) => {
+  if (path === '/payments/treasury' && treasurySidebarItemIdCached) {
+    return treasurySidebarItemIdCached;
+  }
+
   const rows = await prisma.$queryRawUnsafe(
     `
       SELECT id::text as id
@@ -31,7 +48,12 @@ const getSidebarItemIdByPath = async (path) => {
     `,
     path
   );
-  return rows?.[0]?.id || null;
+  
+  const id = rows?.[0]?.id || null;
+  if (path === '/payments/treasury' && id) {
+    treasurySidebarItemIdCached = id;
+  }
+  return id;
 };
 
 const assertTreasuryAssigned = async (user) => {
@@ -39,6 +61,11 @@ const assertTreasuryAssigned = async (user) => {
     const err = new Error('Unauthorized');
     err.statusCode = 401;
     throw err;
+  }
+
+  // System API users bypass assignment checks
+  if (user.id === 'api-user') {
+    return;
   }
 
   const supportsVisibility = await hasTreasuryVisibilityTable();
@@ -132,6 +159,8 @@ const assertTreasuryAssigned = async (user) => {
  *       200:
  *         description: Paginated list of individual assessment records
  */
+let paymentStatusColumnCached = null;
+
 router.get('/properties', protect, async (req, res) => {
   try {
     const { municipality, barangay, taxBegYr } = req.query;
@@ -169,6 +198,7 @@ router.get('/properties', protect, async (req, res) => {
     const totalCount = Number(countResult[0]?.count || 0);
 
     const paymentStatusColumnExists = async () => {
+      if (paymentStatusColumnCached !== null) return paymentStatusColumnCached;
       try {
         const colCheck = await prisma.$queryRawUnsafe(
           `
@@ -180,7 +210,8 @@ router.get('/properties', protect, async (req, res) => {
             LIMIT 1
           `
         );
-        return Array.isArray(colCheck) && colCheck.length > 0;
+        paymentStatusColumnCached = Array.isArray(colCheck) && colCheck.length > 0;
+        return paymentStatusColumnCached;
       } catch {
         return false;
       }
@@ -383,18 +414,28 @@ router.get('/treasury-payments', protect, async (req, res) => {
     const limit = Math.min(Math.max(parseInt(String(req.query.limit || '20'), 10) || 20, 1), 100);
     const offset = (page - 1) * limit;
 
-    const { from, to, orderNumber, tdn, ownerName, municipalityCode, barangayCode } = req.query;
+    const { from, to, orderNumber, tdn, ownerName, municipalityCode, barangayCode, minAmount, maxAmount } = req.query;
 
     let whereClause = '1=1';
     const params = [];
 
     if (from) {
+      // Start of day in Asia/Manila (UTC+8) mapped back to UTC for database comparison
       whereClause += ` AND t.paid_at >= $${params.length + 1}::timestamptz`;
-      params.push(String(from));
+      params.push(`${from}T00:00:00+08:00`);
     }
     if (to) {
+      // End of day in Asia/Manila (UTC+8) mapped back to UTC for database comparison
       whereClause += ` AND t.paid_at <= $${params.length + 1}::timestamptz`;
-      params.push(String(to));
+      params.push(`${to}T23:59:59.999+08:00`);
+    }
+    if (minAmount) {
+      whereClause += ` AND t.order_amount >= $${params.length + 1}::numeric`;
+      params.push(String(minAmount));
+    }
+    if (maxAmount) {
+      whereClause += ` AND t.order_amount <= $${params.length + 1}::numeric`;
+      params.push(String(maxAmount));
     }
     if (orderNumber) {
       whereClause += ` AND t.order_number ILIKE $${params.length + 1}`;
@@ -435,6 +476,11 @@ router.get('/treasury-payments', protect, async (req, res) => {
         t.order_created_at as "orderCreatedAt",
         t.paid_at as "paidAt",
         t.paid_by::text as "paidBy",
+        COALESCE(
+          (SELECT raw_user_meta_data->>'full_name' FROM auth.users WHERE id = t.paid_by LIMIT 1),
+          (SELECT raw_user_meta_data->>'name' FROM auth.users WHERE id = t.paid_by LIMIT 1),
+          'System API'
+        ) as "paidByName",
         t.order_amount as "orderAmount",
         t.property_id::text as "propertyId",
         t.pin,

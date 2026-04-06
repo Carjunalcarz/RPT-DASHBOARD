@@ -50,11 +50,11 @@ describe('Order of Payment module', () => {
     paymentStatus: 'unpaid',
   };
 
-  let intervalSpy: ReturnType<typeof vi.spyOn> | null = null;
-  let clearIntervalSpy: ReturnType<typeof vi.spyOn> | null = null;
+  let intervalSpy: any = null;
+  let clearIntervalSpy: any = null;
 
   beforeEach(() => {
-    intervalSpy = vi.spyOn(window, 'setInterval').mockImplementation(() => 0 as unknown as number);
+    intervalSpy = vi.spyOn(window, 'setInterval').mockImplementation(() => 0 as any);
     clearIntervalSpy = vi.spyOn(window, 'clearInterval').mockImplementation(() => undefined);
     (useAuth as Mock).mockReturnValue({ user: { id: 'user-1', role: 'user' } });
     (getTaxBegYears as Mock).mockResolvedValue(['2026']);

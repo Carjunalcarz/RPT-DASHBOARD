@@ -145,6 +145,18 @@ exports.listRecords = async (req, res, next) => {
   }
 };
 
+exports.getDistinctTaxBegYears = async (req, res, next) => {
+  try {
+    const years = await faasService.getDistinctTaxBegYears();
+    res.status(200).json({
+      success: true,
+      data: years
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports.updateStatus = async (req, res, next) => {
   try {
     const { id } = req.params;

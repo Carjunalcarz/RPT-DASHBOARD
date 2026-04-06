@@ -270,6 +270,10 @@ WHERE
               baseQuery += ` AND o.Name LIKE '%${sanitizedValue}%'`;
               countQuery += ` AND o.Name LIKE '%${sanitizedValue}%'`;
               break;
+            case 'TAX_BEG_YR':
+              baseQuery += ` AND m.TAX_BEG_YR = '${sanitizedValue}'`;
+              countQuery += ` AND m.TAX_BEG_YR = '${sanitizedValue}'`;
+              break;
             default:
               break;
           }
@@ -508,6 +512,29 @@ WHERE
       // Don't throw, just return nulls or assume no duplicate to avoid blocking if DB is down? 
       // No, validation is critical. Throw.
       throw new AppError('Validation check failed: ' + error.message, 500);
+    }
+  }
+
+  /**
+   * Get distinct Tax Beginning Years from RPTMAST
+   */
+  async getDistinctTaxBegYears() {
+    try {
+      const pool = await poolPromise;
+      if (!pool) throw new Error('Database connection failed');
+
+      const result = await pool.request()
+        .query(`
+          SELECT DISTINCT TAX_BEG_YR 
+          FROM RPTAS_AGUSAN.dbo.RPTMAST 
+          WHERE TAX_BEG_YR IS NOT NULL AND LTRIM(RTRIM(TAX_BEG_YR)) != ''
+          ORDER BY TAX_BEG_YR DESC
+        `);
+
+      return result.recordset.map(row => row.TAX_BEG_YR.trim());
+    } catch (error) {
+      logger.error('Error fetching distinct tax beginning years from RPTMAST:', error);
+      throw new AppError('Failed to fetch distinct tax beginning years', 500);
     }
   }
 }

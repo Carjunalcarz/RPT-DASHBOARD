@@ -30,14 +30,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { saveDraft, submitForReview, listFaasRecords } from '@/modules/rptas/shared/services/faasService';
+import { saveDraft, submitForReview, listFaasRecords, getDistinctTaxBegYears } from '@/modules/rptas/shared/services/faasService';
+import { validateTransactionStart, validateTransactionSave } from '@/modules/rptas/shared/services/transactionValidation';
 import { useIdempotency } from '@/hooks/useIdempotency';
 import { useMigrationCart } from '@/context/MigrationCartContext';
 import MigrationCartIndicator from '@/components/migration/MigrationCartIndicator';
 import { Database } from 'lucide-react';
 
 // Types
-interface PropertyRecord {
+export interface PropertyRecord {
   id: string;
   tdn: string;
   arp: string;
@@ -101,7 +102,7 @@ interface PropertyRecord {
   tpdCity?: boolean;
   tpdDeputy?: boolean;
   trees?: any[];
-  status?: 'draft' | 'for-review' | 'approved';
+  status?: 'draft' | 'for-review' | 'approved' | 'pending-municipal' | 'pending-provincial' | 'rejected' | string;
   TRANS_CD?: string; // Transaction Code (Update Code)
   
   // Additional fields for PropertyInformationSection
@@ -122,6 +123,7 @@ interface PropertyRecord {
   ASS_LOT_NO?: string;
   BLOCK_NO?: string;
   LOTE_NO?: string;
+  TAX_BEG_YR?: string;
 } // Add new field for display
 
 
@@ -154,6 +156,9 @@ const RealPropertyDataEntry: React.FC<RealPropertyDataEntryProps> = ({ dataSourc
   const [appliedFilter, setAppliedFilter] = useState({ field: 'TDN', value: '%' });
   const [additionalSearch, setAdditionalSearch] = useState('All Records');
   const [searchText, setSearchText] = useState('');
+  
+  // Tax Beg Years dropdown state
+  const [taxBegYears, setTaxBegYears] = useState<string[]>([]);
 
   // Sub-component editing state
   const [isSubComponentEditing, setIsSubComponentEditing] = useState(false);
@@ -227,19 +232,16 @@ const RealPropertyDataEntry: React.FC<RealPropertyDataEntryProps> = ({ dataSourc
       // Generate a temporary ID for the transaction
       id: `TRANS-${type}-${Date.now()}`,
       
-      // Clear unique identifiers that should be new for the transaction
-      // tdn: '', 
-      // arp: '',
-      
-      // Explicitly set these to empty strings for the UI inputs if they are undefined in selectedRecord
-      // TDN: '',
-      // ARP: '',
-      tdn: selectedRecord.tdn,
-      arp: selectedRecord.arp,
+      // We don't clear the entire TDN anymore, we just let PropertyInformationSection
+      // change the first two digits based on the new effectivity date
+      tdn: selectedRecord.tdn || selectedRecord.TDN || '',
+      arp: selectedRecord.arp || selectedRecord.ARP || '',
+      TDN: selectedRecord.TDN || selectedRecord.tdn || '',
+      ARP: selectedRecord.ARP || selectedRecord.arp || '',
       
       // Link to the previous record (The "Foundation" of the transaction)
-      pOldTdn: selectedRecord.tdn,
-      pPin: selectedRecord.pin,
+      pOldTdn: selectedRecord.tdn || selectedRecord.TDN,
+      pPin: selectedRecord.pin || selectedRecord.PIN,
       pOwner: selectedRecord.owner,
       pOwnerNo: selectedRecord.ownerNo,
       pEffDate: selectedRecord.pEffDate, // Or current date? Usually previous eff date.
@@ -407,7 +409,7 @@ const RealPropertyDataEntry: React.FC<RealPropertyDataEntryProps> = ({ dataSourc
   // Sync data to state
   useEffect(() => {
     if (apiData?.success) {
-      const mappedRecords: PropertyRecord[] = apiData.data.map((item, index) => ({
+      const mappedRecords: PropertyRecord[] = apiData.data.map((item: any, index: number) => ({
         ...item,
         id: `${item.TDN}-${index}`, // Ensure unique ID even with duplicate TDNs
         tdn: item.TDN || '',
@@ -507,6 +509,25 @@ const RealPropertyDataEntry: React.FC<RealPropertyDataEntryProps> = ({ dataSourc
   useEffect(() => {
     setIsLoading(isSwrLoading);
   }, [isSwrLoading]);
+
+  // Fetch distinct Tax Beginning Years
+  useEffect(() => {
+    let mounted = true;
+    const fetchTaxBegYears = async () => {
+      try {
+        const years = await getDistinctTaxBegYears();
+        if (mounted) {
+          setTaxBegYears(years || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch distinct tax beginning years:', err);
+      }
+    };
+    fetchTaxBegYears();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Prevent accidental navigation/refresh when editing
   useEffect(() => {
@@ -699,8 +720,20 @@ const RealPropertyDataEntry: React.FC<RealPropertyDataEntryProps> = ({ dataSourc
     if (!selectedRecord) return;
     const currentRecord = selectedRecord;
 
-    // Check duplicates
-    const errorMsg = await checkDuplicatePinTdn(currentRecord.pin, currentRecord.tdn);
+    // 1. Comprehensive Input Data & Business Rule Validation
+    const saveValidation = validateTransactionSave(currentRecord);
+    if (!saveValidation.isValid) {
+      toast.error('Validation Error', {
+        description: saveValidation.errors[0],
+        duration: 5000,
+      });
+      return;
+    }
+
+    // 2. Check duplicates (Database uniqueness check)
+    const pinVal = currentRecord.PIN || currentRecord.pin || '';
+    const tdnVal = currentRecord.TDN || currentRecord.tdn || '';
+    const errorMsg = await checkDuplicatePinTdn(pinVal, tdnVal);
     if (errorMsg) {
       // Use a persistent toast for validation errors so the user has time to read it
       toast.error('Validation Error', {
@@ -755,8 +788,7 @@ const RealPropertyDataEntry: React.FC<RealPropertyDataEntryProps> = ({ dataSourc
       const savedRecord = await saveDraft(dataToSave, targetId, idempotencyKey);
       
       refreshKey(); // New key for next action
-      toast.dismiss(toastId);
-      toast.success('Draft saved successfully');
+      toast.success('Draft saved successfully', { id: toastId });
       
       // Update local state with the saved record (capture the new backend ID)
       const newId = savedRecord.id || targetId || currentRecord.id;
@@ -772,12 +804,12 @@ const RealPropertyDataEntry: React.FC<RealPropertyDataEntryProps> = ({ dataSourc
           // setRecords(prev => [savedRecord, ...prev]); 
       }
     } catch (error: any) {
-      toast.dismiss(toastId);
       // Prioritize the error message from the backend response (AppError)
       const backendMessage = error.response?.data?.message;
       const errorMessage = backendMessage || error.message || 'Failed to save draft';
       
       toast.error(errorMessage, {
+        id: toastId,
         duration: 5000, // Longer duration for reading
         description: backendMessage ? 'Please check your input.' : 'Server Error'
       });
@@ -791,8 +823,20 @@ const RealPropertyDataEntry: React.FC<RealPropertyDataEntryProps> = ({ dataSourc
     if (!selectedRecord) return;
     const currentRecord = selectedRecord;
 
-    // Check duplicates
-    const errorMsg = await checkDuplicatePinTdn(currentRecord.pin, currentRecord.tdn);
+    // 1. Comprehensive Input Data & Business Rule Validation
+    const saveValidation = validateTransactionSave(currentRecord);
+    if (!saveValidation.isValid) {
+      toast.error('Validation Error', {
+        description: saveValidation.errors[0],
+        duration: 5000,
+      });
+      return;
+    }
+
+    // 2. Check duplicates (Database uniqueness check)
+    const pinVal = currentRecord.PIN || currentRecord.pin || '';
+    const tdnVal = currentRecord.TDN || currentRecord.tdn || '';
+    const errorMsg = await checkDuplicatePinTdn(pinVal, tdnVal);
     if (errorMsg) {
       toast.error('Validation Error', {
         description: errorMsg,
@@ -858,8 +902,7 @@ const RealPropertyDataEntry: React.FC<RealPropertyDataEntryProps> = ({ dataSourc
       
       refreshKey(); // New key for next action
       
-      toast.dismiss(toastId);
-      toast.success('Record submitted for review');
+      toast.success('Record submitted for review', { id: toastId });
       setSelectedRecord({
         ...currentRecord,
         id: recordId,
@@ -868,12 +911,12 @@ const RealPropertyDataEntry: React.FC<RealPropertyDataEntryProps> = ({ dataSourc
       setIsAdding(false);
       setIsEditing(false);
     } catch (error: any) {
-      toast.dismiss(toastId);
       // Prioritize the error message from the backend response (AppError)
       const backendMessage = error.response?.data?.message;
       const errorMessage = backendMessage || error.message || 'Failed to submit record';
       
       toast.error(errorMessage, {
+        id: toastId,
         duration: 5000,
         description: backendMessage ? 'Please check your input.' : 'Server Error'
       });
@@ -1097,14 +1140,16 @@ const RealPropertyDataEntry: React.FC<RealPropertyDataEntryProps> = ({ dataSourc
             <Info size={14} />
             Other Info
           </button>
-          <button 
-            onClick={handleTransactionClick}
-            disabled={!selectedRecord}
-            className="px-3 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 whitespace-nowrap"
-          >
-            <FileText size={14} />
-            Transaction
-          </button>
+          {(!isAdding && !isEditing) && (
+            <button 
+              onClick={handleTransactionClick}
+              disabled={!selectedRecord}
+              className="px-3 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-1.5 font-medium disabled:opacity-50 disabled:cursor-not-allowed h-9 whitespace-nowrap"
+            >
+              <FileText size={14} />
+              Transaction
+            </button>
+          )}
           <button className="px-3 py-2 text-xs bg-white dark:bg-slate-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 text-purple-700 dark:text-purple-400 h-9 whitespace-nowrap">
             <DollarSign size={14} />
             Payment Inq.
@@ -1146,6 +1191,7 @@ const RealPropertyDataEntry: React.FC<RealPropertyDataEntryProps> = ({ dataSourc
                   <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[200px]">PIN</th>
                   <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[150px]">STATUS</th>
                   <th className="px-4 py-3 text-left font-semibold tracking-wide min-w-[250px]">OWNER</th>
+                  <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[120px]">TAX BEG YR</th>
                   <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[100px]">CITY CODE</th>
                   <th className="px-4 py-3 text-left font-semibold tracking-wide whitespace-nowrap w-[100px]">BRGY CODE</th>
                   <th className="px-4 py-3 text-left font-semibold tracking-wide min-w-[150px]">BARANGAY</th>
@@ -1213,6 +1259,7 @@ const RealPropertyDataEntry: React.FC<RealPropertyDataEntryProps> = ({ dataSourc
                       </span>
                     </td>
                     <td className="px-4 py-3 text-slate-700 dark:text-slate-300 whitespace-nowrap truncate max-w-xs">{record.owner}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap text-center">{record.TAX_BEG_YR || 'N/A'}</td>
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap text-center">{record.cityCode}</td>
                     <td className="px-4 py-3 font-mono text-slate-700 dark:text-slate-300 tracking-wider whitespace-nowrap text-center">{record.barangayCode}</td>
                     <td className="px-4 py-3 text-slate-600 dark:text-slate-400 whitespace-nowrap truncate max-w-xs">{record.barangay}</td>
@@ -1271,6 +1318,7 @@ const RealPropertyDataEntry: React.FC<RealPropertyDataEntryProps> = ({ dataSourc
                   <option value="ARP">ARP</option>
                   <option value="PIN">PIN</option>
                   <option value="OWNER">OWNER</option>
+                  <option value="TAX_BEG_YR">TAX BEG YR</option>
                 </select>
               </div>
 
@@ -1280,24 +1328,43 @@ const RealPropertyDataEntry: React.FC<RealPropertyDataEntryProps> = ({ dataSourc
                   Filter Value:
                 </label>
                 <div className="flex-1 flex gap-2">
-                  <input
-                    type="text"
-                    value={filterValue}
-                    onChange={(e) => setFilterValue(e.target.value)}
-                    onKeyDown={handleFilterKeyDown}
-                    className={`flex-1 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      appliedFilter.value !== '%' && appliedFilter.value === filterValue
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                        : 'border-slate-200 dark:border-slate-700'
-                    }`}
-                    data-testid="filter-value"
-                    placeholder={
-                      searchField === 'TDN' ? 'Enter TDN...' : 
-                      searchField === 'pOldTdn' ? 'Enter OLD TDN...' :
-                      searchField === 'ARP' ? 'Enter ARP...' :
-                      `Enter ${searchField}...`
-                    }
-                  />
+                  {searchField === 'TAX_BEG_YR' ? (
+                    <select
+                      value={filterValue}
+                      onChange={(e) => setFilterValue(e.target.value)}
+                      onKeyDown={handleFilterKeyDown}
+                      className={`flex-1 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        appliedFilter.value !== '%' && appliedFilter.value === filterValue
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                          : 'border-slate-200 dark:border-slate-700'
+                      }`}
+                      data-testid="filter-value-dropdown"
+                    >
+                      <option value="%">All Years</option>
+                      {taxBegYears.map((year) => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={filterValue}
+                      onChange={(e) => setFilterValue(e.target.value)}
+                      onKeyDown={handleFilterKeyDown}
+                      className={`flex-1 px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        appliedFilter.value !== '%' && appliedFilter.value === filterValue
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                          : 'border-slate-200 dark:border-slate-700'
+                      }`}
+                      data-testid="filter-value"
+                      placeholder={
+                        searchField === 'TDN' ? 'Enter TDN...' : 
+                        searchField === 'pOldTdn' ? 'Enter OLD TDN...' :
+                        searchField === 'ARP' ? 'Enter ARP...' :
+                        `Enter ${searchField}...`
+                      }
+                    />
+                  )}
                   <button 
                     onClick={handleApplyFilter}
                     disabled={isLoading}
@@ -1577,7 +1644,7 @@ const RealPropertyDataEntry: React.FC<RealPropertyDataEntryProps> = ({ dataSourc
       </Dialog>
 
       {/* Hidden Print Document */}
-      <div style={{ display: 'none' }}>
+      <div className="hidden print:block">
         <div ref={printRef}>
           {selectedRecord && (
             <PrintDocument

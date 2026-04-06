@@ -1,107 +1,63 @@
-const jwt = require('jsonwebtoken');
-const jwksClient = require('jwks-rsa');
 const { AppError } = require('./errorHandler');
 const { runWithContext } = require('../utils/context');
 const logger = require('../utils/logger');
-
-// Initialize JWKS client for Supabase
-// Extracts project reference from SUPABASE_URL
-const getProjectRef = () => {
-  const url = process.env.SUPABASE_URL;
-  if (!url) return null;
-  // Handle formats like http://supabasekong-ref.180.232.187.222.sslip.io
-  const match = url.match(/supabasekong-([^.]+)\./);
-  if (match) return match[1];
-  
-  // Handle formats like https://ref.supabase.co
-  const cloudMatch = url.match(/https:\/\/([^.]+)\.supabase\.co/);
-  return cloudMatch ? cloudMatch[1] : null;
-};
-
-const projectRef = getProjectRef();
-const jwksUri = process.env.SUPABASE_URL ? `${process.env.SUPABASE_URL}/auth/v1/.well-known/jwks.json` : null;
-
-const client = jwksClient({
-  jwksUri: jwksUri,
-  cache: true,
-  rateLimit: true,
-});
-
-// Function to get signing key
-function getKey(header, callback) {
-  client.getSigningKey(header.kid, function(err, key) {
-    if (err) {
-      // Fallback to JWT_SECRET if KID not found (Legacy HS256 support)
-      if (process.env.JWT_SECRET) {
-        return callback(null, process.env.JWT_SECRET);
-      }
-      return callback(err);
-    }
-    const signingKey = key.getPublicKey();
-    callback(null, signingKey);
-  });
-}
-
+const rateLimit = require('express-rate-limit');
 const { supabasePrisma } = require('../modules/rptas/database/prisma');
 
-const { supabase } = require('../modules/rptas/database/supabase');
+// Implement rate limiting for API access
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // Limit each IP to 1000 requests per `window` (here, per 15 minutes)
+  message: 'Too many requests from this IP, please try again after 15 minutes',
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
 
 const protect = async (req, res, next) => {
-  let token;
-  
-  // Check for token in cookies first (primary method)
-  if (req.cookies && req.cookies.access_token) {
-    token = req.cookies.access_token;
-  }
-  // Fallback to Authorization header (optional, good for API clients)
-  else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    token = req.headers.authorization.split(' ')[1];
-  }
-
-  if (!token) {
-    return next(new AppError('You are not logged in! Please log in to get access.', 401));
-  }
-
-  // Determine verification method based on token header
-  const decodedToken = jwt.decode(token, { complete: true });
-  if (!decodedToken) {
-     return next(new AppError('Invalid token format.', 401));
-  }
-
-  const verifyCallback = async (err, decoded) => {
-    if (err) {
-       logger.error(`JWT Verification Failed: ${err.message}`);
-       return next(new AppError('Invalid token. Please log in again.', 401));
-    }
-    await processUser(req, next, decoded);
-  };
-
-  // For Self-hosted Supabase with unknown JWT Secret, we can verify via the GoTrue API directly
-  try {
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+  // Apply rate limiter manually in middleware
+  apiLimiter(req, res, async () => {
+    let apiKey;
     
-    if (error || !user) {
-      logger.error(`Supabase Auth Verification Failed: ${error?.message || 'No user found'}`);
-      return next(new AppError('Invalid token. Please log in again.', 401));
+    // Check for API key in custom header or Authorization header
+    if (req.headers['x-api-key']) {
+      apiKey = req.headers['x-api-key'];
+    } else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      apiKey = req.headers.authorization.split(' ')[1];
+    } else if (req.cookies && req.cookies.access_token) {
+      // Support for Swagger UI 'cookieAuth'
+      apiKey = req.cookies.access_token;
     }
-    
-    // We construct a mock decoded token object to maintain compatibility with existing processUser
+
+    if (!apiKey) {
+      return next(new AppError('You are not authorized! Please provide a valid API key.', 401));
+    }
+
+    // Validate API key against environment variable
+    const validApiKey = process.env.API_ACCESS_KEY;
+    if (!validApiKey) {
+      logger.error('API_ACCESS_KEY is not configured in the environment variables.');
+      return next(new AppError('Server configuration error.', 500));
+    }
+
+    if (apiKey !== validApiKey) {
+      logger.warn(`Invalid API key attempt from IP: ${req.ip || req.connection.remoteAddress}`);
+      return next(new AppError('Invalid API key.', 401));
+    }
+
+    // API Key is valid. Construct a mock user object to maintain backward compatibility.
     const decoded = {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-      user_metadata: user.user_metadata,
-      app_metadata: user.app_metadata
+      sub: 'api-user',
+      email: 'api@system.local',
+      role: 'admin', // Grant admin role to the API key by default
+      user_metadata: { name: 'API System User' },
+      app_metadata: {}
     };
     
-    await processUser(req, next, decoded);
-  } catch (err) {
-    logger.error(`Auth Middleware Error: ${err.message}`);
-    return next(new AppError('Authentication failed.', 401));
-  }
+    return await processUser(req, res, next, decoded);
+  });
 };
 
-async function processUser(req, next, decoded) {
+async function processUser(req, res, next, decoded) {
     // Fetch user role from database
     let dbUser = null;
     try {
@@ -116,7 +72,7 @@ async function processUser(req, next, decoded) {
       // but maybe with limited roles (or just the roles in the token).
       // Supabase JWTs usually contain role info.
       
-      if (decoded.sub && supabasePrisma && supabasePrisma.user) {
+      if (decoded.sub && decoded.sub !== 'api-user' && supabasePrisma && supabasePrisma.user) {
         dbUser = await supabasePrisma.user.findUnique({
           where: { id: decoded.sub },
           select: {
@@ -143,7 +99,7 @@ async function processUser(req, next, decoded) {
     req.user = { 
       ...decoded, 
       id: decoded.sub, // Ensure ID is accessible as req.user.id
-      role: dbUser?.role || 'user', // Default to 'user' if DB role is missing
+      role: dbUser?.role || decoded?.role || 'user', // Default to decoded role or 'user' if DB role is missing
       email: decoded?.email || dbUser?.email || null,
       municipalityCode: dbUser?.municipalityCode || null,
       fullName: dbUser?.fullName || null,

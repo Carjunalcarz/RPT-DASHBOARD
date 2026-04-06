@@ -11,7 +11,7 @@ const hasPayorsTable = async () => {
         `
          SELECT 1
          FROM information_schema.tables
-         WHERE table_schema = 'rptas'
+         WHERE table_schema = 'public'
            AND table_name = 'payors'
          LIMIT 1
         `
@@ -21,6 +21,8 @@ const hasPayorsTable = async () => {
     return false;
   }
 };
+
+const isUuid = (id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
 
 const toRow = (payload) => ({
   firstName: normalize(payload.firstName),
@@ -136,7 +138,7 @@ const createPayor = async ({ user, payload }) => {
       row.idType,
       row.idNumber,
       JSON.stringify(row.contact || {}),
-      user?.id || null
+      (user?.id && isUuid(user.id)) ? user.id : null
     );
     return created?.[0];
   } catch (e) {
@@ -224,7 +226,7 @@ const bulkCreatePayors = async ({ user, rows }) => {
         row.idType,
         row.idNumber,
         JSON.stringify(row.contact || {}),
-        user?.id || null
+        (user?.id && isUuid(user.id)) ? user.id : null
       );
       if (inserted?.[0]) created.push(inserted[0]);
     } catch (e) {

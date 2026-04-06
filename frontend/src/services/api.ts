@@ -12,7 +12,7 @@ const api = axios.create({
   withCredentials: true // Important for cookies
 });
 
-// Request interceptor to add Bearer token
+// Request interceptor to add API Key
 api.interceptors.request.use(
   (config) => {
     // Check if we are in mock mode
@@ -20,10 +20,12 @@ api.interceptors.request.use(
         return config;
     }
     
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
+    // Attach the API Key
+    const apiKey = import.meta.env.VITE_API_ACCESS_KEY;
+    if (apiKey) {
+      config.headers['x-api-key'] = apiKey;
     }
+    
     return config;
   },
   (error) => {

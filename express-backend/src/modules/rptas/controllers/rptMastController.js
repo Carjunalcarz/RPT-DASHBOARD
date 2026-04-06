@@ -39,6 +39,22 @@ class RptMastController {
   }
 
   /**
+   * Get distinct Tax Beginning Years
+   * GET /api/rptmast/distinct/tax-beg-years
+   */
+  async getDistinctTaxBegYears(req, res, next) {
+    try {
+      const result = await rptMastService.getDistinctTaxBegYears();
+      res.status(200).json({
+        success: true,
+        data: result
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * Update Signatory data
    * PUT /api/rptmast/signatories/:tdn
    */

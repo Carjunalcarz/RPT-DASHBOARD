@@ -35,6 +35,7 @@ const setupSignatoryTemplatesRoutes = require('./setupSignatoryTemplatesRoutes')
 const sidebarRoutes = require('./sidebarRoutes');
 const oopRoutes = require('./oopRoutes');
 const payorRoutes = require('./payorRoutes');
+const barangayRoutes = require('./barangayRoutes');
 
 // Mount routes to maintain exact backward compatibility with server.js paths
 router.use('/health', healthRoutes);
@@ -48,6 +49,7 @@ router.use('/api/users', userRoutes); // Alias
 router.use('/api/v1/permissions', permissionsRoutes);
 router.use('/api/permissions', permissionsRoutes);
 router.use('/api/rptmast', rptMastRoutes);
+router.use('/api/v1/rptmast', rptMastRoutes);
 router.use('/api/rpt-ass', rptAssRoutes);
 router.use('/api/bldg-adj', bldgAdjRoutes);
 router.use('/api/bldg-struc', bldgStrucRoutes);
@@ -72,6 +74,8 @@ router.use('/api/v1/setup/signatory-templates', setupSignatoryTemplatesRoutes);
 router.use('/api/v1/sidebar', sidebarRoutes);
 router.use('/api/v1/oop', oopRoutes);
 router.use('/api/v1/payors', payorRoutes);
+router.use('/api/barangays', barangayRoutes);
+router.use('/api/v1/barangays', barangayRoutes);
 
 // Legacy routes support
 router.use('/api/dashboard', dashboardRoutes);
@@ -82,5 +86,6 @@ router.use('/api/subclasses', subClassRoutes);
 router.use('/api/trees', treesRoutes);
 router.use('/api/land-tax', landTaxRoutes);
 router.use('/api/v1/land-tax', landTaxRoutes);
+router.use('/api/faas', faasRoutes);
 
 module.exports = router;

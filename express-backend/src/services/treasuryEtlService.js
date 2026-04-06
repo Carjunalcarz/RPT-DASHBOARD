@@ -2,7 +2,6 @@ const crypto = require('crypto');
 const logger = require('../utils/logger');
 const { DB_SCHEMA } = require('../modules/rptas/config/database');
 
-
 const isUuid = (value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
 
 const validateInputs = ({ orderId, orderNumber, propertyIds }) => {
@@ -220,10 +219,11 @@ const exportPaidOrder = async ({ tx, order, propertyIds, paidAt, performedBy }) 
       orderId,
       orderNumber,
       orderDescription,
-      orderCreatedBy,
+      orderCreatedBy: isUuid(orderCreatedBy) ? orderCreatedBy : null,
       orderCreatedAt,
       paidAt,
-      paidBy: performedBy.id,
+      // Fallback to a zero-UUID if testing via API key or invalid ID to satisfy the NOT NULL constraint
+      paidBy: isUuid(performedBy.id) ? performedBy.id : '00000000-0000-0000-0000-000000000000',
       orderAmount,
       propertyId,
       pin: p.pin || null,

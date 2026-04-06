@@ -9,7 +9,7 @@ import SignatoriesSection from './SignatoriesSection';
 import PreviousTDNsSection from "./PreviousTDNsSection";
 import TaxDecSheetSection from "./TaxDecSheetSection";
 import OtherPropertyTab from "../OtherPropertyTab";
-import { PropertyRecord } from '@/modules/rptas/shared/types/dataEntryTypes';
+import { PropertyRecord } from './RealPropertyDataEntry';
 
 interface PropertyDetailsViewProps {
   activeTab: string;
