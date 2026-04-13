@@ -86,12 +86,13 @@ app.use(idempotency);
 // Debug Middleware to trace Cookie/Token flow (After Cookie Parser)
 app.use((req, res, next) => {
   if (process.env.NODE_ENV === 'development') {
-    logger.debug(`[${req.method} ${req.url}] Cookies: ${JSON.stringify(req.cookies || {})} | Auth Header: ${req.headers.authorization ? 'Present' : 'Missing'}`);
+    logger.debug(`[${req.method} ${req.url}] Cookies: ${JSON.stringify(req.cookies || {})} | API Key: ${req.headers['x-api-key'] ? 'Present' : 'Missing'}`);
   }
   next();
 });
 
 // Swagger Documentation
+const swaggerServerUrl = process.env.SWAGGER_SERVER_URL || '/';
 const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
@@ -102,7 +103,7 @@ const swaggerOptions = {
     },
     servers: [
       {
-        url: `http://localhost:${process.env.PORT || 3000}`,
+        url: swaggerServerUrl,
       },
     ],
     components: {
@@ -170,6 +171,21 @@ app.get('/swagger-init.js', (req, res) => {
 
 // Routes
 const rptasRoutes = require('./modules/rptas/routes');
+
+app.get('/health/live', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
+app.get('/health/ready', async (req, res) => {
+  try {
+    const client = dbAdapter.getClient();
+    await client.$queryRaw`SELECT 1`;
+    res.status(200).json({ status: 'ok' });
+  } catch (error) {
+    res.status(503).json({ status: 'error' });
+  }
+});
+
 app.use('/', rptasRoutes);
 
 // Legacy routes support if needed

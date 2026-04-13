@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: rpt_dashboard
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d rpt_dashboard"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - app_net
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      CORS_ORIGIN: http://localhost:5173
+      API_ACCESS_KEY: local-dev-key
+      JWT_SECRET: local-dev-secret
+      JWT_EXPIRES_IN: 90d
+      LOG_LEVEL: debug
+      LOG_TO_FILES: "false"
+      DB_SCHEMA: rptas
+      REFRESH_REPORTING_ON_STARTUP: "false"
+      SUPABASE_URL: http://localhost
+      SUPABASE_SERVICE_KEY: local-dev-key
+      SUPABASE_DB_URL: postgresql://postgres:postgres@postgres:5432/rpt_dashboard?schema=rptas&search_path=rptas,public
+      SUPABASE_DIRECT_URL: postgresql://postgres:postgres@postgres:5432/rpt_dashboard?schema=rptas&search_path=rptas,public
+      ALLOW_MSSQL_FAILURE: "true"
+      MSSQL_CONNECTION_STRING: sqlserver://localhost:1433;database=master;user=sa;password=Password123!;encrypt=false;trustServerCertificate=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    networks:
+      - app_net
+
+volumes:
+  pgdata:
+
+networks:
+  app_net:
+    driver: bridge

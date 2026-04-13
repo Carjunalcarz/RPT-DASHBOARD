@@ -2,7 +2,7 @@ const winston = require('winston');
 const DailyRotateFile = require('winston-daily-rotate-file');
 const path = require('path');
 
-const logDir = 'logs';
+const logDir = process.env.LOG_DIR || 'logs';
 
 const levels = {
   error: 0,
@@ -13,9 +13,10 @@ const levels = {
 };
 
 const level = () => {
+  if (process.env.LOG_LEVEL) return process.env.LOG_LEVEL;
   const env = process.env.NODE_ENV || 'development';
   const isDevelopment = env === 'development';
-  return isDevelopment ? 'debug' : 'warn';
+  return isDevelopment ? 'debug' : 'info';
 };
 
 const colors = {
@@ -43,25 +44,29 @@ const transports = [
       winston.format.simple()
     ),
   }),
-  new DailyRotateFile({
-    filename: path.join(logDir, 'error-%DATE%.log'),
-    datePattern: 'YYYY-MM-DD',
-    zippedArchive: true,
-    maxSize: '20m',
-    maxFiles: '14d',
-    level: 'error',
-    format: winston.format.json(),
-  }),
-  new DailyRotateFile({
-    filename: path.join(logDir, 'combined-%DATE%.log'),
-    datePattern: 'YYYY-MM-DD',
-    zippedArchive: true,
-    maxSize: '20m',
-    maxFiles: '14d',
-    format: winston.format.json(),
-  }),
 ];
 
+
+if (process.env.LOG_TO_FILES === 'true') {
+  transports.push(
+    new DailyRotateFile({
+      datePattern: 'YYYY-MM-DD',
+      zippedArchive: true,
+      maxSize: '20m',
+      maxFiles: '14d',
+      level: 'error',
+      format: winston.format.json(),
+    }),
+    new DailyRotateFile({
+      filename: path.join(logDir, 'combined-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      zippedArchive: true,
+      maxSize: '20m',
+      maxFiles: '14d',
+      format: winston.format.json(),
+    }),
+  );
+}
 const logger = winston.createLogger({
   level: level(),
   levels,

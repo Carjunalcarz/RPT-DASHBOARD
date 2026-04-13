@@ -15,7 +15,7 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "lint": "eslint src/**/*.js",
-    "prisma:generate:if-missing": "node -e \"const fs=require('fs');const ok=fs.existsSync('src/generated/mssql-client')&&fs.existsSync('src/generated/supabase-client-v6');process.exit(ok?0:1)\" || npm run prisma:generate",
+    "prisma:generate:if-missing": "node -e \"const fs=require('fs');const hasSchemas=fs.existsSync('prisma/schema.mssql.prisma')&&fs.existsSync('prisma/schema.supabase.prisma');if(!hasSchemas)process.exit(0);const ok=fs.existsSync('src/generated/mssql-client')&&fs.existsSync('src/generated/supabase-client-v6');process.exit(ok?0:1)\" || npm run prisma:generate",
     "prisma:generate:mssql": "prisma generate --schema=./prisma/schema.mssql.prisma",
     "prisma:generate:supabase": "prisma generate --schema=./prisma/schema.supabase.prisma",
     "prisma:generate": "npm run prisma:generate:mssql && npm run prisma:generate:supabase",
@@ -32,6 +32,7 @@
     "@babel/preset-env": "^7.29.0",
     "@babel/preset-react": "^7.28.5",
     "@babel/register": "^7.28.6",
+    "@prisma/client": "5.10.0",
     "@react-pdf/renderer": "^4.3.2",
     "@supabase/supabase-js": "^2.98.0",
     "awilix": "^13.0.3",
@@ -46,6 +47,7 @@
     "jwks-rsa": "^3.2.2",
     "mssql": "^12.2.0",
     "pg": "^8.19.0",
+    "prisma": "5.10.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "supabase": "^2.76.12",
@@ -57,14 +59,13 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@prisma/client": "5.10.0",
     "eslint": "^9.0.0",
     "jest": "^29.7.0",
     "nodemon": "^3.0.0",
-    "prisma": "5.10.0",
     "supertest": "^6.3.0"
   },
   "engines": {
     "node": ">=18.0.0"
   }
 }
+

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const classificationController = require('../controllers/classificationController');
+const mainClassCustomController = require('../controllers/mainClassCustomController');
 const protect = require('../../../middleware/auth');
 
 /**
@@ -60,6 +61,10 @@ const protect = require('../../../middleware/auth');
  */
 router.get('/', protect, classificationController.getAll);
 router.post('/', protect, classificationController.create);
+
+router.get('/custom', protect, (req, res, next) => mainClassCustomController.list(req, res, next));
+router.post('/custom', protect, (req, res, next) => mainClassCustomController.upsert(req, res, next));
+router.delete('/custom/:code', protect, (req, res, next) => mainClassCustomController.delete(req, res, next));
 
 /**
  * @swagger

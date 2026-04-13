@@ -89,5 +89,46 @@ export const rptasNavigation = [
         order: 5,
       }
     ]
+  },
+  {
+    key: "references",
+    label: "References",
+    icon: "Database",
+    showInSidebar: true,
+    order: 5,
+    children: [
+      {
+        key: "references-barangay",
+        label: "Barangay Registry",
+        path: "/rptas/references/barangays",
+        icon: "MapPin",
+        showInSidebar: true,
+        order: 1,
+      },
+      {
+        key: "references-city-barangay",
+        label: "City-Barangay Mapping",
+        path: "/rptas/references/city-barangay-mapping",
+        icon: "Map",
+        showInSidebar: true,
+        order: 2,
+      },
+      {
+        key: "references-actual-use",
+        label: "Actual Use Setup",
+        path: "/rptas/references/actual-use-setup",
+        icon: "Tags",
+        showInSidebar: true,
+        order: 3,
+      },
+      {
+        key: "references-classification-rates",
+        label: "Actual Use Rates",
+        path: "/rptas/references/classification-rates",
+        icon: "Percent",
+        showInSidebar: true,
+        order: 4,
+      }
+    ]
   }
 ];

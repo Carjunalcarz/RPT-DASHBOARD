@@ -36,6 +36,12 @@ const sidebarRoutes = require('./sidebarRoutes');
 const oopRoutes = require('./oopRoutes');
 const payorRoutes = require('./payorRoutes');
 const barangayRoutes = require('./barangayRoutes');
+const cityRoutes = require('./cityRoutes');
+const cityBarangayRoutes = require('./cityBarangayRoutes');
+const mainclassActualUseRoutes = require('./mainclassActualUseRoutes');
+const classificationRateRoutes = require('./classificationRateRoutes');
+const actualUseRateRoutes = require('./actualUseRateRoutes');
+const actualUseOrdinanceRoutes = require('./actualUseOrdinanceRoutes');
 
 // Mount routes to maintain exact backward compatibility with server.js paths
 router.use('/health', healthRoutes);
@@ -76,6 +82,18 @@ router.use('/api/v1/oop', oopRoutes);
 router.use('/api/v1/payors', payorRoutes);
 router.use('/api/barangays', barangayRoutes);
 router.use('/api/v1/barangays', barangayRoutes);
+router.use('/api/cities', cityRoutes);
+router.use('/api/v1/cities', cityRoutes);
+router.use('/api/city-barangay-assignments', cityBarangayRoutes);
+router.use('/api/v1/city-barangay-assignments', cityBarangayRoutes);
+router.use('/api/mainclass-actualuse-assignments', mainclassActualUseRoutes);
+router.use('/api/v1/mainclass-actualuse-assignments', mainclassActualUseRoutes);
+router.use('/api/actualuse-ordinances', actualUseOrdinanceRoutes);
+router.use('/api/v1/actualuse-ordinances', actualUseOrdinanceRoutes);
+router.use('/api/classification-rates', classificationRateRoutes);
+router.use('/api/v1/classification-rates', classificationRateRoutes);
+router.use('/api/actual-use-rates', actualUseRateRoutes);
+router.use('/api/v1/actual-use-rates', actualUseRateRoutes);
 
 // Legacy routes support
 router.use('/api/dashboard', dashboardRoutes);

@@ -11,19 +11,17 @@ const fs = require('fs');
 require('dotenv').config();
 const { DB_SCHEMA } = require('../modules/rptas/config/database');
 
-
 async function runReportingSetup(client) {
   logger.info('[Startup] Setting up reporting schema and ETL...');
   try {
-    const sqlPath = path.join(__dirname, '..', 'database', 'reporting_setup.sql');
+    const sqlPath = path.join(__dirname, '..', 'modules', 'rptas', 'database', 'reporting_setup.sql');
     if (!fs.existsSync(sqlPath)) {
       logger.warn(`[Startup] Reporting setup SQL file not found at ${sqlPath}. Skipping.`);
       return true;
     }
 
     const sqlContent = fs.readFileSync(sqlPath, 'utf8').replace(/__DB_SCHEMA__/g, DB_SCHEMA);
-    
-    // Split the SQL into individual statements while handling $$ blocks for functions
+
     const statements = [];
     let currentStatement = '';
     let inDollarBlock = false;
@@ -31,42 +29,35 @@ async function runReportingSetup(client) {
 
     for (let line of lines) {
       currentStatement += line + '\n';
-      
-      // Check for $$ delimiters
+
       const dollarMatches = line.match(/\$\$/g);
       if (dollarMatches && dollarMatches.length % 2 !== 0) {
         inDollarBlock = !inDollarBlock;
       }
 
-      // If not in a dollar block and line ends with a semicolon (optionally followed by comments)
       if (!inDollarBlock && /;\s*(--.*)?$/.test(line)) {
         statements.push(currentStatement.trim());
         currentStatement = '';
       }
     }
-    
+
     if (currentStatement.trim()) {
       statements.push(currentStatement.trim());
     }
 
-    // Execute statements one by one
     for (const stmt of statements) {
       const cleanStmt = stmt.trim();
-      // Skip if statement is purely comments or empty
-      if (cleanStmt && cleanStmt.length > 0 && !cleanStmt.split('\n').every(l => l.trim().startsWith('--') || l.trim() === '')) {
-        try {
-          // logger.debug(`[Startup] Executing statement: ${cleanStmt.substring(0, 50)}...`);
-          await client.$executeRawUnsafe(cleanStmt);
-        } catch (stmtError) {
-          logger.error(`[Startup] Error executing SQL statement: ${stmtError.message}\nStatement: ${cleanStmt.substring(0, 200)}...`);
-          throw stmtError; // Re-throw to be caught by the outer catch
-        }
+      if (
+        cleanStmt &&
+        cleanStmt.length > 0 &&
+        !cleanStmt.split('\n').every((l) => l.trim().startsWith('--') || l.trim() === '')
+      ) {
+        await client.$executeRawUnsafe(cleanStmt);
       }
     }
-    
+
     logger.info('[Startup] Reporting schema and ETL functions updated successfully.');
 
-    // Trigger initial ETL refresh if requested
     const shouldRefresh = process.env.REFRESH_REPORTING_ON_STARTUP === 'true';
     if (shouldRefresh) {
       logger.info('[Startup] Triggering initial reporting data refresh...');
@@ -85,7 +76,6 @@ async function verifyDatabaseConnectivity(client, name) {
   logger.info(`[Startup] Verifying connectivity to ${name}...`);
   try {
     await client.$connect();
-    // Simple query to verify
     if (name === 'Supabase') {
       await client.$queryRawUnsafe(`SELECT 1`);
     } else {
@@ -99,21 +89,89 @@ async function verifyDatabaseConnectivity(client, name) {
   }
 }
 
+async function ensureSupabaseExtensions(client) {
+  try {
+    await client.$executeRawUnsafe(`CREATE EXTENSION IF NOT EXISTS unaccent;`);
+  } catch (error) {
+    logger.warn(`[Startup] Unable to ensure unaccent extension: ${error.message}`);
+  }
+
+  try {
+    await client.$executeRawUnsafe(`CREATE EXTENSION IF NOT EXISTS pg_trgm;`);
+  } catch (error) {
+    logger.warn(`[Startup] Unable to ensure pg_trgm extension: ${error.message}`);
+  }
+
+  try {
+    const rows = await client.$queryRawUnsafe(
+      `SELECT COUNT(*)::int AS count
+       FROM pg_proc p
+       JOIN pg_namespace n ON n.oid = p.pronamespace
+       WHERE p.proname = 'unaccent'
+       AND p.pronargs = 1
+       AND n.nspname = $1`,
+      DB_SCHEMA
+    );
+    const exists = Array.isArray(rows) && rows[0] && Number(rows[0].count) > 0;
+    if (!exists) {
+      await client.$executeRawUnsafe(
+        `CREATE OR REPLACE FUNCTION ${DB_SCHEMA}.unaccent(input text)
+         RETURNS text
+         LANGUAGE sql
+         IMMUTABLE
+         AS $$ SELECT input $$;`
+      );
+      logger.warn('[Startup] Installed fallback unaccent(text) function in DB schema.');
+    }
+  } catch (error) {
+    logger.warn(`[Startup] Unable to ensure unaccent function: ${error.message}`);
+  }
+
+  try {
+    const rows = await client.$queryRawUnsafe(
+      `SELECT COUNT(*)::int AS count
+       FROM pg_proc p
+       JOIN pg_namespace n ON n.oid = p.pronamespace
+       WHERE p.proname = 'similarity'
+       AND p.pronargs = 2
+       AND n.nspname = $1`,
+      DB_SCHEMA
+    );
+    const exists = Array.isArray(rows) && rows[0] && Number(rows[0].count) > 0;
+    if (!exists) {
+      try {
+        await client.$executeRawUnsafe(
+          `CREATE OR REPLACE FUNCTION ${DB_SCHEMA}.similarity(a text, b text)
+           RETURNS real
+           LANGUAGE sql
+           IMMUTABLE
+           AS $$ SELECT public.similarity(a, b) $$;`
+        );
+        logger.warn('[Startup] Installed wrapper similarity(text,text) function in DB schema.');
+      } catch (inner) {
+        await client.$executeRawUnsafe(
+          `CREATE OR REPLACE FUNCTION ${DB_SCHEMA}.similarity(a text, b text)
+           RETURNS real
+           LANGUAGE sql
+           IMMUTABLE
+           AS $$ SELECT 0::real $$;`
+        );
+        logger.warn('[Startup] Installed fallback similarity(text,text) function in DB schema.');
+      }
+    }
+  } catch (error) {
+    logger.warn(`[Startup] Unable to ensure similarity function: ${error.message}`);
+  }
+}
+
 async function runMigrations(schemaPath, name) {
   logger.info(`[Startup] Running pending migrations for ${name} using schema ${schemaPath}...`);
   try {
-    // Check if migrations folder exists and has content
-    const migrationsDir = path.join(process.cwd(), 'prisma', 'migrations');
-    
-    // For MSSQL, we might not have migrations in the same folder if they are PG specific
-    // Let's check the schema to see if it's the primary target
     if (name === 'MSSQL') {
-      logger.info(`[Startup] Skipping migrations for MSSQL as it is likely a read-only or externally managed source.`);
+      logger.info('[Startup] Skipping migrations for MSSQL as it is likely a read-only or externally managed source.');
       return true;
     }
 
-    // Temporary fix: Do not block startup if migrations fail (especially due to connection issues like P1001)
-    // Run migrations
     const deployCmd = `npx prisma migrate deploy --schema=${schemaPath}`;
     try {
       const deployOutput = execSync(deployCmd, { encoding: 'utf8' });
@@ -133,24 +191,21 @@ async function runHealthCheck(client, name) {
   logger.info(`[Startup] Performing final health check for ${name}...`);
   try {
     if (name === 'Supabase') {
-      // Check for essential tables
       const faasCount = await client.faasRecord.count();
       logger.info(`[Startup] Health check: Found ${faasCount} FAAS records.`);
-      
-      // Check if reporting tables exist (using raw SQL as they might not be in Prisma schema yet)
+
       const tablesCheck = await client.$queryRawUnsafe(`
-        SELECT count(*) 
-        FROM information_schema.tables 
-        WHERE table_schema = '${DB_SCHEMA}' 
+        SELECT count(*)
+        FROM information_schema.tables
+        WHERE table_schema = '${DB_SCHEMA}'
         AND table_name IN ('owner', 'municipality', 'barangay', 'rpt_property', 'rpt_assessment')
       `);
       const tableCount = Number(tablesCheck[0].count);
       logger.info(`[Startup] Health check: Found ${tableCount}/5 reporting tables.`);
-      
+
       if (tableCount < 5) {
-        logger.warn(`[Startup] Warning: Some reporting tables are missing. Reporting features may be degraded.`);
+        logger.warn('[Startup] Warning: Some reporting tables are missing. Reporting features may be degraded.');
       } else {
-        // Check if any data exists in reporting
         const propCheck = await client.$queryRawUnsafe(`SELECT count(*) FROM ${DB_SCHEMA}.rpt_property`);
         const propCount = Number(propCheck[0].count);
         if (propCount === 0 && faasCount > 0) {
@@ -160,9 +215,8 @@ async function runHealthCheck(client, name) {
         }
       }
     } else {
-      // MSSQL specific check
-      const result = await client.$queryRawUnsafe(`SELECT TOP 1 * FROM RPTMAST`);
-      logger.info(`[Startup] Health check: RPTMAST accessible.`);
+      await client.$queryRawUnsafe(`SELECT TOP 1 * FROM RPTMAST`);
+      logger.info('[Startup] Health check: RPTMAST accessible.');
     }
     return true;
   } catch (error) {
@@ -179,10 +233,8 @@ async function startup() {
   const supabaseBase = new SupabaseClient();
 
   try {
-    // 1. Verify Connectivity
     const mssqlOk = await verifyDatabaseConnectivity(mssqlBase, 'MSSQL');
     const supabaseOk = await verifyDatabaseConnectivity(supabaseBase, 'Supabase');
-
     const allowMssqlFailure = process.env.ALLOW_MSSQL_FAILURE === 'true';
 
     if (!supabaseOk) {
@@ -199,23 +251,19 @@ async function startup() {
       }
     }
 
-    // 2. Run Migrations
-    // Only run migrations for Supabase as MSSQL is usually read-only/externally managed
-    const supabaseMigrateOk = await runMigrations('./prisma/schema.supabase.prisma', 'Supabase');
+    await ensureSupabaseExtensions(supabaseBase);
 
+    const supabaseMigrateOk = await runMigrations('./prisma/schema.supabase.prisma', 'Supabase');
     if (!supabaseMigrateOk) {
       logger.error('[Startup] Critical: Supabase database migration failed. Aborting startup.');
       process.exit(1);
     }
 
-    // 3. Reporting Setup
     const reportingOk = await runReportingSetup(supabaseBase);
     if (!reportingOk) {
       logger.warn('[Startup] Warning: Reporting setup failed. Reporting features may be unavailable.');
-      // We don't exit here as the main app can still run without reporting
     }
 
-    // 4. Health Checks
     const supabaseHealthOk = await runHealthCheck(supabaseBase, 'Supabase');
     if (!supabaseHealthOk) {
       logger.error('[Startup] Critical: Supabase health check failed. Aborting startup.');
@@ -231,11 +279,9 @@ async function startup() {
 
     const duration = (Date.now() - startTime) / 1000;
     logger.info(`[Startup] Deployment process completed successfully in ${duration}s. Starting application server...`);
-    
-    // Disconnect clients before handing off to the main app
+
     await mssqlBase.$disconnect();
     await supabaseBase.$disconnect();
-
   } catch (error) {
     logger.error(`[Startup] Unexpected error during startup: ${error.message}`);
     process.exit(1);
@@ -247,3 +293,4 @@ if (require.main === module) {
 }
 
 module.exports = startup;
+

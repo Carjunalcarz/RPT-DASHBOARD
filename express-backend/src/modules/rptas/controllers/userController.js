@@ -29,14 +29,15 @@ exports.getUsers = async (req, res, next) => {
         connectionString: process.env.SUPABASE_DB_URL || process.env.DATABASE_URL
       });
       await client.connect();
-      const res = await client.query('SELECT id, email, role, email_confirmed_at, created_at, last_sign_in_at FROM auth.users;');
+      const res = await client.query('SELECT id, email, role, email_confirmed_at, created_at, last_sign_in_at, raw_user_meta_data FROM auth.users;');
       users = res.rows.map(r => ({
         id: r.id,
         email: r.email,
         role: r.role,
         email_confirmed_at: r.email_confirmed_at,
         created_at: r.created_at,
-        last_sign_in_at: r.last_sign_in_at
+        last_sign_in_at: r.last_sign_in_at,
+        raw_user_meta_data: r.raw_user_meta_data || {}
       }));
       await client.end();
     } catch (dbErr) {
@@ -67,11 +68,13 @@ exports.getUsers = async (req, res, next) => {
     // Merge auth user data with public profile data
     const mergedUsers = users.map(user => {
       const profile = profileMap.get(user.id) || {};
+      const meta = user.raw_user_meta_data || {};
       return {
         id: user.id,
         email: user.email,
         role: profile.role || 'user', // Default to user if no profile
-        municipalityCode: profile.municipalityCode || null,
+        municipalityCode: profile.municipalityCode || meta.municipality_code || meta.municipalityCode || null,
+        classLevel: meta.class_level || meta.classLevel || null,
         fullName: profile.fullName || null,
         contactNo: profile.contactNo || null,
         createdAt: user.created_at,
@@ -217,7 +220,7 @@ exports.updateUser = async (req, res, next) => {
     }
 
     const { id } = req.params;
-    const { role, municipalityCode, fullName, contactNo } = req.body;
+    const { role, municipalityCode, fullName, contactNo, classLevel } = req.body;
 
     // Check if user exists in public table
     let existingUser = null;
@@ -262,10 +265,34 @@ exports.updateUser = async (req, res, next) => {
       throw upsertError;
     }
 
+    try {
+      const metaPatch = {};
+      if (municipalityCode !== undefined) metaPatch.municipality_code = municipalityCode;
+      if (classLevel !== undefined) metaPatch.class_level = classLevel;
+
+      if (Object.keys(metaPatch).length > 0) {
+        const { Client } = require('pg');
+        const client = new Client({
+          connectionString: process.env.SUPABASE_DB_URL || process.env.DATABASE_URL
+        });
+        await client.connect();
+        await client.query(
+          'UPDATE auth.users SET raw_user_meta_data = COALESCE(raw_user_meta_data, \'{}\'::jsonb) || $2::jsonb WHERE id = $1;',
+          [id, JSON.stringify(metaPatch)]
+        );
+        await client.end();
+      }
+    } catch (metaErr) {
+      logger.warn(`Failed to update auth.users metadata for ${id}: ${metaErr.message}`);
+    }
+
     res.status(200).json({
       status: 'success',
       data: {
-        user: updatedUser
+        user: {
+          ...updatedUser,
+          classLevel: classLevel !== undefined ? classLevel : undefined
+        }
       }
     });
   } catch (error) {

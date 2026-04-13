@@ -9,7 +9,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true // Important for cookies
+  withCredentials: false // Do not send cookies, use only API key
 });
 
 // Request interceptor to add API Key

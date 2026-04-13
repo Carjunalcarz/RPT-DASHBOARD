@@ -515,7 +515,7 @@ class FaasService {
                               true
                             )
                             || jsonb_build_object('Rec_AppDate', $4)
-                        WHERE id = ANY($5::text[])
+                        WHERE id::uuid = ANY($5::uuid[])
                         `,
                         status,
                         remarks || null,
@@ -558,7 +558,7 @@ class FaasService {
                               true
                             )
                             || jsonb_build_object('SGD_APPROVED', true)
-                        WHERE id = ANY($5::text[])
+                        WHERE id::uuid = ANY($5::uuid[])
                         `,
                         status,
                         remarks || null,
@@ -574,7 +574,7 @@ class FaasService {
                           status = $1,
                           updated_at = NOW(),
                           data = jsonb_set(COALESCE(data, '{}'::jsonb), '{REM}', to_jsonb($2), true)
-                        WHERE id = ANY($3::text[])
+                        WHERE id::uuid = ANY($3::uuid[])
                         `,
                         status,
                         remarks || null,

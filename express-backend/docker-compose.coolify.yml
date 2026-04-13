@@ -1,0 +1,55 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: ${PORT:-3000}
+      HEALTHCHECK_PATH: ${HEALTHCHECK_PATH:-/health/live}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_TO_FILES: ${LOG_TO_FILES:-false}
+      LOG_DIR: ${LOG_DIR:-logs}
+    restart: unless-stopped
+    init: true
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "const http=require('http');const port=process.env.PORT||3000;const path='/health/ready';const req=http.request({host:'127.0.0.1',port,path,timeout:4000},res=>process.exit(res.statusCode===200?0:1));req.on('error',()=>process.exit(1));req.on('timeout',()=>{req.destroy();process.exit(1)});req.end();"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    networks:
+      - app_net
+    deploy:
+      replicas: ${REPLICAS:-2}
+      restart_policy:
+        condition: any
+      resources:
+        limits:
+          cpus: "${CPU_LIMIT:-0.50}"
+          memory: ${MEMORY_LIMIT:-512M}
+        reservations:
+          cpus: "${CPU_RESERVATION:-0.25}"
+          memory: ${MEMORY_RESERVATION:-256M}
+
+networks:
+  app_net:
+    driver: bridge

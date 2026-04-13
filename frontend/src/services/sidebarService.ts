@@ -15,13 +15,13 @@ export interface SidebarItem {
 
 const sidebarService = {
   getSidebarItems: async () => {
-    const response = await api.get('/sidebar', { timeout: 60000 });
-    return response.data;
+    // Disabled: User is now on the new dashboard using RBAC modules
+    return { success: true, data: [] };
   },
 
   getManagementSidebarItems: async () => {
-    const response = await api.get('/sidebar/manage');
-    return response.data;
+    // Disabled: Replaced by Module Management in the new dashboard
+    return { success: true, data: [] };
   },
 
   createSidebarItem: async (data: Partial<SidebarItem>) => {
