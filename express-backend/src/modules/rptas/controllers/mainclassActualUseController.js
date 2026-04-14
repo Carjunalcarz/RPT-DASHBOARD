@@ -6,7 +6,8 @@ class MainclassActualUseController {
     try {
       const municipalityCode = req.query?.municipalityCode ? String(req.query.municipalityCode).trim() : null;
       const classLevel = req.query?.classLevel ? String(req.query.classLevel).trim() : null;
-      const setups = await setupService.getAllSetups(municipalityCode, classLevel);
+      const ordinanceNo = req.query?.ordinanceNo ? String(req.query.ordinanceNo).trim() : null;
+      const setups = await setupService.getAllSetups(municipalityCode, classLevel, ordinanceNo);
       res.status(200).json({
         status: 'success',
         data: setups
@@ -21,12 +22,13 @@ class MainclassActualUseController {
       const { code } = req.params;
       const municipalityCode = req.query?.municipalityCode ? String(req.query.municipalityCode).trim() : null;
       const classLevel = req.query?.classLevel ? String(req.query.classLevel).trim() : null;
+      const ordinanceNo = req.query?.ordinanceNo ? String(req.query.ordinanceNo).trim() : null;
 
       if (!municipalityCode || !classLevel) {
         return next(new AppError('municipalityCode and classLevel are required', 400));
       }
 
-      const setup = await setupService.getSetupByMainClass(municipalityCode, classLevel, code);
+      const setup = await setupService.getSetupByMainClass(municipalityCode, classLevel, code, ordinanceNo);
       
       if (!setup) {
         return res.status(404).json({

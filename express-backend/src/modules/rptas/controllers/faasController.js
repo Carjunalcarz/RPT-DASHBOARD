@@ -160,7 +160,7 @@ exports.getDistinctTaxBegYears = async (req, res, next) => {
 exports.updateStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { status, remarks } = req.body;
+    const { status, remarks, approverName, approverPosition } = req.body;
     const userEmail = req.user ? req.user.email : 'anonymous';
     const userId = req.user ? req.user.id : null;
 
@@ -168,7 +168,7 @@ exports.updateStatus = async (req, res, next) => {
         throw new AppError('Invalid status value', 400);
     }
 
-    const record = await faasService.updateStatus(id, status, remarks, userEmail, userId);
+    const record = await faasService.updateStatus(id, status, remarks, userEmail, userId, approverName, approverPosition);
 
     res.status(200).json({
       success: true,
@@ -181,7 +181,7 @@ exports.updateStatus = async (req, res, next) => {
 
 exports.batchUpdateStatus = async (req, res, next) => {
   try {
-    const { ids, status, remarks } = req.body;
+    const { ids, status, remarks, approverName, approverPosition } = req.body;
     const userEmail = req.user ? req.user.email : 'anonymous';
     const userId = req.user ? req.user.id : null;
 
@@ -193,7 +193,7 @@ exports.batchUpdateStatus = async (req, res, next) => {
         throw new AppError('Invalid status value', 400);
     }
 
-    const results = await faasService.batchUpdateStatus(ids, status, remarks, userEmail, userId);
+    const results = await faasService.batchUpdateStatus(ids, status, remarks, userEmail, userId, approverName, approverPosition);
 
     res.status(200).json({
       success: true,

@@ -4,7 +4,11 @@ const { AppError } = require('../../../middleware/errorHandler');
 class ActualUseRateController {
   async getAll(req, res, next) {
     try {
-      const rows = await service.getAll();
+      const municipalityCode = req.query?.municipalityCode ? String(req.query.municipalityCode).trim() : null;
+      const classLevel = req.query?.classLevel ? String(req.query.classLevel).trim() : null;
+      const ordinanceNo = req.query?.ordinanceNo ? String(req.query.ordinanceNo).trim() : null;
+      const mainClassCode = req.query?.mainClassCode ? String(req.query.mainClassCode).trim() : null;
+      const rows = await service.getAll({ municipalityCode, classLevel, ordinanceNo, mainClassCode });
       res.status(200).json({
         status: 'success',
         data: rows,
@@ -16,8 +20,17 @@ class ActualUseRateController {
 
   async upsert(req, res, next) {
     try {
-      const { mainClassCode, actualUseCode, actualUseName, rate } = req.body || {};
+      const { municipalityCode, classLevel, ordinanceNo, mainClassCode, actualUseCode, actualUseName, rate } = req.body || {};
 
+      if (!municipalityCode || String(municipalityCode).trim() === '') {
+        return next(new AppError('Municipality Code is required', 400));
+      }
+      if (!classLevel || String(classLevel).trim() === '') {
+        return next(new AppError('Class Level is required', 400));
+      }
+      if (!ordinanceNo || String(ordinanceNo).trim() === '') {
+        return next(new AppError('Ordinance No. is required', 400));
+      }
       if (!mainClassCode || String(mainClassCode).trim() === '') {
         return next(new AppError('Main Class Code is required', 400));
       }
@@ -37,6 +50,9 @@ class ActualUseRateController {
       }
 
       const saved = await service.upsert(
+        String(municipalityCode).trim(),
+        String(classLevel).trim(),
+        String(ordinanceNo).trim(),
         String(mainClassCode).trim(),
         String(actualUseCode).trim(),
         String(actualUseName).trim(),
@@ -68,4 +84,3 @@ class ActualUseRateController {
 }
 
 module.exports = new ActualUseRateController();
-

@@ -325,7 +325,7 @@ class FaasService {
    * @param {string} userEmail 
    * @param {string} userId 
    */
-  async updateStatus(id, status, remarks, userEmail, userId) {
+  async updateStatus(id, status, remarks, userEmail, userId, approverName, approverPosition) {
     try {
         // 1. Get current record
         const currentRecord = await this.getRecord(id);
@@ -357,6 +357,10 @@ class FaasService {
 
         const currentData = currentRecord.data || {};
         let auditDetails = { status, remarks };
+        const actorEmail = userEmail;
+        const signatoryName = approverName || userEmail;
+        const signatoryPosition = approverPosition || null;
+        const nowIso = new Date().toISOString();
 
         // 4. Update Audit/Signatory Info in JSON Data
         if (status === 'pending-provincial') {
@@ -364,10 +368,17 @@ class FaasService {
             updateData.data = {
                 ...currentData,
                 REM: remarks || currentData.REM,
-                municipal_approver: userEmail,
-                municipal_approval_date: new Date().toISOString(),
-                Rec_Approval: userEmail, // Legacy mapping
-                Rec_AppDate: new Date().toISOString()
+                municipal_approver: actorEmail,
+                municipal_approval_date: nowIso,
+                Rec_Approval: signatoryName, // Legacy mapping
+                Rec_ApprovalPos: signatoryPosition || currentData.Rec_ApprovalPos,
+                Rec_AppDate: nowIso,
+                recApproval: signatoryName,
+                recApprovalPos: signatoryPosition || currentData.recApprovalPos,
+                recAppDate: nowIso,
+                cityAssessor: signatoryName,
+                cityAssessorPos: signatoryPosition || currentData.cityAssessorPos,
+                cityAssessorDate: nowIso
             };
             auditDetails.stage = 'Municipal Approval';
         } else if (status === 'approved') {
@@ -375,10 +386,17 @@ class FaasService {
             updateData.data = {
                 ...currentData,
                 REM: remarks || currentData.REM,
-                provincial_approver: userEmail,
-                provincial_approval_date: new Date().toISOString(),
-                Approved: userEmail, // Legacy mapping
-                ApprovedDate: new Date().toISOString(),
+                provincial_approver: actorEmail,
+                provincial_approval_date: nowIso,
+                Approved: signatoryName, // Legacy mapping
+                ApprovedPos: signatoryPosition || currentData.ApprovedPos,
+                ApprovedDate: nowIso,
+                approved: signatoryName,
+                approvedPos: signatoryPosition || currentData.approvedPos,
+                approvedDate: nowIso,
+                provAssessor: signatoryName,
+                provAssessorPos: signatoryPosition || currentData.provAssessorPos,
+                provAssessorDate: nowIso,
                 SGD_APPROVED: true
             };
             auditDetails.stage = 'Provincial Approval';
@@ -429,7 +447,7 @@ class FaasService {
    * @param {string} userEmail 
    * @param {string} userId 
    */
-  async batchUpdateStatus(ids, status, remarks, userEmail, userId) {
+  async batchUpdateStatus(ids, status, remarks, userEmail, userId, approverName, approverPosition) {
     try {
         if (!ids || !Array.isArray(ids) || ids.length === 0) {
             throw new AppError('No IDs provided for batch update', 400);
@@ -477,6 +495,9 @@ class FaasService {
             if (!eligible.length) return results;
 
             const nowIso = new Date().toISOString();
+            const actorEmail = userEmail;
+            const signatoryName = approverName || userEmail;
+            const signatoryPosition = approverPosition || null;
             const auditDetails =
                 status === 'pending-provincial'
                     ? { status, remarks, stage: 'Municipal Approval', bulk: true }
@@ -503,7 +524,7 @@ class FaasService {
                                     true
                                   ),
                                   '{municipal_approver}',
-                                  to_jsonb($3),
+                                  to_jsonb($7),
                                   true
                                 ),
                                 '{municipal_approval_date}',
@@ -515,13 +536,28 @@ class FaasService {
                               true
                             )
                             || jsonb_build_object('Rec_AppDate', $4)
+                            || jsonb_build_object('recAppDate', $4)
+                            || jsonb_build_object('recApproval', $3)
+                            || jsonb_build_object('cityAssessor', $3)
+                            || jsonb_build_object('cityAssessorPos', COALESCE($6::text, data->>'cityAssessorPos'))
+                            || jsonb_build_object('cityAssessorDate', $4)
+                            || CASE
+                                 WHEN $6::text IS NULL THEN '{}'::jsonb
+                                 ELSE jsonb_build_object('Rec_ApprovalPos', $6)
+                               END
+                            || CASE
+                                 WHEN $6::text IS NULL THEN '{}'::jsonb
+                                 ELSE jsonb_build_object('recApprovalPos', $6)
+                               END
                         WHERE id::uuid = ANY($5::uuid[])
                         `,
                         status,
                         remarks || null,
-                        userEmail,
+                        signatoryName,
                         nowIso,
-                        eligible
+                        eligible,
+                        signatoryPosition,
+                        actorEmail
                     );
                 } else if (status === 'approved') {
                     await tx.$executeRawUnsafe(
@@ -542,7 +578,7 @@ class FaasService {
                                       true
                                     ),
                                     '{provincial_approver}',
-                                    to_jsonb($3),
+                                     to_jsonb($7),
                                     true
                                   ),
                                   '{provincial_approval_date}',
@@ -558,13 +594,29 @@ class FaasService {
                               true
                             )
                             || jsonb_build_object('SGD_APPROVED', true)
+                            || jsonb_build_object('approved', $3)
+                            || jsonb_build_object('ApprovedDate', $4)
+                            || jsonb_build_object('approvedDate', $4)
+                            || jsonb_build_object('provAssessor', $3)
+                            || jsonb_build_object('provAssessorPos', COALESCE($6::text, data->>'provAssessorPos'))
+                            || jsonb_build_object('provAssessorDate', $4)
+                            || CASE
+                                 WHEN $6::text IS NULL THEN '{}'::jsonb
+                                 ELSE jsonb_build_object('ApprovedPos', $6)
+                               END
+                            || CASE
+                                 WHEN $6::text IS NULL THEN '{}'::jsonb
+                                 ELSE jsonb_build_object('approvedPos', $6)
+                               END
                         WHERE id::uuid = ANY($5::uuid[])
                         `,
                         status,
                         remarks || null,
-                        userEmail,
+                        signatoryName,
                         nowIso,
-                        eligible
+                        eligible,
+                        signatoryPosition,
+                        actorEmail
                     );
                 } else {
                     await tx.$executeRawUnsafe(

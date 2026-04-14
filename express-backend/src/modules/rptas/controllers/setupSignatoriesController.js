@@ -2,6 +2,11 @@ const { z } = require('zod');
 const { supabasePrisma } = require('../database/prisma');
 const { AppError } = require('../../../middleware/errorHandler');
 
+const isUuid = (value) => {
+  if (typeof value !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+};
+
 const createSchema = z.object({
   name: z.string().trim().min(2).max(200),
   title: z.string().trim().min(2).max(200),
@@ -96,6 +101,7 @@ const create = async (req, res, next) => {
     }
 
     const payload = parsed.data;
+    const actorId = isUuid(req.user?.id) ? req.user.id : null;
     const record = await supabasePrisma.setupSignatory.create({
       data: {
         name: payload.name,
@@ -104,8 +110,8 @@ const create = async (req, res, next) => {
         email: payload.email || null,
         phone: payload.phone || null,
         isActive: payload.isActive ?? true,
-        createdById: req.user?.id || null,
-        updatedById: req.user?.id || null,
+        createdById: actorId,
+        updatedById: actorId,
       },
     });
 
@@ -130,6 +136,7 @@ const update = async (req, res, next) => {
     if (!existing) return next(new AppError('Signatory not found', 404));
 
     const payload = parsed.data;
+    const actorId = isUuid(req.user?.id) ? req.user.id : null;
     const record = await supabasePrisma.setupSignatory.update({
       where: { id },
       data: {
@@ -139,7 +146,7 @@ const update = async (req, res, next) => {
         ...(payload.email !== undefined ? { email: payload.email || null } : {}),
         ...(payload.phone !== undefined ? { phone: payload.phone || null } : {}),
         ...(payload.isActive !== undefined ? { isActive: payload.isActive } : {}),
-        updatedById: req.user?.id || null,
+        updatedById: actorId,
       },
     });
 
@@ -159,12 +166,13 @@ const remove = async (req, res, next) => {
     });
     if (!existing) return next(new AppError('Signatory not found', 404));
 
+    const actorId = isUuid(req.user?.id) ? req.user.id : null;
     await supabasePrisma.setupSignatory.update({
       where: { id },
       data: {
         deletedAt: new Date(),
-        deletedById: req.user?.id || null,
-        updatedById: req.user?.id || null,
+        deletedById: actorId,
+        updatedById: actorId,
       },
     });
 
@@ -181,4 +189,3 @@ module.exports = {
   update,
   remove,
 };
-

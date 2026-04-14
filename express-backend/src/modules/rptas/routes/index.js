@@ -98,6 +98,8 @@ router.use('/api/v1/actual-use-rates', actualUseRateRoutes);
 // Legacy routes support
 router.use('/api/dashboard', dashboardRoutes);
 router.use('/api/sidebar', sidebarRoutes);
+router.use('/api/setup/signatories', setupSignatoriesRoutes);
+router.use('/api/setup/signatory-templates', setupSignatoryTemplatesRoutes);
 router.use('/api/classifications', classificationRoutes);
 router.use('/api/actual-uses', actualUseRoutes);
 router.use('/api/subclasses', subClassRoutes);

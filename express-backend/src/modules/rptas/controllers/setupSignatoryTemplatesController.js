@@ -2,6 +2,11 @@ const { z } = require('zod');
 const { supabasePrisma } = require('../database/prisma');
 const { AppError } = require('../../../middleware/errorHandler');
 
+const isUuid = (value) => {
+  if (typeof value !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+};
+
 const templateSchema = z.object({
   year: z.number().int().min(1900).max(2100),
   description: z.string().optional(),
@@ -91,6 +96,7 @@ const createTemplate = async (req, res, next) => {
     });
     if (existing) return next(new AppError(`Template for year ${payload.year} already exists`, 400));
 
+    const actorId = isUuid(req.user?.id) ? req.user.id : null;
     const template = await supabasePrisma.setupSignatoryTemplate.create({
       data: {
         year: payload.year,
@@ -124,8 +130,8 @@ const createTemplate = async (req, res, next) => {
         deputySgd: payload.deputySgd ?? false,
         deputyTpd: payload.deputyTpd ?? false,
         deputyDate: payload.deputyDate ? new Date(payload.deputyDate) : null,
-        createdById: req.user?.id || null,
-        updatedById: req.user?.id || null,
+        createdById: actorId,
+        updatedById: actorId,
       },
       include: includeSignatories,
     });
@@ -151,6 +157,7 @@ const updateTemplate = async (req, res, next) => {
     if (!existing) return next(new AppError('Template not found', 404));
 
     const payload = parsed.data;
+    const actorId = isUuid(req.user?.id) ? req.user.id : null;
     const updated = await supabasePrisma.setupSignatoryTemplate.update({
       where: { id },
       data: {
@@ -185,7 +192,7 @@ const updateTemplate = async (req, res, next) => {
         ...(payload.deputySgd !== undefined ? { deputySgd: payload.deputySgd } : {}),
         ...(payload.deputyTpd !== undefined ? { deputyTpd: payload.deputyTpd } : {}),
         ...(payload.deputyDate !== undefined ? { deputyDate: payload.deputyDate ? new Date(payload.deputyDate) : null } : {}),
-        updatedById: req.user?.id || null,
+        updatedById: actorId,
       },
       include: includeSignatories,
     });
@@ -206,12 +213,13 @@ const deleteTemplate = async (req, res, next) => {
     });
     if (!existing) return next(new AppError('Template not found', 404));
 
+    const actorId = isUuid(req.user?.id) ? req.user.id : null;
     await supabasePrisma.setupSignatoryTemplate.update({
       where: { id },
       data: {
         deletedAt: new Date(),
-        deletedById: req.user?.id || null,
-        updatedById: req.user?.id || null,
+        deletedById: actorId,
+        updatedById: actorId,
         isActive: false,
       },
     });

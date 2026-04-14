@@ -73,9 +73,19 @@ class MainclassActualUseSupabaseService {
     }
   }
 
-  async getAllSetups(municipalityCode, classLevel) {
+  async getAllSetups(municipalityCode, classLevel, ordinanceNo) {
     await this.ensureTableExists();
     try {
+      if (municipalityCode && classLevel && ordinanceNo) {
+        const rows = await prisma.$queryRawUnsafe(`
+          SELECT id, municipality_code, class_level, ordinance_no, date_approved, mainclass_code, mainclass_name, actual_uses, created_at, updated_at
+          FROM rptas.mainclass_actualuse_setup
+          WHERE municipality_code = $1 AND class_level = $2 AND ordinance_no = $3
+          ORDER BY mainclass_name ASC
+        `, municipalityCode, classLevel, ordinanceNo);
+        return rows;
+      }
+
       if (municipalityCode && classLevel) {
         const rows = await prisma.$queryRawUnsafe(`
           SELECT id, municipality_code, class_level, ordinance_no, date_approved, mainclass_code, mainclass_name, actual_uses, created_at, updated_at
@@ -98,15 +108,22 @@ class MainclassActualUseSupabaseService {
     }
   }
 
-  async getSetupByMainClass(municipalityCode, classLevel, mainClassCode) {
+  async getSetupByMainClass(municipalityCode, classLevel, mainClassCode, ordinanceNo) {
     await this.ensureTableExists();
     try {
-      const rows = await prisma.$queryRawUnsafe(`
-        SELECT id, municipality_code, class_level, ordinance_no, date_approved, mainclass_code, mainclass_name, actual_uses, created_at, updated_at
-        FROM rptas.mainclass_actualuse_setup
-        WHERE municipality_code = $1 AND class_level = $2 AND mainclass_code = $3
-        LIMIT 1
-      `, municipalityCode, classLevel, mainClassCode);
+      const rows = ordinanceNo
+        ? await prisma.$queryRawUnsafe(`
+          SELECT id, municipality_code, class_level, ordinance_no, date_approved, mainclass_code, mainclass_name, actual_uses, created_at, updated_at
+          FROM rptas.mainclass_actualuse_setup
+          WHERE municipality_code = $1 AND class_level = $2 AND mainclass_code = $3 AND ordinance_no = $4
+          LIMIT 1
+        `, municipalityCode, classLevel, mainClassCode, ordinanceNo)
+        : await prisma.$queryRawUnsafe(`
+          SELECT id, municipality_code, class_level, ordinance_no, date_approved, mainclass_code, mainclass_name, actual_uses, created_at, updated_at
+          FROM rptas.mainclass_actualuse_setup
+          WHERE municipality_code = $1 AND class_level = $2 AND mainclass_code = $3
+          LIMIT 1
+        `, municipalityCode, classLevel, mainClassCode);
       return rows.length > 0 ? rows[0] : null;
     } catch (error) {
       logger.error('Error fetching setup by main class code:', error);
@@ -149,6 +166,21 @@ class MainclassActualUseSupabaseService {
       return true;
     } catch (error) {
       logger.error('Error deleting setup:', error);
+      throw error;
+    }
+  }
+
+  async listDistinctMainClasses() {
+    await this.ensureTableExists();
+    try {
+      const rows = await prisma.$queryRawUnsafe(`
+        SELECT DISTINCT ON (mainclass_code) mainclass_code, mainclass_name
+        FROM rptas.mainclass_actualuse_setup
+        ORDER BY mainclass_code ASC, updated_at DESC
+      `);
+      return rows;
+    } catch (error) {
+      logger.error('Error fetching distinct main classes:', error);
       throw error;
     }
   }
