@@ -4,6 +4,7 @@ const logger = require('../../../utils/logger');
 const rptMastService = require('./rptMastService');
 
 const rptAssService = require('./rptAssService');
+const { assertStandardRevisionAllowed } = require('./revisionPolicy');
 const { DB_SCHEMA } = require('../config/database');
 
 
@@ -166,6 +167,16 @@ class FaasService {
       // Perform Validation (Passing existingRecord to optimize checks)
       await this.validateTransaction(data, currentId, existingRecord);
 
+      const transCode = String(data.TRANS_CD || data.transCode || '').trim().toUpperCase();
+      const pOldTdn = String(data.pOldTdn || data.P_OLD_TDN || data.old_tdn || '').trim();
+      let revisionValidation = null;
+      if (transCode === 'REV' && pOldTdn) {
+        const baseline = await rptAssService.getAll({ page: 1, limit: 1000, filters: { TDN: pOldTdn } });
+        const baselineRows = baseline?.data || [];
+        const nextRows = data.assessments || data.assessmentRecords || [];
+        revisionValidation = assertStandardRevisionAllowed(baselineRows, nextRows);
+      }
+
       let record;
       let action;
 
@@ -200,7 +211,7 @@ class FaasService {
       }
 
       // Audit Log (Non-blocking)
-      this.logAudit(action, record.id, { tdn }, userEmail, userId).catch(err => {
+      this.logAudit(action, record.id, { tdn, transCode: transCode || undefined, pOldTdn: pOldTdn || undefined, revision: revisionValidation?.audit || undefined }, userEmail, userId).catch(err => {
           logger.warn(`Background audit log failed for ${action}:`, err.message);
       });
 

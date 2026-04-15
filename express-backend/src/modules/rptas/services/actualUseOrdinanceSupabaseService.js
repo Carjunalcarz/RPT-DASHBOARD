@@ -6,6 +6,21 @@ class ActualUseOrdinanceSupabaseService {
     try {
       await prisma.$executeRawUnsafe(`CREATE SCHEMA IF NOT EXISTS rptas;`);
       await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS rptas.mainclass_actualuse_setup (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          municipality_code VARCHAR(50) NOT NULL DEFAULT 'ALL',
+          class_level VARCHAR(20) NOT NULL DEFAULT 'ALL',
+          ordinance_no VARCHAR(100),
+          date_approved DATE,
+          mainclass_code VARCHAR(50) NOT NULL DEFAULT '',
+          mainclass_name VARCHAR(255) NOT NULL DEFAULT '',
+          actual_uses JSONB NOT NULL DEFAULT '[]',
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+      `);
+
+      await prisma.$executeRawUnsafe(`
         CREATE TABLE IF NOT EXISTS rptas.actualuse_ordinances (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           municipality_code VARCHAR(50) NOT NULL,
@@ -41,22 +56,25 @@ class ActualUseOrdinanceSupabaseService {
         DROP INDEX IF EXISTS rptas.actualuse_ordinances_muni_class_no_key;
       `);
       await prisma.$executeRawUnsafe(`
-        CREATE UNIQUE INDEX IF NOT EXISTS actualuse_ordinances_no_key
-        ON rptas.actualuse_ordinances (ordinance_no);
+        DROP INDEX IF EXISTS actualuse_ordinances_no_key;
+      `);
+      await prisma.$executeRawUnsafe(`
+        CREATE UNIQUE INDEX IF NOT EXISTS actualuse_ordinances_ctx_key
+        ON rptas.actualuse_ordinances (municipality_code, class_level, ordinance_no);
       `);
       await prisma.$executeRawUnsafe(`
         DELETE FROM rptas.actualuse_ordinances a
         WHERE a.id NOT IN (
-          SELECT DISTINCT ON (ordinance_no) id
+          SELECT DISTINCT ON (municipality_code, class_level, ordinance_no) id
           FROM rptas.actualuse_ordinances
-          ORDER BY ordinance_no, date_approved DESC, updated_at DESC
+          ORDER BY municipality_code, class_level, ordinance_no, date_approved DESC, updated_at DESC
         );
       `);
       await prisma.$executeRawUnsafe(`
         INSERT INTO rptas.actualuse_ordinances (municipality_code, class_level, ordinance_no, date_approved, updated_at)
         SELECT
-          'ALL' AS municipality_code,
-          'ALL' AS class_level,
+          municipality_code,
+          class_level,
           ordinance_no,
           MAX(date_approved) AS date_approved,
           NOW() AS updated_at
@@ -64,8 +82,8 @@ class ActualUseOrdinanceSupabaseService {
         WHERE ordinance_no IS NOT NULL
           AND ordinance_no <> ''
           AND date_approved IS NOT NULL
-        GROUP BY ordinance_no
-        ON CONFLICT (ordinance_no)
+        GROUP BY municipality_code, class_level, ordinance_no
+        ON CONFLICT (municipality_code, class_level, ordinance_no)
         DO UPDATE SET
           date_approved = EXCLUDED.date_approved,
           updated_at = NOW();
@@ -76,16 +94,31 @@ class ActualUseOrdinanceSupabaseService {
     }
   }
 
-  async list() {
+  async list(municipalityCode, classLevel) {
     await this.ensureTableExists();
     try {
-      const rows = await prisma.$queryRawUnsafe(
-        `
-          SELECT id, municipality_code, class_level, ordinance_no, date_approved, created_at, updated_at
-          FROM rptas.actualuse_ordinances
-          ORDER BY date_approved DESC, ordinance_no ASC
-        `
-      );
+      const muni = municipalityCode ? String(municipalityCode).trim() : null;
+      const level = classLevel ? String(classLevel).trim() : null;
+      const rows =
+        muni && level
+          ? await prisma.$queryRawUnsafe(
+              `
+                SELECT id, municipality_code, class_level, ordinance_no, date_approved, created_at, updated_at
+                FROM rptas.actualuse_ordinances
+                WHERE (municipality_code = 'ALL' OR municipality_code = $1)
+                  AND (class_level = 'ALL' OR class_level = $2)
+                ORDER BY date_approved DESC, ordinance_no ASC
+              `,
+              muni,
+              level
+            )
+          : await prisma.$queryRawUnsafe(
+              `
+                SELECT id, municipality_code, class_level, ordinance_no, date_approved, created_at, updated_at
+                FROM rptas.actualuse_ordinances
+                ORDER BY date_approved DESC, ordinance_no ASC
+              `
+            );
       return rows;
     } catch (error) {
       logger.error('Error fetching actual use ordinances:', error);
@@ -93,8 +126,10 @@ class ActualUseOrdinanceSupabaseService {
     }
   }
 
-  async upsert(ordinanceNo, dateApproved) {
+  async upsert(municipalityCode, classLevel, ordinanceNo, dateApproved) {
     await this.ensureTableExists();
+    const muni = String(municipalityCode || '').trim() || 'ALL';
+    const level = String(classLevel || '').trim() || 'ALL';
     const ord = String(ordinanceNo || '').trim();
     const date = String(dateApproved || '').trim();
 
@@ -102,13 +137,15 @@ class ActualUseOrdinanceSupabaseService {
       const rows = await prisma.$queryRawUnsafe(
         `
           INSERT INTO rptas.actualuse_ordinances (municipality_code, class_level, ordinance_no, date_approved, updated_at)
-          VALUES ('ALL', 'ALL', $1, $2::date, NOW())
-          ON CONFLICT (ordinance_no)
+          VALUES ($1, $2, $3, $4::date, NOW())
+          ON CONFLICT (municipality_code, class_level, ordinance_no)
           DO UPDATE SET
             date_approved = EXCLUDED.date_approved,
             updated_at = NOW()
           RETURNING id, municipality_code, class_level, ordinance_no, date_approved, created_at, updated_at
         `,
+        muni,
+        level,
         ord,
         date
       );

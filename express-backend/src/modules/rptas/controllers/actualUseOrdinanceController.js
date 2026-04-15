@@ -4,7 +4,9 @@ const { AppError } = require('../../../middleware/errorHandler');
 class ActualUseOrdinanceController {
   async list(req, res, next) {
     try {
-      const data = await ordinanceService.list();
+      const municipalityCode = req.query?.municipalityCode ? String(req.query.municipalityCode).trim() : null;
+      const classLevel = req.query?.classLevel ? String(req.query.classLevel).trim() : null;
+      const data = await ordinanceService.list(municipalityCode, classLevel);
       res.status(200).json({ status: 'success', data });
     } catch (error) {
       next(new AppError('Failed to fetch ordinances: ' + error.message, 500));
@@ -13,12 +15,14 @@ class ActualUseOrdinanceController {
 
   async upsert(req, res, next) {
     try {
-      const { ordinanceNo, dateApproved } = req.body || {};
+      const { municipalityCode, classLevel, ordinanceNo, dateApproved } = req.body || {};
       if (!ordinanceNo || !dateApproved) {
         return next(new AppError('Ordinance No. and Date Approved are required', 400));
       }
 
-      const saved = await ordinanceService.upsert(ordinanceNo, dateApproved);
+      const muni = municipalityCode ? String(municipalityCode).trim() : 'ALL';
+      const level = classLevel ? String(classLevel).trim() : 'ALL';
+      const saved = await ordinanceService.upsert(muni, level, ordinanceNo, dateApproved);
       res.status(200).json({ status: 'success', data: saved });
     } catch (error) {
       next(new AppError('Failed to save ordinance: ' + error.message, 500));
