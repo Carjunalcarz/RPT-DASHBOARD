@@ -4,13 +4,14 @@ const { AppError } = require('../../../middleware/errorHandler');
 class BldgUnitCostController {
   async getAll(req, res, next) {
     try {
-      const { page, limit, strucType, bldgCode, city } = req.query;
+      const { page, limit, strucType, bldgCode, city, effDate } = req.query;
       const result = await bldgUnitCostService.getAll({ 
         page, 
         limit, 
         strucType, 
         bldgCode,
-        city
+        city,
+        effDate
       });
       res.status(200).json(result);
     } catch (error) {
@@ -29,6 +30,16 @@ class BldgUnitCostController {
         return res.status(404).json({ success: false, message: 'Unit cost not found' });
       }
       res.status(200).json({ success: true, data: result });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getDistinctEffDates(req, res, next) {
+    try {
+      const { strucType, bldgCode, city } = req.query;
+      const result = await bldgUnitCostService.getDistinctEffDates({ strucType, bldgCode, city });
+      res.status(200).json(result);
     } catch (error) {
       next(error);
     }

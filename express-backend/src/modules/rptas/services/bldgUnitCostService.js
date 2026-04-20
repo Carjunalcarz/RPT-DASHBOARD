@@ -7,7 +7,7 @@ class BldgUnitCostService {
    * Get all building unit costs with optional filtering
    * @param {Object} params 
    */
-  async getAll({ page = 1, limit = 100, strucType, bldgCode, city }) {
+  async getAll({ page = 1, limit = 100, strucType, bldgCode, city, effDate }) {
     try {
       const pool = await poolPromise;
       if (!pool) throw new Error('Database connection failed');
@@ -39,6 +39,10 @@ class BldgUnitCostService {
         query += ` AND u.City = @city`;
       }
 
+      if (effDate) {
+        query += ` AND CONVERT(date, u.Eff_Date) = CONVERT(date, @effDate)`;
+      }
+
       query += ` ORDER BY u.StrucType, u.BldgCode`;
 
       // Simple pagination
@@ -64,11 +68,13 @@ class BldgUnitCostService {
       if (strucType) countQuery += ` AND u.StrucType = @strucType`;
       if (bldgCode) countQuery += ` AND u.BldgCode = @bldgCode`;
       if (city) countQuery += ` AND u.City = @city`;
+      if (effDate) countQuery += ` AND CONVERT(date, u.Eff_Date) = CONVERT(date, @effDate)`;
       
       const countRequest = pool.request();
       if (strucType) countRequest.input('strucType', strucType);
       if (bldgCode) countRequest.input('bldgCode', bldgCode);
       if (city) countRequest.input('city', city);
+      if (effDate) countRequest.input('effDate', effDate);
       
       const countResult = await countRequest.query(countQuery);
       const total = countResult.recordset[0].total;
@@ -128,6 +134,42 @@ class BldgUnitCostService {
       return result.recordset[0] || null;
     } catch (error) {
       logger.error('Error in BldgUnitCostService.getUnitCost:', error);
+      throw new AppError(error.message, 500);
+    }
+  }
+
+  async getDistinctEffDates({ strucType, bldgCode, city }) {
+    try {
+      const pool = await poolPromise;
+      if (!pool) throw new Error('Database connection failed');
+
+      let query = `
+        SELECT DISTINCT u.Eff_Date
+        FROM RPTAS_AGUSAN.dbo.BLDG_UNITCOST u
+        WHERE u.Eff_Date IS NOT NULL
+      `;
+
+      if (strucType) query += ` AND u.StrucType = @strucType`;
+      if (bldgCode) query += ` AND u.BldgCode = @bldgCode`;
+      if (city) query += ` AND u.City = @city`;
+
+      query += ` ORDER BY u.Eff_Date DESC`;
+
+      const request = pool.request();
+      if (strucType) request.input('strucType', strucType);
+      if (bldgCode) request.input('bldgCode', bldgCode);
+      if (city) request.input('city', city);
+      if (effDate) request.input('effDate', effDate);
+
+      const result = await request.query(query);
+      const dates = (result.recordset || [])
+        .map((r) => r.Eff_Date)
+        .filter(Boolean)
+        .map((d) => String(d).slice(0, 10));
+
+      return { success: true, data: dates };
+    } catch (error) {
+      logger.error('Error in BldgUnitCostService.getDistinctEffDates:', error);
       throw new AppError(error.message, 500);
     }
   }

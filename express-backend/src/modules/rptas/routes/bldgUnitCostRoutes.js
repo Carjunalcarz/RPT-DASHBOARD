@@ -35,6 +35,8 @@ const protect = require('../../../middleware/auth');
  */
 router.get('/', protect, bldgUnitCostController.getAll);
 
+router.get('/distinct/eff-dates', protect, bldgUnitCostController.getDistinctEffDates);
+
 /**
  * @swagger
  * /api/bldg-unit-cost/lookup:
