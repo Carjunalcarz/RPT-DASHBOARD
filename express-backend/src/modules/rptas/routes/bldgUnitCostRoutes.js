@@ -37,6 +37,18 @@ router.get('/', protect, bldgUnitCostController.getAll);
 
 router.get('/distinct/eff-dates', protect, bldgUnitCostController.getDistinctEffDates);
 
+router.get('/sets', protect, bldgUnitCostController.listUnitCostSets);
+router.post('/sets', protect, protect.restrictTo('admin'), bldgUnitCostController.createUnitCostSet);
+router.get('/sets/:id', protect, bldgUnitCostController.getUnitCostSet);
+router.get('/sets/:id/items', protect, bldgUnitCostController.listUnitCostSetItems);
+router.post('/sets/:id/items', protect, protect.restrictTo('admin'), bldgUnitCostController.createUnitCostSetItem);
+router.put('/sets/:id/items/:itemId', protect, protect.restrictTo('admin'), bldgUnitCostController.updateUnitCostSetItem);
+router.delete('/sets/:id/items/:itemId', protect, protect.restrictTo('admin'), bldgUnitCostController.deleteUnitCostSetItem);
+router.patch('/sets/:id', protect, protect.restrictTo('admin'), bldgUnitCostController.updateUnitCostSet);
+router.post('/sets/:id/restore', protect, protect.restrictTo('admin'), bldgUnitCostController.restoreUnitCostSet);
+router.post('/sets/:id/items/:itemId/restore', protect, protect.restrictTo('admin'), bldgUnitCostController.restoreUnitCostSetItem);
+router.delete('/sets/:id', protect, protect.restrictTo('admin'), bldgUnitCostController.deleteUnitCostSet);
+
 /**
  * @swagger
  * /api/bldg-unit-cost/lookup:

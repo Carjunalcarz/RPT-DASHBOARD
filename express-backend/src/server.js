@@ -16,6 +16,7 @@ const rateLimiter = require('./middleware/rateLimiter');
 const requestLogger = require('./middleware/requestLogger');
 const idempotency = require('./middleware/idempotency');
 const logger = require('./utils/logger');
+const { runSupabaseStartupMigrations } = require('./modules/rptas/database/startupMigrations');
 
 const app = express();
 
@@ -195,18 +196,21 @@ app.use(errorHandler);
 
 // Start Server if not imported (for testing)
 if (require.main === module) {
-  const PORT = process.env.PORT || 3000;
-  const server = app.listen(PORT, () => {
-    logger.info(`Server running on port ${PORT}`);
-  });
+  (async () => {
+    await runSupabaseStartupMigrations();
 
-  // Handle unhandled promise rejections
-  process.on('unhandledRejection', (err) => {
-    logger.error('UNHANDLED REJECTION! Shutting down...', err);
-    server.close(() => {
-      process.exit(1);
+    const PORT = process.env.PORT || 3000;
+    const server = app.listen(PORT, () => {
+      logger.info(`Server running on port ${PORT}`);
     });
-  });
+
+    process.on('unhandledRejection', (err) => {
+      logger.error('UNHANDLED REJECTION! Shutting down...', err);
+      server.close(() => {
+        process.exit(1);
+      });
+    });
+  })();
 }
 
 module.exports = app;

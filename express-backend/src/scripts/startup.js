@@ -103,6 +103,12 @@ async function ensureSupabaseExtensions(client) {
   }
 
   try {
+    await client.$executeRawUnsafe(`CREATE EXTENSION IF NOT EXISTS pgcrypto;`);
+  } catch (error) {
+    logger.warn(`[Startup] Unable to ensure pgcrypto extension: ${error.message}`);
+  }
+
+  try {
     const rows = await client.$queryRawUnsafe(
       `SELECT COUNT(*)::int AS count
        FROM pg_proc p
@@ -177,7 +183,12 @@ async function runMigrations(schemaPath, name) {
       const deployOutput = execSync(deployCmd, { encoding: 'utf8' });
       logger.info(`[Startup] Migration deploy output for ${name}: ${deployOutput.trim()}`);
     } catch (deployError) {
-      logger.warn(`[Startup] Migration deploy failed for ${name}, but continuing startup. Error: ${deployError.message}`);
+      const msg = String(deployError?.message || '');
+      if (msg.includes('P3005') || msg.includes('The database schema is not empty')) {
+        logger.info(`[Startup] Skipping Prisma migrate deploy for ${name} because the database is not empty (P3005).`);
+      } else {
+        logger.warn(`[Startup] Migration deploy failed for ${name}, but continuing startup. Error: ${deployError.message}`);
+      }
     }
 
     return true;
@@ -293,4 +304,3 @@ if (require.main === module) {
 }
 
 module.exports = startup;
-

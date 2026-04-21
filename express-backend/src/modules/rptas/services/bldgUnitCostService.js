@@ -56,6 +56,7 @@ class BldgUnitCostService {
       if (strucType) request.input('strucType', strucType);
       if (bldgCode) request.input('bldgCode', bldgCode);
       if (city) request.input('city', city);
+      if (effDate) request.input('effDate', effDate);
 
       const result = await request.query(query);
 
