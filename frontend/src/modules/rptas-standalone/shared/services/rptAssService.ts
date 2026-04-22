@@ -20,6 +20,9 @@ export interface RptAssRecord {
   ASS_LEVEL: number;
   TAXABLE_RATE: number;
   ASS_VALUE: number;
+  STRUCTURE_UNIT_VALUE?: number;
+  STRUCTURE_MARKET_VAL?: number;
+  STRUCTURE_ASS_VALUE?: number;
   TAXABILITY: string;
   BU: string;
   SQAREA: number;
@@ -66,24 +69,51 @@ export interface RptAssResponse {
   data: RptAssRecord[];
 }
 
+const API_BASE = import.meta.env.VITE_API_URL
+  ? import.meta.env.VITE_API_URL.replace('/v1', '')
+  : 'http://localhost:3000/api';
+
+const RPT_ASS_TTL_MS = 60 * 1000;
+const rptAssByTdnCache = new Map<string, { value: RptAssRecord[]; expiresAt: number }>();
+const rptAssByTdnInFlight = new Map<string, Promise<RptAssRecord[]>>();
+
 export const getRptAssByTdn = async (tdn: string): Promise<RptAssRecord[]> => {
   if (!tdn) return [];
-  // Use the absolute path strategy similar to rptMastService if needed, 
-  // but let's assume standard api usage first. 
-  // If rptMastService uses a hack, we might need it here too.
-  // rptMastService used: `${API_BASE}/rptmast/RPTAS_AGUSAN`
-  // rptAssRoutes are mounted at /api/rpt-ass
-  
-  const API_BASE = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/v1', '') : 'http://localhost:3000/api';
-  
+
+  const key = String(tdn).trim();
+  const now = Date.now();
+  const cached = rptAssByTdnCache.get(key);
+  if (cached && cached.expiresAt > now) return cached.value;
+
+  const inFlight = rptAssByTdnInFlight.get(key);
+  if (inFlight) return inFlight;
+
   try {
-    const response = await api.get(`${API_BASE}/rpt-ass`, { 
-      params: { 
-        TDN: tdn,
-        limit: 1000 // Get all assessments for this TDN
-      } 
-    });
-    return response.data.data;
+    const promise = api
+      .get(`${API_BASE}/rpt-ass`, {
+        params: {
+          TDN: key,
+          limit: 1000,
+          _ts: Date.now(),
+        },
+      })
+      .then((response) => {
+        const rows = (response.data?.data || []) as RptAssRecord[];
+        rptAssByTdnCache.set(key, { value: rows, expiresAt: Date.now() + RPT_ASS_TTL_MS });
+        return rows;
+      })
+      .catch((error) => {
+        const status = error?.response?.status;
+        if (status === 304 && cached) return cached.value;
+        console.error('Failed to fetch assessment records', error);
+        throw error;
+      })
+      .finally(() => {
+        rptAssByTdnInFlight.delete(key);
+      });
+
+    rptAssByTdnInFlight.set(key, promise);
+    return promise;
   } catch (error) {
     console.error('Failed to fetch assessment records', error);
     throw error;

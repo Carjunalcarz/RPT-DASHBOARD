@@ -41,7 +41,28 @@ class RptAssService {
 
       // Base query
       let query = `
-        SELECT * FROM RPTAS_AGUSAN.dbo.RPT_ASS
+        SELECT
+          a.*,
+          bs.STRUCTURE_UNIT_VALUE,
+          bs.STRUCTURE_MARKET_VAL,
+          bs.STRUCTURE_ASS_VALUE
+        FROM RPTAS_AGUSAN.dbo.RPT_ASS a
+        LEFT JOIN (
+          SELECT
+            TDN,
+            KIND,
+            Classification,
+            Actual_use,
+            MAX(ISNULL(UNIT_VALUE, 0)) AS STRUCTURE_UNIT_VALUE,
+            SUM(ISNULL(Market_Val, 0)) AS STRUCTURE_MARKET_VAL,
+            SUM(ISNULL(ASS_VALUE, 0)) AS STRUCTURE_ASS_VALUE
+          FROM RPTAS_AGUSAN.dbo.BLDG_STRUC
+          GROUP BY TDN, KIND, Classification, Actual_use
+        ) bs
+          ON bs.TDN = a.TDN
+         AND bs.KIND = a.KIND
+         AND bs.Classification = a.CLASSIFICATION
+         AND bs.Actual_use = a.ACTUAL_USE
         WHERE 1=1
       `;
 
@@ -53,7 +74,7 @@ class RptAssService {
           // Use parameters to prevent SQL injection
           request.input(key, sql.VarChar, filters[key]);
           request2.input(key, sql.VarChar, filters[key]);
-          query += ` AND ${key} = @${key}`;
+          query += ` AND a.${key} = @${key}`;
         }
       });
       
@@ -63,9 +84,26 @@ class RptAssService {
       const totalCountResult = await request.query(countQuery);
       const total = totalCountResult.recordset[0].total;
 
+      const allowedSortFields = new Set([
+        'REGION',
+        'PROV',
+        'CITY',
+        'DISTRICT',
+        'TDN',
+        'KIND',
+        'CLASSIFICATION',
+        'ACTUAL_USE',
+        'FOR_YEAR',
+        'EFF_DATE',
+        'MARKET_VAL',
+        'ASS_VALUE',
+      ]);
+      const sortBySafe = allowedSortFields.has(sortBy) ? sortBy : 'TDN';
+      const sortOrderSafe = String(sortOrder || 'ASC').toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+
       // Sorting and Pagination
       // MSSQL requires OFFSET FETCH for pagination with ORDER BY
-      query += ` ORDER BY ${sortBy} ${sortOrder} OFFSET ${(page - 1) * limit} ROWS FETCH NEXT ${limit} ROWS ONLY`;
+      query += ` ORDER BY a.${sortBySafe} ${sortOrderSafe} OFFSET ${(page - 1) * limit} ROWS FETCH NEXT ${limit} ROWS ONLY`;
 
       logger.info(`Executing RPT_ASS getAll query`);
       
@@ -74,7 +112,7 @@ class RptAssService {
       // Enhance result with formatted area
       const enhancedData = result.recordset.map(record => ({
         ...record,
-        formattedArea: this.getAreaWithUnit(record.AREA, record.IF_DEFAULT)
+        formattedArea: this.getAreaWithUnit(record.AREA, record.IF_DEFAULT),
       }));
 
       return {
@@ -100,7 +138,31 @@ class RptAssService {
       const pool = await poolPromise;
       const result = await pool.request()
         .input('id', sql.VarChar, id)
-        .query('SELECT * FROM RPTAS_AGUSAN.dbo.RPT_ASS WHERE TDN = @id'); // Using TDN as ID based on typical RPT structure
+        .query(`
+          SELECT
+            a.*,
+            bs.STRUCTURE_UNIT_VALUE,
+            bs.STRUCTURE_MARKET_VAL,
+            bs.STRUCTURE_ASS_VALUE
+          FROM RPTAS_AGUSAN.dbo.RPT_ASS a
+          LEFT JOIN (
+            SELECT
+              TDN,
+              KIND,
+              Classification,
+              Actual_use,
+              MAX(ISNULL(UNIT_VALUE, 0)) AS STRUCTURE_UNIT_VALUE,
+              SUM(ISNULL(Market_Val, 0)) AS STRUCTURE_MARKET_VAL,
+              SUM(ISNULL(ASS_VALUE, 0)) AS STRUCTURE_ASS_VALUE
+            FROM RPTAS_AGUSAN.dbo.BLDG_STRUC
+            GROUP BY TDN, KIND, Classification, Actual_use
+          ) bs
+            ON bs.TDN = a.TDN
+           AND bs.KIND = a.KIND
+           AND bs.Classification = a.CLASSIFICATION
+           AND bs.Actual_use = a.ACTUAL_USE
+          WHERE a.TDN = @id
+        `); // Using TDN as ID based on typical RPT structure
 
       if (result.recordset.length === 0) {
         throw new AppError('Record not found', 404);

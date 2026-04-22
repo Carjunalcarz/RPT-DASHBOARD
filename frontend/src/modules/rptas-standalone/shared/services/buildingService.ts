@@ -27,17 +27,42 @@ export interface BuildingAppraisal {
   rate: number;              // Unit Value
 }
 
+const BUILDING_TYPES_TTL_MS = 5 * 60 * 1000;
+let buildingTypesCache: { value: BuildingType[]; expiresAt: number } | null = null;
+let buildingTypesInFlight: Promise<BuildingType[]> | null = null;
+
+export const invalidateBuildingTypesCache = () => {
+  buildingTypesCache = null;
+};
+
 export const getBuildingTypes = async (): Promise<BuildingType[]> => {
-  try {
-    const response = await api.get('/buildings/types');
-    if (response.data && response.data.success) {
-      return response.data.data;
-    }
-    return [];
-  } catch (error) {
-    console.error('Error fetching building types:', error);
-    return [];
+  const now = Date.now();
+  if (buildingTypesCache && buildingTypesCache.expiresAt > now) {
+    return buildingTypesCache.value;
   }
+
+  if (buildingTypesInFlight) {
+    return buildingTypesInFlight;
+  }
+
+  buildingTypesInFlight = (async () => {
+    try {
+      const response = await api.get('/buildings/types');
+      const types =
+        response.data && response.data.success ? (response.data.data as BuildingType[]) : [];
+      if (response.data && response.data.success) {
+        buildingTypesCache = { value: types, expiresAt: Date.now() + BUILDING_TYPES_TTL_MS };
+      }
+      return types;
+    } catch (error) {
+      console.error('Error fetching building types:', error);
+      return [];
+    } finally {
+      buildingTypesInFlight = null;
+    }
+  })();
+
+  return buildingTypesInFlight;
 };
 
 export const getBuildingMarketValues = async (params?: {

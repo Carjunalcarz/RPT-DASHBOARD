@@ -85,8 +85,8 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({
         subClass: r.SUB_CLASS || '',
         area: r.AREA || 0,
         unitValue: r.UNIT_VALUE || 0,
-        baseMarketValue: r.MARKET_VAL || 0,
-        adjustedMarketValue: r.MARKET_VAL || 0, // Using same value for now as API might not provide split
+        baseMarketValue: (r.STRUCTURE_MARKET_VAL ?? r.MARKET_VAL) || 0,
+        adjustedMarketValue: (r.STRUCTURE_MARKET_VAL ?? r.MARKET_VAL) || 0,
         assessmentLevel: r.ASS_LEVEL || 0,
         assessedValue: r.ASS_VALUE || 0,
         taxable: r.TAXABLE_RATE > 0, // Simplified logic

@@ -143,22 +143,60 @@ class BldgStrucService {
     try {
       const pool = await poolPromise;
       const request = pool.request();
-      request.input('tdn', sql.VarChar, tdn);
-      request.input('floorOrd', sql.Int, floorOrd);
 
-      const fields = Object.keys(data);
+      request.input('p_tdn', sql.VarChar, tdn);
+      request.input('p_floorOrd', sql.Int, floorOrd);
+
+      const allowedFields = new Set([
+        'Region', 'Prov', 'City', 'DISTRICT', 'TDN', 'KIND', 'Classification', 'Actual_use', 'SubClass', 'Struc_type',
+        'BldgCode', 'Storey', 'TAXABILITY', 'BU', 'D_construct', 'D_occupied', 'D_complete', 'Maintenance', 'Age',
+        'Dep_Code', 'Dep_Rate', 'Floor_area', 'UNIT_VALUE', 'OLD_MVAL', 'Market_Val', 'ASS_LEVEL', 'ASS_VALUE',
+        'Foundation', 'Posts', 'Beams', 'Truss_Framing', 'Roof', 'Ext_Walls', 'Flooring', 'Doors', 'Ceiling', 'Windows',
+        'Stairs', 'Partition', 'Wall_Finish', 'Electrical', 'Toilet_Bath', 'Plumbing', 'Fixtures', 'StoreyDesc',
+        'Bldg_Permit', 'Total_Area', 'FloorOrd', 'Others', 'P_CONSTRUCT', 'FloorJoists', 'FloorDesc', 'FrameFlooring',
+        'FinFlooring', 'FrameExt_Walls', 'FinExt_Walls', 'FrameRoof', 'FinRoof', 'FramePartition', 'FinPartition',
+        'FrameCeiling', 'FinCeiling', 'Sub_Tdn', 'C_occupied', 'C_complete', 'IsImprovement', 'Struc_Desc', 'Struc_Part',
+        'BUCC_CODE', 'BUCC_Rate', 'AdjustedUnitValue', 'FirstFloor', 'SecondFloor', 'ThirdFloor'
+      ]);
+
+      const fields = Object.keys(data || {}).filter((field) => {
+        if (!allowedFields.has(field)) return false;
+        if (field === 'TDN') return false;
+        if (field === 'FloorOrd') return false;
+        return true;
+      });
       if (fields.length === 0) throw new AppError('No data provided for update', 400);
 
-      const setClause = fields.map(field => {
-        request.input(field, data[field]);
-        return `${field} = @${field}`;
-      }).join(', ');
+      const bindField = (field, value) => {
+        const name = `f_${field}`;
+        if (typeof value === 'number') {
+          request.input(name, sql.Decimal(18, 4), value);
+          return;
+        }
+        if (typeof value === 'boolean') {
+          request.input(name, sql.Bit, value);
+          return;
+        }
+        if (field.startsWith('D_') || field.startsWith('C_')) {
+          if (value) request.input(name, sql.DateTime, new Date(value));
+          else request.input(name, sql.DateTime, null);
+          return;
+        }
+        request.input(name, sql.VarChar, value === undefined ? null : value);
+      };
+
+      const setClause = fields
+        .map((field) => {
+          bindField(field, data[field]);
+          return `${field} = @f_${field}`;
+        })
+        .join(', ');
 
       const query = `
         UPDATE RPTAS_AGUSAN.dbo.BLDG_STRUC
         SET ${setClause}
-        WHERE TDN = @tdn AND FloorOrd = @floorOrd;
-        SELECT * FROM RPTAS_AGUSAN.dbo.BLDG_STRUC WHERE TDN = @tdn AND FloorOrd = @floorOrd;
+        WHERE TDN = @p_tdn AND FloorOrd = @p_floorOrd;
+        SELECT * FROM RPTAS_AGUSAN.dbo.BLDG_STRUC WHERE TDN = @p_tdn AND FloorOrd = @p_floorOrd;
       `;
 
       const result = await request.query(query);
