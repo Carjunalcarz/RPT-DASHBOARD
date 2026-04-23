@@ -56,6 +56,11 @@ const validate = require('../../../middleware/validate');
  *           type: string
  *         description: Filter by table name
  *       - in: query
+ *         name: recordId
+ *         schema:
+ *           type: string
+ *         description: Filter by record ID
+ *       - in: query
  *         name: action
  *         schema:
  *           type: string
@@ -123,6 +128,7 @@ router.get(
   protect,
   validate([
     query('source').optional().isIn(['mssql', 'supabase']).withMessage('Invalid source'),
+    query('recordId').optional().isString().withMessage('Invalid recordId'),
     query('page').optional().isInt({ min: 1 }).withMessage('Page must be greater than 0'),
     query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
     query('startDate').optional().isISO8601().withMessage('Invalid start date'),

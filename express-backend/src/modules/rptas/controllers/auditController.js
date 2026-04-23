@@ -9,7 +9,7 @@ const getClient = (source) => {
 
 exports.getAuditLogs = async (req, res, next) => {
   try {
-    const { source, tableName, action, userId, startDate, endDate, page = 1, limit = 10 } = req.query;
+    const { source, tableName, recordId, action, userId, startDate, endDate, page = 1, limit = 10 } = req.query;
     
     // Default to Supabase if not specified
     const targetSource = source || 'supabase';
@@ -21,6 +21,7 @@ exports.getAuditLogs = async (req, res, next) => {
 
     const where = {};
     if (tableName) where.tableName = tableName;
+    if (recordId) where.recordId = recordId;
     if (action) where.action = action;
     if (userId) where.userId = userId;
     if (startDate || endDate) {
