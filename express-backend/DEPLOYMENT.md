@@ -34,6 +34,7 @@ Required:
 Optional:
 
 - `ALLOW_MSSQL_FAILURE=true` (allows startup to proceed if MSSQL is unreachable)
+- `ALLOW_FORCE_ADMIN=false` (**dev bootstrap only — keep `false` in production**). When `true` and the client sends `x-force-admin: true` (set by the frontend `VITE_FORCE_ADMIN=true`), `GET /rbac/me` persists a real `super_admin` role for the authenticated user. Intended to promote your first admin once; while enabled, **every** user who logs in is promoted, so set both flags back to `false` afterwards.
 - `REFRESH_REPORTING_ON_STARTUP=false`
 - `LOG_LEVEL=info`
 - `LOG_TO_FILES=false`

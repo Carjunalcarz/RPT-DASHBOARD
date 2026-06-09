@@ -8,7 +8,7 @@ datasource db {
   provider  = "postgresql"
   url       = env("SUPABASE_DB_URL")
   directUrl = env("SUPABASE_DIRECT_URL")
-  schemas   = ["public", "admin_setup", "rptas"]
+  schemas   = ["public", "admin_setup"]
 }
 
 model AuditLog {
@@ -212,7 +212,7 @@ model SetupSignatory {
   @@index([name])
   @@index([isActive])
   @@map("setup_signatories")
-  @@schema("rptas")
+  @@schema("public")
 }
 
 model SetupSignatoryTemplate {
@@ -274,7 +274,7 @@ model SetupSignatoryTemplate {
 
   @@unique([year, deletedAt]) // Allow multiple years if one is deleted, but active unique year
   @@map("setup_signatory_templates")
-  @@schema("rptas")
+  @@schema("public")
 }
 
 model BuildingType {
@@ -286,7 +286,7 @@ model BuildingType {
   marketValues BuildingMarketValue[]
 
   @@map("building_types")
-  @@schema("rptas")
+  @@schema("public")
 }
 
 model BuildingMarketValue {
@@ -303,7 +303,7 @@ model BuildingMarketValue {
   buildingType    BuildingType @relation(fields: [buildingTypeId], references: [id])
 
   @@map("building_market_values")
-  @@schema("rptas")
+  @@schema("public")
 }
 
 model OrderOfPayment {
@@ -322,7 +322,7 @@ model OrderOfPayment {
   @@index([status])
   @@index([dateCreated])
   @@map("orders_of_payment")
-  @@schema("rptas")
+  @@schema("public")
 }
 
 model OopHistory {
@@ -338,7 +338,7 @@ model OopHistory {
   @@index([orderId, timestamp])
   @@index([action])
   @@map("oop_history")
-  @@schema("rptas")
+  @@schema("public")
 }
 
 model Municipality {
@@ -350,7 +350,7 @@ model Municipality {
   marketValues LandMarketValue[]
 
   @@map("municipalities")
-  @@schema("rptas")
+  @@schema("public")
 }
 
 model LandClassification {
@@ -363,7 +363,7 @@ model LandClassification {
   subClasses LandSubClass[]
 
   @@map("land_classifications")
-  @@schema("rptas")
+  @@schema("public")
 }
 
 model LandSubClass {
@@ -378,7 +378,7 @@ model LandSubClass {
 
   @@unique([classificationId, code])
   @@map("land_sub_classes")
-  @@schema("rptas")
+  @@schema("public")
 }
 
 model LandMarketValue {
@@ -400,7 +400,7 @@ model LandMarketValue {
   @@index([ordinanceNo])
   @@index([effectivityDate])
   @@map("land_market_values")
-  @@schema("rptas")
+  @@schema("public")
 }
 
 model SimpleLandMarketValue {
@@ -420,7 +420,7 @@ model SimpleLandMarketValue {
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   @@map("simple_land_market_values")
-  @@schema("rptas")
+  @@schema("public")
 }
 
 model Land_Agricultural {
@@ -435,7 +435,7 @@ model Land_Agricultural {
 
   @@index([landType])
   @@map("land_agricultural")
-  @@schema("rptas")
+  @@schema("public")
 }
 
 model BuildingAppraisal {
@@ -449,7 +449,7 @@ model BuildingAppraisal {
   updatedAt          DateTime @default(now()) @map("updated_at")
 
   @@map("building_appraisals")
-  @@schema("rptas")
+  @@schema("public")
 }
 
 model FaasRecord {
@@ -461,8 +461,8 @@ model FaasRecord {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@map("dbo_faas_records")
-  @@schema("rptas")
+  @@map("faas_records")
+  @@schema("public")
 }
 
 model MigrationLog {
@@ -475,7 +475,7 @@ model MigrationLog {
 
   @@index([sourceId])
   @@map("migration_logs")
-  @@schema("rptas")
+  @@schema("public")
 }
 
 model IdempotencyKey {
@@ -512,7 +512,7 @@ model SidebarItem {
   visibleTo SidebarItemUserVisibility[]
 
   @@map("sidebar_items")
-  @@schema("rptas")
+  @@schema("public")
 }
 
 model SidebarItemUserVisibility {
@@ -525,7 +525,7 @@ model SidebarItemUserVisibility {
   @@id([sidebarItemId, userId])
   @@index([userId])
   @@map("sidebar_item_user_visibility")
-  @@schema("rptas")
+  @@schema("public")
 }
 
 model Payor {
@@ -543,5 +543,5 @@ model Payor {
   @@unique([idType, idNumber], map: "payors_id_type_id_number_key")
   @@index([lastName, firstName])
   @@map("payors")
-  @@schema("rptas")
+  @@schema("public")
 }

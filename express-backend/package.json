@@ -23,6 +23,8 @@
     "prisma:migrate:supabase": "prisma migrate dev --schema=./prisma/schema.supabase.prisma",
     "prisma:seed:mssql": "node prisma/seed.mssql.js",
     "prisma:seed:supabase": "node prisma/seed.supabase.js",
+    "prisma:seed:system-admin": "node prisma/seed.systemAdmin.js",
+    "system-admin:init": "node src/scripts/initSystemAdmin.js",
     "seed": "npm run prisma:seed:mssql && npm run prisma:seed:supabase"
   },
   "keywords": [],

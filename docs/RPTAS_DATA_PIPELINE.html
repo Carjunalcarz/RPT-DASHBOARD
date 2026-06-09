@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RPTAS Data Pipeline — MSSQL → Approval → Order of Payment</title>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#161b22; --panel2:#1c2230; --border:#2a3140;
+    --text:#d7dde7; --muted:#8a93a3; --accent:#7aa2f7; --accent2:#bb9af7;
+    --green:#9ece6a; --amber:#e0af68; --red:#f7768e; --cyan:#7dcfff;
+    --code:#0c0f14; --maxw:980px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:15px/1.65 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code,pre,.mono{font-family:"JetBrains Mono",Consolas,"SF Mono",Menlo,monospace}
+  code{background:var(--code);padding:1px 6px;border-radius:5px;font-size:.86em;color:var(--cyan)}
+  /* layout */
+  .wrap{display:flex;max-width:1320px;margin:0 auto}
+  nav.toc{position:sticky;top:0;align-self:flex-start;height:100vh;overflow:auto;
+    width:280px;flex:0 0 280px;padding:26px 18px;border-right:1px solid var(--border);background:var(--panel)}
+  nav.toc h2{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:18px 0 8px}
+  nav.toc a{display:block;color:var(--text);padding:5px 10px;border-radius:6px;font-size:13.5px}
+  nav.toc a:hover{background:var(--panel2);text-decoration:none}
+  nav.toc a.sub{padding-left:22px;color:var(--muted);font-size:13px}
+  main{flex:1;min-width:0;padding:40px 48px 120px;max-width:var(--maxw)}
+  h1{font-size:30px;margin:0 0 6px;line-height:1.2}
+  .lede{color:var(--muted);font-size:16px;margin:0 0 28px}
+  h2.sec{font-size:23px;margin:54px 0 14px;padding-top:14px;border-top:1px solid var(--border)}
+  h3{font-size:17px;margin:28px 0 10px;color:#fff}
+  p{margin:10px 0}
+  /* stage badges */
+  .badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;
+    padding:3px 9px;border-radius:20px;vertical-align:middle;margin-right:8px}
+  .b1{background:rgba(122,162,247,.16);color:var(--accent);border:1px solid rgba(122,162,247,.35)}
+  .b2{background:rgba(187,154,247,.16);color:var(--accent2);border:1px solid rgba(187,154,247,.35)}
+  .b3{background:rgba(158,206,106,.16);color:var(--green);border:1px solid rgba(158,206,106,.35)}
+  /* cards / callouts */
+  .note{background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--accent);
+    padding:12px 16px;border-radius:8px;margin:16px 0}
+  .note.warn{border-left-color:var(--amber)}
+  .note.danger{border-left-color:var(--red)}
+  .note .t{font-weight:700;margin-bottom:2px}
+  /* diagram */
+  pre.flow{background:var(--code);border:1px solid var(--border);border-radius:10px;
+    padding:18px 20px;overflow:auto;color:var(--text);font-size:13px;line-height:1.5}
+  pre.flow .a{color:var(--accent)} pre.flow .g{color:var(--green)}
+  pre.flow .p{color:var(--accent2)} pre.flow .m{color:var(--muted)} pre.flow .y{color:var(--amber)}
+  /* tables */
+  table{border-collapse:collapse;width:100%;margin:16px 0;font-size:13.5px}
+  th,td{border:1px solid var(--border);padding:8px 11px;text-align:left;vertical-align:top}
+  th{background:var(--panel2);color:#fff;font-weight:600}
+  tr:nth-child(even) td{background:rgba(255,255,255,.015)}
+  td code{font-size:.92em}
+  .pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;white-space:nowrap}
+  .pu{background:rgba(224,175,104,.18);color:var(--amber)}
+  .pp{background:rgba(125,207,255,.16);color:var(--cyan)}
+  .pd{background:rgba(158,206,106,.16);color:var(--green)}
+  /* steps */
+  ol.steps{counter-reset:s;list-style:none;padding-left:0;margin:14px 0}
+  ol.steps>li{position:relative;padding:6px 0 6px 42px;margin:6px 0}
+  ol.steps>li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:4px;
+    width:26px;height:26px;border-radius:50%;background:var(--panel2);border:1px solid var(--border);
+    color:var(--accent);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+  kbd{background:var(--panel2);border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;padding:1px 6px;font-size:.82em}
+  .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:5px;background:var(--panel2);border:1px solid var(--border);color:var(--muted);margin-left:6px}
+  .meth{font-weight:700;font-size:11px;padding:2px 7px;border-radius:5px}
+  .get{background:rgba(125,207,255,.16);color:var(--cyan)}
+  .post{background:rgba(158,206,106,.16);color:var(--green)}
+  .put{background:rgba(224,175,104,.16);color:var(--amber)}
+  .del{background:rgba(247,118,142,.16);color:var(--red)}
+  footer{color:var(--muted);font-size:12.5px;margin-top:60px;padding-top:18px;border-top:1px solid var(--border)}
+  @media(max-width:880px){nav.toc{display:none}main{padding:24px 18px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav class="toc">
+  <strong style="font-size:15px">RPTAS Pipeline</strong>
+  <h2>Contents</h2>
+  <a href="#overview">Overview</a>
+  <a href="#architecture">Architecture &amp; schemas</a>
+  <h2>Stage 1 · Migrate</h2>
+  <a href="#s1" >MSSQL → FAAS draft</a>
+  <a href="#s1-source" class="sub">Legacy source (MSSQL)</a>
+  <a href="#s1-cart" class="sub">Migration cart</a>
+  <a href="#s1-write" class="sub">Write to Supabase</a>
+  <h2>Stage 2 · Approve</h2>
+  <a href="#s2a">Approval workflow</a>
+  <a href="#s2a-life" class="sub">Status lifecycle</a>
+  <a href="#s2a-api" class="sub">Endpoints &amp; metadata</a>
+  <a href="#s2a-sig" class="sub">Signatories</a>
+  <a href="#s2b">Reporting sync</a>
+  <a href="#s2b-trigger" class="sub">Trigger chain</a>
+  <a href="#s2b-match" class="sub">Matching hierarchy</a>
+  <a href="#s2b-tables" class="sub">Tables written</a>
+  <h2>Stage 3 · Bill</h2>
+  <a href="#s3">Order of Payment</a>
+  <a href="#s3-model" class="sub">Data model</a>
+  <a href="#s3-api" class="sub">Endpoints</a>
+  <a href="#s3-flow" class="sub">Create → pay → receipt</a>
+  <h2>Reference</h2>
+  <a href="#tables">Table reference</a>
+  <a href="#enums">Enums</a>
+  <a href="#ops">Operational notes</a>
+</nav>
+
+<main>
+  <h1>RPTAS Data Pipeline</h1>
+  <p class="lede">From legacy <strong>MSSQL</strong> → <strong>FAAS approval</strong> → <strong>reporting</strong> → <strong>Order of Payment</strong>. End-to-end trace of a property record through the Real Property Tax Assessment System.</p>
+
+  <!-- OVERVIEW -->
+  <h2 class="sec" id="overview">Overview</h2>
+  <p>A property record moves through four stages. It is read from the read-only SQL Server source, staged as an editable FAAS draft, routed through a two-tier assessor approval, automatically projected into reporting/master tables on approval, and finally billed as a Treasury Order of Payment.</p>
+
+  <pre class="flow">
+<span class="m">  STAGE 1            STAGE 2a              STAGE 2b               STAGE 3</span>
+┌────────────┐  ┌──────────────────┐  ┌──────────────────┐  ┌────────────────────┐
+│   <span class="a">MSSQL</span>    │─▶│  <span class="g">FAAS draft</span>      │─▶│  <span class="p">Reporting</span>       │─▶│  <span class="y">Order of Payment</span>  │
+│ RPTAS_AGUSAN│  │ dbo_faas_records │  │ rpt_property /    │  │ orders_of_payment  │
+│ (dbo, R/O) │  │ draft → approved │  │ rpt_assessment    │  │ + treasury exports │
+└────────────┘  └──────────────────┘  └──────────────────┘  └────────────────────┘
+   <span class="m">read/migrate</span>      <span class="m">human approval</span>      <span class="m">DB trigger sync</span>        <span class="m">collect + receipt</span></pre>
+
+  <!-- ARCHITECTURE -->
+  <h2 class="sec" id="architecture">Architecture &amp; schemas</h2>
+  <table>
+    <tr><th>Schema / DB</th><th>Holds</th><th>Access</th></tr>
+    <tr><td><code>RPTAS_AGUSAN.dbo</code> <span class="tag">MSSQL</span></td><td>Legacy master/assessment data (<code>RPTMAST</code>, <code>RPT_ASS</code>, …)</td><td><strong>Read-only</strong> — never written by RPTAS</td></tr>
+    <tr><td><code>rptas</code> <span class="tag">Supabase/PG</span></td><td>All RPTAS transaction + reporting data</td><td>Read/write</td></tr>
+    <tr><td><code>admin_setup</code></td><td>RBAC (roles, modules, user_roles, permissions)</td><td>Read/write</td></tr>
+    <tr><td><code>public</code></td><td>Identity &amp; system (<code>users</code>, <code>AuditLog</code>, <code>_prisma_migrations</code>)</td><td>Read/write</td></tr>
+  </table>
+  <div class="note"><div class="t">Naming convention</div>Two "crucial" tables carry a <code>dbo_</code> prefix for easy identification: <code>rptas.dbo_faas_records</code> and <code>rptas.dbo_properties</code>. The schema name <code>DB_SCHEMA=rptas</code> is interpolated into raw SQL; Prisma models map via <code>@@schema("rptas")</code>.</div>
+
+  <!-- STAGE 1 -->
+  <h2 class="sec" id="s1"><span class="badge b1">Stage 1</span>Migrate from MSSQL into a FAAS draft</h2>
+  <p>Select legacy property records from MSSQL and stage them as editable FAAS draft records in Supabase.</p>
+
+  <h3 id="s1-source">Legacy source (read-only MSSQL)</h3>
+  <ul>
+    <li>Pool: <code>src/modules/rptas/database/mssql.js</code> (env <code>MSSQL_*</code>), database <code>RPTAS_AGUSAN</code>.</li>
+    <li><code>PropertyService.getAgusanMigrationData()</code> joins <code>dbo.RPTMAST</code> (master), <code>dbo.BARANGAY</code>, <code>dbo.Rptowner</code>, <code>dbo.SIGNATORY</code>, <code>dbo.MASTEXTN</code>, <code>dbo.RPT_TREE</code>. Assessments read from <code>dbo.RPT_ASS</code>.</li>
+    <li>Returns: TDN, ARP, PIN, CITY, BCODE, owner/admin, barangay, market/assessed values, and a <code>trees[]</code> array.</li>
+  </ul>
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Purpose</th></tr>
+    <tr><td><span class="meth get">GET</span></td><td><code>/api/rptmast/RPTAS_AGUSAN</code></td><td>Eligible migration properties (paged, role-filtered by municipality)</td></tr>
+    <tr><td><span class="meth get">GET</span></td><td><code>/api/rptmast/mastextn/:tdn</code></td><td>Property extension data by TDN</td></tr>
+    <tr><td><span class="meth get">GET</span></td><td><code>/api/rptmast/distinct/tax-beg-years</code></td><td>Distinct tax-begin years for filtering</td></tr>
+  </table>
+
+  <h3 id="s1-cart">Migration cart (frontend staging)</h3>
+  <ul>
+    <li><code>MigrationCartContext.tsx</code> — selected properties persisted in <code>localStorage</code> key <code>rpt_migration_cart</code> (id, tdn, pin, owner, barangay, full data snapshot).</li>
+    <li><code>MigrationCartPage.tsx</code> — review cart, detect TDNs already in Supabase, choose a migration type (e.g. <em>General Revision</em>), toggle skip-existing, then <strong>Execute Bulk Migration</strong> with a live progress bar.</li>
+  </ul>
+
+  <h3 id="s1-write">Write to Supabase</h3>
+  <p>Services: <code>faas/FaasService.js</code> (<code>saveDraft</code>, <code>bulkMigrate</code>) and legacy <code>services/faasService.js</code>. Target table <code>rptas.dbo_faas_records</code>:</p>
+  <table>
+    <tr><th>Column</th><th>Notes</th></tr>
+    <tr><td><code>id</code></td><td>uuid</td></tr>
+    <tr><td><code>tdn</code></td><td>Tax Declaration Number (unique guard)</td></tr>
+    <tr><td><code>status</code></td><td>single create → <code>draft</code>; bulk migrate → <code>pending-municipal</code></td></tr>
+    <tr><td><code>data</code> <span class="tag">jsonb</span></td><td>full MSSQL snapshot + edits: <code>assessments[]</code>, <code>buildings[]</code>, <code>trees[]</code>, signatory fields</td></tr>
+    <tr><td><code>created_by</code>, <code>created_at</code>, <code>updated_at</code></td><td>audit columns</td></tr>
+  </table>
+  <p><strong>Dedup guards:</strong> PIN immutability on revisions · duplicate-TDN check in <code>dbo_faas_records</code> · MSSQL <code>RPTMAST</code> duplicate check. <strong>Tracking:</strong> <code>rptas.migration_logs</code> (source TDN → FAAS id) and <code>public."AuditLog"</code> (<code>CREATE_DRAFT</code>/<code>UPDATE_DRAFT</code>/<code>BULK_MIGRATE</code>).</p>
+  <pre class="flow">Properties UI ─▶ <span class="a">GET /api/rptmast/...</span> ─▶ add to cart ─▶ <span class="g">POST /api/v1/faas/bulk-migrate</span>
+              ─▶ INSERT <span class="p">rptas.dbo_faas_records</span> (+ migration_logs, AuditLog)</pre>
+
+  <!-- STAGE 2a -->
+  <h2 class="sec" id="s2a"><span class="badge b2">Stage 2a</span>FAAS approval workflow (two-tier)</h2>
+
+  <h3 id="s2a-life">Status lifecycle</h3>
+  <pre class="flow"><span class="g">draft</span> ──submit──▶ <span class="y">pending-municipal</span> ──municipal approve──▶ <span class="y">pending-provincial</span> ──provincial approve──▶ <span class="g">approved</span>
+                      │                                  │
+                      └─ reject ─▶ <span class="m">rejected-municipal</span>     └─ reject ─▶ <span class="m">rejected-provincial</span>
+       <span class="m">other states: for-review, cancelled</span></pre>
+  <table>
+    <tr><th>From</th><th>To</th><th>Actor / action</th></tr>
+    <tr><td><code>draft</code> / <code>for-review</code></td><td><code>pending-municipal</code></td><td>Preparer submits</td></tr>
+    <tr><td><code>pending-municipal</code></td><td><code>pending-provincial</code></td><td>Municipal Assessor approves</td></tr>
+    <tr><td><code>pending-municipal</code></td><td><code>rejected-municipal</code></td><td>Municipal Assessor rejects</td></tr>
+    <tr><td><code>pending-provincial</code></td><td><code>approved</code></td><td>Provincial Assessor approves (final)</td></tr>
+    <tr><td><code>pending-provincial</code></td><td><code>rejected-provincial</code></td><td>Provincial Assessor rejects</td></tr>
+  </table>
+
+  <h3 id="s2a-api">Endpoints &amp; recorded metadata</h3>
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Purpose</th></tr>
+    <tr><td><span class="meth put">PUT</span></td><td><code>/api/v1/faas/:id/status</code></td><td>Single transition (<code>updateStatus</code>)</td></tr>
+    <tr><td><span class="meth post">POST</span></td><td><code>/api/v1/faas/batch-status</code></td><td>Bulk transition (<code>batchUpdateStatus</code>) — "Bulk Action"</td></tr>
+  </table>
+  <p>Each transition merges approver metadata into <code>data</code> JSONB and writes to <code>public."AuditLog"</code>:</p>
+  <ul>
+    <li>→ <code>pending-provincial</code> (municipal): <code>municipal_approver</code>, <code>municipal_approval_date</code>, <code>Rec_Approval</code>, <code>Rec_ApprovalPos</code></li>
+    <li>→ <code>approved</code> (provincial): <code>provincial_approver</code>, <code>provincial_approval_date</code>, <code>Approved</code>, <code>ApprovedPos</code>, <code>SGD_APPROVED</code></li>
+  </ul>
+
+  <h3 id="s2a-sig">Signatories &amp; UI</h3>
+  <p>Approval pages: <code>MunicipalApprovals.tsx</code>, <code>ProvincialApprovals.tsx</code>, <code>PropertyApproval.tsx</code>. Approver names/positions come from <strong>Signatory Setup</strong> (<code>rptas.setup_signatories</code>, <code>rptas.setup_signatory_templates</code>), filtered by department (<em>Municipal / Provincial Assessor Office</em>).</p>
+
+  <!-- STAGE 2b -->
+  <h2 class="sec" id="s2b"><span class="badge b2">Stage 2b</span>Reporting sync (automatic on approval)</h2>
+  <p>When a FAAS record becomes <code>approved</code>, a PostgreSQL trigger projects it into reporting/master tables. Defined in <code>src/modules/rptas/database/reporting_setup.sql</code> and re-applied on every backend startup by <code>src/scripts/startup.js</code>.</p>
+
+  <h3 id="s2b-trigger">Trigger chain</h3>
+  <pre class="flow">UPDATE <span class="p">rptas.dbo_faas_records</span> SET status='approved'
+      │  <span class="m">AFTER INSERT/UPDATE/DELETE</span>
+      ▼
+<span class="a">trg_faas_records_reporting_sync</span> ─▶ rptas.trg_sync_faas_to_reporting()
+      │  <span class="m">fires only when status is/was 'approved'</span>
+      ▼
+<span class="a">rptas.sync_faas_to_reporting(faas_id)</span>   <span class="m">— if no longer approved, deletes from rpt_property &amp; exits</span></pre>
+
+  <h3 id="s2b-match">Property matching hierarchy</h3>
+  <p>The sync resolves which master property an approved FAAS belongs to, in order. Ambiguous matches are queued for a human in <code>rptas.manual_review_queue</code>.</p>
+  <table>
+    <tr><th>#</th><th>Match by</th><th>Source</th><th>If ambiguous (confidence)</th></tr>
+    <tr><td>1</td><td>PIN (+ muni + barangay)</td><td><code>dbo_properties</code></td><td>manual review · 60</td></tr>
+    <tr><td>2</td><td>Old TDN</td><td><code>property_tdn_history</code></td><td>manual review · 55</td></tr>
+    <tr><td>3</td><td>New TDN (current)</td><td><code>property_tdn_history</code></td><td>manual review · 40</td></tr>
+    <tr><td>4</td><td>Lot / Block</td><td><code>dbo_properties</code></td><td>—</td></tr>
+    <tr><td>5</td><td>ARP No.</td><td><code>dbo_properties</code></td><td>—</td></tr>
+    <tr><td>6</td><td>Owner-name trigram similarity</td><td><code>property_owner_history</code></td><td>accept if <code>similarity ≥ 0.60</code> &amp; clear lead</td></tr>
+    <tr><td>7</td><td>No match → <strong>create new</strong> <code>dbo_properties</code></td><td>—</td><td>needs muni + barangay</td></tr>
+  </table>
+
+  <h3 id="s2b-tables">Tables written by the sync</h3>
+  <table>
+    <tr><th>Table</th><th>What it records</th></tr>
+    <tr><td><code>rptas.dbo_properties</code></td><td>Master property — single source of truth (identifiers, current TDN/owner pointers, <code>last_source_record_id</code>)</td></tr>
+    <tr><td><code>rptas.property_tdn_history</code></td><td>Current + historical TDN chain (<code>change_reason</code> enum); enforce-current trigger deactivates prior rows</td></tr>
+    <tr><td><code>rptas.property_owner_history</code></td><td>Current + historical owners (<code>change_reason</code> enum); enforce-current trigger</td></tr>
+    <tr><td><code>rptas.rpt_property</code></td><td>Reporting snapshot (<code>source_record_id</code> → FAAS, <code>master_property_id</code> → <code>dbo_properties</code>, <code>payment_status</code>)</td></tr>
+    <tr><td><code>rptas.rpt_assessment</code></td><td>Assessment lines rebuilt from <code>data-&gt;'assessments'</code></td></tr>
+    <tr><td><code>rptas.manual_review_queue</code></td><td>Ambiguous matches awaiting human resolution</td></tr>
+    <tr><td><code>rptas.owner</code> / <code>municipality</code> / <code>barangay</code></td><td>Dimension upserts</td></tr>
+  </table>
+
+  <!-- STAGE 3 -->
+  <h2 class="sec" id="s3"><span class="badge b3">Stage 3</span>Order of Payment (Treasury)</h2>
+  <p>Bill the approved properties, collect payment, and export the paid record.</p>
+
+  <h3 id="s3-model">Data model</h3>
+  <table>
+    <tr><th>Table</th><th>Key fields</th></tr>
+    <tr><td><code>rptas.orders_of_payment</code></td><td><code>order_number</code> (<code>OOP-YYYYMMDD-XXXXXX</code>), <code>amount</code>, <code>description</code>, <code>property_ids</code> (jsonb), <code>status</code> (<span class="pill pp">pending</span> <span class="pill pd">paid</span> / cancelled)</td></tr>
+    <tr><td><code>rptas.oop_history</code></td><td><code>action</code> (created / paid / cancelled / etl_exported), <code>payload</code> snapshot (payer, rates, totals, assessments)</td></tr>
+    <tr><td><code>rptas.payors</code></td><td>name, address, ID type/number, contact — linked to an OOP by <em>name in the description</em>, not an FK</td></tr>
+    <tr><td><code>rptas.treasury_payment_exports</code></td><td>ETL output, one row per paid property (PIN, TDN, owner, location, summed market/assessed value)</td></tr>
+  </table>
+
+  <h3 id="s3-api">Endpoints (treasury module, v2)</h3>
+  <table>
+    <tr><th>Method</th><th>Endpoint</th><th>Purpose</th></tr>
+    <tr><td><span class="meth post">POST</span></td><td><code>/api/v2/oop</code></td><td>Create OOP from selected properties</td></tr>
+    <tr><td><span class="meth put">PATCH</span></td><td><code>/api/v2/oop/:id</code></td><td>Update pending OOP</td></tr>
+    <tr><td><span class="meth post">POST</span></td><td><code>/api/v2/oop/:id/pay</code></td><td>Mark paid → ETL export</td></tr>
+    <tr><td><span class="meth post">POST</span></td><td><code>/api/v2/oop/:id/cancel</code></td><td>Cancel pending OOP</td></tr>
+    <tr><td><span class="meth get">GET</span></td><td><code>/api/v2/oop/pending</code></td><td>List pending (treasury officer)</td></tr>
+    <tr><td><span class="meth get">GET</span></td><td><code>/api/v2/oop/:id/history</code></td><td>Audit trail</td></tr>
+    <tr><td><span class="meth get">GET</span></td><td><code>/api/v2/payors/search</code></td><td>Fuzzy payor lookup</td></tr>
+    <tr><td><span class="meth post">POST</span></td><td><code>/api/v2/payors</code> · <code>/bulk</code></td><td>Register / bulk-import payors</td></tr>
+  </table>
+
+  <h3 id="s3-flow">Create → pay → receipt</h3>
+  <ol class="steps">
+    <li><strong>Create OOP</strong> (<code>OrderOfPaymentPage.tsx</code>): pick <span class="pill pu">unpaid</span> properties from <code>rpt_property</code>, select a payor, set rates (tax %, penalty %, per-record fee, other fees), preview, confirm → <code>INSERT orders_of_payment(status='pending')</code>, properties → <span class="pill pp">pending</span>, <code>oop_history: created</code>.</li>
+    <li><strong>Confirm payment</strong> (<code>TreasuryConfirmPage.tsx</code>, treasury officer/admin): review pending OOP, pick payment method, <strong>Approve Payment</strong> → <code>markPaid()</code>.</li>
+    <li><strong>ETL export</strong>: <code>treasuryEtlService.exportPaidOrder()</code> upserts <code>treasury_payment_exports</code> (joining <code>rpt_property</code> + <code>owner</code> + summed <code>rpt_assessment</code>); properties → <span class="pill pd">paid</span>, OOP → <span class="pill pd">paid</span>, <code>oop_history: etl_exported, paid</code>.</li>
+    <li><strong>Receipt</strong>: printable official receipt rendered from the <code>oop_history</code> snapshot.</li>
+  </ol>
+  <pre class="flow"><span class="p">rpt_property</span>(<span class="y">unpaid</span>) ─create─▶ <span class="y">orders_of_payment</span>(pending) + rpt_property(<span class="m">pending</span>)
+                          │ treasury approves → markPaid()
+                          ▼
+<span class="g">treasury_payment_exports</span> + orders_of_payment(<span class="g">paid</span>) + rpt_property(<span class="g">paid</span>) ─▶ receipt</pre>
+
+  <!-- REFERENCE -->
+  <h2 class="sec" id="tables">Table reference</h2>
+  <table>
+    <tr><th>Schema</th><th>Table</th><th>Stage</th><th>Role</th></tr>
+    <tr><td><code>dbo</code> <span class="tag">MSSQL</span></td><td><code>RPTMAST</code>, <code>RPT_ASS</code>, <code>MASTEXTN</code>, <code>RPT_TREE</code>, <code>Rptowner</code>, <code>SIGNATORY</code></td><td>1</td><td>Legacy source (read-only)</td></tr>
+    <tr><td><code>rptas</code></td><td><code>dbo_faas_records</code></td><td>1–2</td><td>FAAS records + status lifecycle</td></tr>
+    <tr><td><code>rptas</code></td><td><code>migration_logs</code></td><td>1</td><td>MSSQL→Supabase migration tracking</td></tr>
+    <tr><td><code>rptas</code></td><td><code>setup_signatories</code>, <code>setup_signatory_templates</code></td><td>2a</td><td>Approver signatories</td></tr>
+    <tr><td><code>rptas</code></td><td><code>dbo_properties</code></td><td>2b</td><td>Master property (source of truth)</td></tr>
+    <tr><td><code>rptas</code></td><td><code>property_tdn_history</code>, <code>property_owner_history</code></td><td>2b</td><td>Current + historical chains</td></tr>
+    <tr><td><code>rptas</code></td><td><code>rpt_property</code>, <code>rpt_assessment</code></td><td>2b–3</td><td>Reporting snapshot + assessment lines</td></tr>
+    <tr><td><code>rptas</code></td><td><code>manual_review_queue</code></td><td>2b</td><td>Ambiguous matches for human review</td></tr>
+    <tr><td><code>rptas</code></td><td><code>owner</code>, <code>municipality</code>, <code>barangay</code></td><td>2b</td><td>Dimension tables</td></tr>
+    <tr><td><code>rptas</code></td><td><code>orders_of_payment</code>, <code>oop_history</code></td><td>3</td><td>Treasury OOP + audit</td></tr>
+    <tr><td><code>rptas</code></td><td><code>payors</code></td><td>3</td><td>Payor registry</td></tr>
+    <tr><td><code>rptas</code></td><td><code>treasury_payment_exports</code></td><td>3</td><td>ETL output for paid orders</td></tr>
+    <tr><td><code>public</code></td><td><code>AuditLog</code></td><td>all</td><td>Cross-cutting audit trail</td></tr>
+  </table>
+
+  <h2 class="sec" id="enums">Enums (in <code>rptas</code>)</h2>
+  <table>
+    <tr><th>Type</th><th>Values</th></tr>
+    <tr><td><code>property_status</code></td><td><code>active</code>, <code>archived</code>, <code>split</code>, <code>merged</code></td></tr>
+    <tr><td><code>tdn_change_reason</code></td><td><code>new</code>, <code>general_revision</code>, <code>correction</code>, <code>split</code>, <code>merge</code>, <code>other</code></td></tr>
+    <tr><td><code>owner_change_reason</code></td><td><code>new</code>, <code>transfer</code>, <code>inheritance</code>, <code>correction</code>, <code>other</code></td></tr>
+  </table>
+
+  <h2 class="sec" id="ops">Operational notes</h2>
+  <div class="note"><div class="t">Reporting setup runs on startup</div><code>startup.js</code> re-applies <code>reporting_setup.sql</code> (idempotent) on every boot — it (re)creates the reporting tables, enum types, the <code>sync_faas_to_reporting</code> function, and the <code>trg_faas_records_reporting_sync</code> trigger. If you rename a reporting-owned table (e.g. <code>properties</code>), update that file in the same change or startup will recreate an empty original.</div>
+  <div class="note warn"><div class="t">Stuck in <code>manual_review_queue</code></div>If an approved FAAS produced no <code>rpt_property</code> row, check <code>manual_review_queue</code> — the matcher found multiple/zero candidates (missing muni/barangay codes, duplicate PINs, weak owner similarity).</div>
+  <div class="note warn"><div class="t">OOP stuck <code>pending</code></div>A property can only be in one active OOP. If a property shows <span class="pill pp">pending</span> and can't be re-billed, an earlier OOP holds it — cancel that OOP (<code>/api/v2/oop/:id/cancel</code>) to release it back to <span class="pill pu">unpaid</span>.</div>
+  <div class="note danger"><div class="t">Enum consistency</div>The <code>property_status</code> / <code>*_change_reason</code> enums must exist only in <code>rptas</code>. Duplicates in <code>public</code> cause <code>42804</code> "type mismatch" errors during the reporting sync (column vs. function cast). Columns and function casts must reference the same <code>rptas.*</code> type.</div>
+
+  <footer>
+    RPTAS data pipeline — generated for the LGU Real Property Tax Assessment System.
+    Source of truth: <code>express-backend/src/modules/rptas/</code>, <code>express-backend/src/modules/treasury/</code>, and
+    <code>reporting_setup.sql</code>. Endpoint paths and table/enum names reflect the current <code>rptas</code> schema state.
+  </footer>
+</main>
+</div>
+</body>
+</html>

@@ -1,278 +1,65 @@
--- Reporting Schema and ETL for FAAS/RPT Audit Data
--- Target: PostgreSQL / Supabase
--- Source: faas_records(id, status, data jsonb, created_at, updated_at)
+-- =====================================================================
+-- Consolidate RPTAS transaction data into schema "rptas"
+-- Run ONCE in the Supabase SQL Editor. Wrapped in a single transaction —
+-- if anything fails, NOTHING is applied.
+--
+-- REVERSAL: move each table back with
+--   ALTER TABLE rptas.<t> SET SCHEMA public;
+-- and restore the 5 functions from your pre-migration backup.
+-- =====================================================================
+BEGIN;
 
---------------------------------------------------------------------------------
--- 1. Create Reporting Tables
---------------------------------------------------------------------------------
+CREATE SCHEMA IF NOT EXISTS rptas;
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-CREATE EXTENSION IF NOT EXISTS unaccent;
-
--- Owners table
-CREATE TABLE IF NOT EXISTS rptas.owner (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL,
-    address TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(name, address)
-);
-
--- Municipalities table
-CREATE TABLE IF NOT EXISTS rptas.municipality (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    code TEXT NOT NULL UNIQUE,
-    description TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Barangays table
-CREATE TABLE IF NOT EXISTS rptas.barangay (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    municipality_id UUID REFERENCES rptas.municipality(id) ON DELETE CASCADE,
-    code TEXT NOT NULL,
-    description TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(municipality_id, code)
-);
-
--- RPT Property table
-CREATE TABLE IF NOT EXISTS rptas.rpt_property (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    source_record_id TEXT REFERENCES rptas.dbo_faas_records(id) ON DELETE SET NULL,
-    pin TEXT,
-    tdn TEXT,
-    owner_id UUID REFERENCES rptas.owner(id) ON DELETE SET NULL,
-    owner_name_snapshot TEXT,
-    owner_address_snapshot TEXT,
-    municipality_id UUID REFERENCES rptas.municipality(id) ON DELETE SET NULL,
-    municipality_code TEXT,
-    municipality_name_snapshot TEXT,
-    barangay_id UUID REFERENCES rptas.barangay(id) ON DELETE SET NULL,
-    barangay_code TEXT,
-    barangay_name_snapshot TEXT,
-    muncode TEXT,
-    bcode TEXT,
-    tax_beg_yr TEXT,
-    trans_code TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(source_record_id)
-);
-
--- RPT Assessment table
-CREATE TABLE IF NOT EXISTS rptas.rpt_assessment (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    property_id UUID REFERENCES rptas.rpt_property(id) ON DELETE CASCADE,
-    kind TEXT,
-    ass_level NUMERIC,
-    taxability TEXT,
-    classification TEXT,
-    subclass TEXT,
-    area NUMERIC,
-    measurement TEXT,
-    market_value NUMERIC,
-    ass_value NUMERIC,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-DO $$
+-- 1) Drop the empty orphan rptas copies (verified 0 rows) so the populated
+--    public.* tables can take their place. Aborts if any is unexpectedly
+--    non-empty.
+DO $mig$
+DECLARE d text; n bigint;
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'property_status' AND typnamespace = 'rptas'::regnamespace) THEN
-        CREATE TYPE rptas.property_status AS ENUM ('active','archived','split','merged');
+  FOREACH d IN ARRAY ARRAY['barangay','municipality','owner'] LOOP
+    IF to_regclass('rptas.'||quote_ident(d)) IS NOT NULL THEN
+      EXECUTE format('SELECT count(*) FROM rptas.%I', d) INTO n;
+      IF n = 0 THEN
+        EXECUTE format('DROP TABLE rptas.%I CASCADE', d);
+        RAISE NOTICE 'dropped empty orphan rptas.%', d;
+      ELSE
+        RAISE EXCEPTION 'rptas.% has % rows - not an empty orphan; aborting', d, n;
+      END IF;
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'rpt_payment_status' AND typnamespace = 'rptas'::regnamespace) THEN
-        CREATE TYPE rptas.rpt_payment_status AS ENUM ('unpaid','pending','paid');
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'tdn_change_reason' AND typnamespace = 'rptas'::regnamespace) THEN
-        CREATE TYPE rptas.tdn_change_reason AS ENUM ('new','general_revision','correction','split','merge','other');
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'owner_change_reason' AND typnamespace = 'rptas'::regnamespace) THEN
-        CREATE TYPE rptas.owner_change_reason AS ENUM ('new','transfer','inheritance','correction','other');
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'lineage_event' AND typnamespace = 'rptas'::regnamespace) THEN
-        CREATE TYPE rptas.lineage_event AS ENUM ('split','merge');
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'review_status' AND typnamespace = 'rptas'::regnamespace) THEN
-        CREATE TYPE rptas.review_status AS ENUM ('queued','in_progress','resolved','dismissed');
-    END IF;
-END
-$$;
+  END LOOP;
+END $mig$;
 
-CREATE TABLE IF NOT EXISTS rptas.dbo_properties (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    status rptas.property_status NOT NULL DEFAULT 'active',
-    municipality_code TEXT NOT NULL,
-    barangay_code TEXT NOT NULL,
-    pin TEXT,
-    arp_no TEXT,
-    lot_no TEXT,
-    block_no TEXT,
-    current_tdn_history_id UUID,
-    current_owner_history_id UUID,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    created_from_source_record_id TEXT REFERENCES rptas.dbo_faas_records(id) ON DELETE SET NULL,
-    last_source_record_id TEXT REFERENCES rptas.dbo_faas_records(id) ON DELETE SET NULL
-);
-
-CREATE TABLE IF NOT EXISTS rptas.property_tdn_history (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    property_id UUID NOT NULL REFERENCES rptas.dbo_properties(id) ON DELETE CASCADE,
-    tdn TEXT NOT NULL,
-    old_tdn TEXT,
-    tax_beg_year INT,
-    effective_from DATE NOT NULL DEFAULT CURRENT_DATE,
-    effective_to DATE,
-    is_current BOOLEAN NOT NULL DEFAULT TRUE,
-    change_reason rptas.tdn_change_reason NOT NULL DEFAULT 'new',
-    source_record_id TEXT REFERENCES rptas.dbo_faas_records(id) ON DELETE SET NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS rptas.property_owner_history (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    property_id UUID NOT NULL REFERENCES rptas.dbo_properties(id) ON DELETE CASCADE,
-    owner_name TEXT NOT NULL,
-    owner_address TEXT,
-    is_current BOOLEAN NOT NULL DEFAULT TRUE,
-    effective_from DATE NOT NULL DEFAULT CURRENT_DATE,
-    effective_to DATE,
-    change_reason rptas.owner_change_reason NOT NULL DEFAULT 'new',
-    source_record_id TEXT REFERENCES rptas.dbo_faas_records(id) ON DELETE SET NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS rptas.property_lineage (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    event rptas.lineage_event NOT NULL,
-    effective_date DATE NOT NULL DEFAULT CURRENT_DATE,
-    from_property_id UUID NOT NULL REFERENCES rptas.dbo_properties(id) ON DELETE RESTRICT,
-    to_property_id UUID NOT NULL REFERENCES rptas.dbo_properties(id) ON DELETE RESTRICT,
-    notes TEXT,
-    source_record_id TEXT REFERENCES rptas.dbo_faas_records(id) ON DELETE SET NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    CONSTRAINT property_lineage_no_self_ref CHECK (from_property_id <> to_property_id)
-);
-
-CREATE TABLE IF NOT EXISTS rptas.manual_review_queue (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    submission_id TEXT NOT NULL REFERENCES rptas.dbo_faas_records(id) ON DELETE CASCADE,
-    status rptas.review_status NOT NULL DEFAULT 'queued',
-    reason TEXT NOT NULL,
-    confidence_score NUMERIC(5,2),
-    candidate_property_ids UUID[],
-    candidate_notes JSONB,
-    assigned_to UUID,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    resolved_at TIMESTAMP WITH TIME ZONE,
-    resolution TEXT,
-    resolved_property_id UUID REFERENCES rptas.dbo_properties(id) ON DELETE SET NULL
-);
-
-ALTER TABLE rptas.rpt_property
-    ADD COLUMN IF NOT EXISTS master_property_id UUID;
-
-ALTER TABLE rptas.rpt_property
-    ADD COLUMN IF NOT EXISTS payment_status rptas.rpt_payment_status NOT NULL DEFAULT 'unpaid';
-
-UPDATE rptas.rpt_property
-SET payment_status = 'unpaid'
-WHERE payment_status IS NULL;
-
-DO $$
+-- 2) Move transaction/data tables public -> rptas (idempotent: skips any
+--    table already moved or absent). Triggers, FKs, indexes move with them.
+DO $mig$
+DECLARE t text; tbls text[] := ARRAY['faas_records', 'properties', 'property_lineage', 'property_owner_history', 'property_tdn_history', 'rpt_property', 'rpt_assessment', 'orders_of_payment', 'oop_history', 'payors', 'owner', 'barangay', 'municipality', 'municipalities', 'building_appraisals', 'building_market_values', 'building_types', 'land_agricultural', 'land_classifications', 'land_market_values', 'land_sub_classes', 'simple_land_market_values', 'setup_signatories', 'setup_signatory_templates', 'treasury_payment_exports', 'manual_review_queue', 'migration_logs', 'sidebar_items', 'sidebar_item_user_visibility'];
 BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM pg_constraint
-        WHERE conname = 'rpt_property_master_property_id_fkey'
-    ) THEN
-        ALTER TABLE rptas.rpt_property
-            ADD CONSTRAINT rpt_property_master_property_id_fkey
-            FOREIGN KEY (master_property_id)
-            REFERENCES rptas.dbo_properties(id)
-            ON DELETE SET NULL;
+  FOREACH t IN ARRAY tbls LOOP
+    IF to_regclass('public.'||quote_ident(t)) IS NOT NULL
+       AND to_regclass('rptas.'||quote_ident(t)) IS NULL THEN
+      EXECUTE format('ALTER TABLE public.%I SET SCHEMA rptas', t);
+      RAISE NOTICE 'moved %', t;
     END IF;
-END
-$$;
+  END LOOP;
+END $mig$;
 
-CREATE UNIQUE INDEX IF NOT EXISTS property_tdn_history_one_current_per_property
-    ON rptas.property_tdn_history(property_id)
-    WHERE is_current;
-
-CREATE UNIQUE INDEX IF NOT EXISTS property_tdn_history_unique_current_tdn
-    ON rptas.property_tdn_history(tdn)
-    WHERE is_current;
-
-CREATE UNIQUE INDEX IF NOT EXISTS property_tdn_history_property_tdn_unique
-    ON rptas.property_tdn_history(property_id, tdn);
-
-CREATE UNIQUE INDEX IF NOT EXISTS property_owner_history_one_current_per_property
-    ON rptas.property_owner_history(property_id)
-    WHERE is_current;
-
-CREATE INDEX IF NOT EXISTS properties_muni_brgy_idx
-    ON rptas.dbo_properties(municipality_code, barangay_code);
-
-CREATE INDEX IF NOT EXISTS properties_pin_idx
-    ON rptas.dbo_properties(pin);
-
-CREATE INDEX IF NOT EXISTS properties_arp_idx
-    ON rptas.dbo_properties(arp_no);
-
-CREATE INDEX IF NOT EXISTS properties_lot_block_idx
-    ON rptas.dbo_properties(municipality_code, barangay_code, lot_no, block_no);
-
-CREATE INDEX IF NOT EXISTS property_tdn_history_tdn_idx
-    ON rptas.property_tdn_history(tdn);
-
-CREATE INDEX IF NOT EXISTS property_tdn_history_old_tdn_idx
-    ON rptas.property_tdn_history(old_tdn);
-
-CREATE INDEX IF NOT EXISTS property_owner_history_owner_trgm
-    ON rptas.property_owner_history
-    USING gin ((lower(owner_name)) public.gin_trgm_ops);
-
-CREATE INDEX IF NOT EXISTS manual_review_status_idx
-    ON rptas.manual_review_queue(status, created_at DESC);
-
-CREATE UNIQUE INDEX IF NOT EXISTS manual_review_one_open_per_submission
-    ON rptas.manual_review_queue(submission_id)
-    WHERE status IN ('queued','in_progress');
-
-CREATE OR REPLACE FUNCTION rptas.tdn_history_enforce_current()
-RETURNS TRIGGER AS $$
+-- 3) Move the dependent view too.
+DO $mig$
 BEGIN
-    IF NEW.is_current THEN
-        UPDATE rptas.property_tdn_history
-        SET is_current = FALSE,
-            effective_to = COALESCE(effective_to, NEW.effective_from - INTERVAL '1 day')
-        WHERE property_id = NEW.property_id
-          AND is_current = TRUE
-          AND id <> NEW.id;
+  IF to_regclass('public.v_properties_current') IS NOT NULL THEN
+    EXECUTE 'ALTER VIEW public.v_properties_current SET SCHEMA rptas';
+    RAISE NOTICE 'moved view v_properties_current';
+  END IF;
+END $mig$;
 
-        UPDATE rptas.dbo_properties
-        SET current_tdn_history_id = NEW.id,
-            updated_at = NOW()
-        WHERE id = NEW.property_id;
-    END IF;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_tdn_history_enforce_current ON rptas.property_tdn_history;
-CREATE TRIGGER trg_tdn_history_enforce_current
-BEFORE INSERT OR UPDATE OF is_current ON rptas.property_tdn_history
-FOR EACH ROW EXECUTE FUNCTION rptas.tdn_history_enforce_current();
-
-CREATE OR REPLACE FUNCTION rptas.owner_history_enforce_current()
-RETURNS TRIGGER AS $$
+-- 4) Rewrite the 5 functions: moved-table references repointed public.* -> rptas.*
+--    (function/type references deliberately left in public).
+-- ----- owner_history_enforce_current -----
+CREATE OR REPLACE FUNCTION public.owner_history_enforce_current()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
 BEGIN
     IF NEW.is_current THEN
         UPDATE rptas.property_owner_history
@@ -282,7 +69,7 @@ BEGIN
           AND is_current = TRUE
           AND id <> NEW.id;
 
-        UPDATE rptas.dbo_properties
+        UPDATE rptas.properties
         SET current_owner_history_id = NEW.id,
             updated_at = NOW()
         WHERE id = NEW.property_id;
@@ -290,43 +77,60 @@ BEGIN
 
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$function$
+;
 
-DROP TRIGGER IF EXISTS trg_owner_history_enforce_current ON rptas.property_owner_history;
-CREATE TRIGGER trg_owner_history_enforce_current
-BEFORE INSERT OR UPDATE OF is_current ON rptas.property_owner_history
-FOR EACH ROW EXECUTE FUNCTION rptas.owner_history_enforce_current();
+-- ----- tdn_history_enforce_current -----
+CREATE OR REPLACE FUNCTION public.tdn_history_enforce_current()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+    IF NEW.is_current THEN
+        UPDATE rptas.property_tdn_history
+        SET is_current = FALSE,
+            effective_to = COALESCE(effective_to, NEW.effective_from - INTERVAL '1 day')
+        WHERE property_id = NEW.property_id
+          AND is_current = TRUE
+          AND id <> NEW.id;
 
-DROP VIEW IF EXISTS rptas.v_properties_current;
-CREATE VIEW rptas.v_properties_current AS
-SELECT
-    p.id AS property_id,
-    p.status,
-    p.municipality_code,
-    p.barangay_code,
-    p.pin,
-    p.arp_no,
-    p.lot_no,
-    p.block_no,
-    t.tdn AS current_tdn,
-    t.tax_beg_year AS current_tax_beg_year,
-    t.effective_from AS tdn_effective_from,
-    o.owner_name AS current_owner_name,
-    o.owner_address AS current_owner_address,
-    o.effective_from AS owner_effective_from,
-    p.created_at,
-    p.updated_at
-FROM rptas.dbo_properties p
-LEFT JOIN rptas.property_tdn_history t ON t.id = p.current_tdn_history_id
-LEFT JOIN rptas.property_owner_history o ON o.id = p.current_owner_history_id;
+        UPDATE rptas.properties
+        SET current_tdn_history_id = NEW.id,
+            updated_at = NOW()
+        WHERE id = NEW.property_id;
+    END IF;
 
---------------------------------------------------------------------------------
--- 2. ETL Logic (Incremental and Batch)
---------------------------------------------------------------------------------
+    RETURN NEW;
+END;
+$function$
+;
 
--- Function to process a single record
-CREATE OR REPLACE FUNCTION rptas.sync_faas_to_reporting(v_faas_record_id TEXT)
-RETURNS void AS $$
+-- ----- trg_sync_faas_to_reporting -----
+CREATE OR REPLACE FUNCTION public.trg_sync_faas_to_reporting()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+    -- Only sync if status changed to approved or if already approved and data changed
+    IF (TG_OP = 'INSERT' AND NEW.status = 'approved') OR
+       (TG_OP = 'UPDATE' AND (NEW.status = 'approved' OR OLD.status = 'approved')) THEN
+        PERFORM public.sync_faas_to_reporting(NEW.id);
+    END IF;
+    
+    IF TG_OP = 'DELETE' THEN
+        DELETE FROM rptas.rpt_property WHERE source_record_id = OLD.id;
+    END IF;
+    
+    RETURN NULL;
+END;
+$function$
+;
+
+-- ----- sync_faas_to_reporting -----
+CREATE OR REPLACE FUNCTION public.sync_faas_to_reporting(v_faas_record_id text)
+ RETURNS void
+ LANGUAGE plpgsql
+AS $function$
 DECLARE
     v_rec RECORD;
     v_owner_id UUID;
@@ -352,11 +156,11 @@ DECLARE
     v_owner_best_sim REAL;
     v_owner_second_sim REAL;
     v_existing_current_owner TEXT;
-    v_tdn_reason rptas.tdn_change_reason;
+    v_tdn_reason public.tdn_change_reason;
     v_tax_beg_year_int INT;
     v_assessment_rec JSONB;
 BEGIN
-    SELECT * INTO v_rec FROM rptas.dbo_faas_records WHERE id = v_faas_record_id;
+    SELECT * INTO v_rec FROM rptas.faas_records WHERE id = v_faas_record_id;
     
     -- If the record is NOT approved, we remove it from reporting
     IF v_rec IS NULL OR v_rec.status != 'approved' THEN
@@ -423,14 +227,14 @@ BEGIN
 
     IF v_pin IS NOT NULL AND v_muncode IS NOT NULL AND v_barangay_code IS NOT NULL THEN
         SELECT COUNT(*) INTO v_candidate_count
-        FROM rptas.dbo_properties p
+        FROM rptas.properties p
         WHERE p.municipality_code = v_muncode
           AND p.barangay_code = v_barangay_code
           AND p.pin = v_pin;
 
         IF v_candidate_count = 1 THEN
             SELECT p.id INTO v_master_property_id
-            FROM rptas.dbo_properties p
+            FROM rptas.properties p
             WHERE p.municipality_code = v_muncode
               AND p.barangay_code = v_barangay_code
               AND p.pin = v_pin
@@ -483,7 +287,7 @@ BEGIN
 
     IF v_master_property_id IS NULL AND v_muncode IS NOT NULL AND v_barangay_code IS NOT NULL AND v_lot_no IS NOT NULL AND v_block_no IS NOT NULL THEN
         SELECT COUNT(*) INTO v_candidate_count
-        FROM rptas.dbo_properties p
+        FROM rptas.properties p
         WHERE p.municipality_code = v_muncode
           AND p.barangay_code = v_barangay_code
           AND p.lot_no = v_lot_no
@@ -491,7 +295,7 @@ BEGIN
 
         IF v_candidate_count = 1 THEN
             SELECT p.id INTO v_master_property_id
-            FROM rptas.dbo_properties p
+            FROM rptas.properties p
             WHERE p.municipality_code = v_muncode
               AND p.barangay_code = v_barangay_code
               AND p.lot_no = v_lot_no
@@ -502,14 +306,14 @@ BEGIN
 
     IF v_master_property_id IS NULL AND v_muncode IS NOT NULL AND v_barangay_code IS NOT NULL AND v_arp_no IS NOT NULL THEN
         SELECT COUNT(*) INTO v_candidate_count
-        FROM rptas.dbo_properties p
+        FROM rptas.properties p
         WHERE p.municipality_code = v_muncode
           AND p.barangay_code = v_barangay_code
           AND p.arp_no = v_arp_no;
 
         IF v_candidate_count = 1 THEN
             SELECT p.id INTO v_master_property_id
-            FROM rptas.dbo_properties p
+            FROM rptas.properties p
             WHERE p.municipality_code = v_muncode
               AND p.barangay_code = v_barangay_code
               AND p.arp_no = v_arp_no
@@ -520,7 +324,7 @@ BEGIN
     IF v_master_property_id IS NULL AND v_owner_name IS NOT NULL AND v_muncode IS NOT NULL AND v_barangay_code IS NOT NULL THEN
         SELECT p.id, similarity(unaccent(lower(oh.owner_name)), unaccent(lower(v_owner_name)))::REAL
           INTO v_owner_best_property_id, v_owner_best_sim
-        FROM rptas.dbo_properties p
+        FROM rptas.properties p
         JOIN rptas.property_owner_history oh ON oh.id = p.current_owner_history_id
         WHERE p.municipality_code = v_muncode
           AND p.barangay_code = v_barangay_code
@@ -529,7 +333,7 @@ BEGIN
 
         SELECT similarity(unaccent(lower(oh.owner_name)), unaccent(lower(v_owner_name)))::REAL
           INTO v_owner_second_sim
-        FROM rptas.dbo_properties p
+        FROM rptas.properties p
         JOIN rptas.property_owner_history oh ON oh.id = p.current_owner_history_id
         WHERE p.municipality_code = v_muncode
           AND p.barangay_code = v_barangay_code
@@ -550,7 +354,7 @@ BEGIN
     END IF;
 
     IF v_master_property_id IS NULL THEN
-        INSERT INTO rptas.dbo_properties (
+        INSERT INTO rptas.properties (
             municipality_code, barangay_code, pin, arp_no, lot_no, block_no,
             created_from_source_record_id, last_source_record_id
         ) VALUES (
@@ -559,7 +363,7 @@ BEGIN
         )
         RETURNING id INTO v_master_property_id;
     ELSE
-        UPDATE rptas.dbo_properties
+        UPDATE rptas.properties
         SET pin = COALESCE(pin, v_pin),
             arp_no = COALESCE(arp_no, v_arp_no),
             lot_no = COALESCE(lot_no, v_lot_no),
@@ -571,7 +375,7 @@ BEGIN
 
     IF v_owner_name IS NOT NULL THEN
         SELECT oh.owner_name INTO v_existing_current_owner
-        FROM rptas.dbo_properties p
+        FROM rptas.properties p
         JOIN rptas.property_owner_history oh ON oh.id = p.current_owner_history_id
         WHERE p.id = v_master_property_id;
 
@@ -581,8 +385,8 @@ BEGIN
             ) VALUES (
                 v_master_property_id, v_owner_name, v_owner_address, TRUE, CURRENT_DATE,
                 CASE
-                    WHEN v_existing_current_owner IS NULL THEN 'new'::rptas.owner_change_reason
-                    ELSE 'transfer'::rptas.owner_change_reason
+                    WHEN v_existing_current_owner IS NULL THEN 'new'::public.owner_change_reason
+                    ELSE 'transfer'::public.owner_change_reason
                 END,
                 v_faas_record_id
             );
@@ -710,84 +514,22 @@ BEGIN
         FROM jsonb_array_elements(v_rec.data->'assessments') AS elem;
     END IF;
 END;
-$$ LANGUAGE plpgsql;
+$function$
+;
 
--- 6. Batch Refresh Function
-CREATE OR REPLACE FUNCTION rptas.refresh_reporting_data()
-RETURNS void AS $$
+-- ----- refresh_reporting_data -----
+CREATE OR REPLACE FUNCTION public.refresh_reporting_data()
+ RETURNS void
+ LANGUAGE plpgsql
+AS $function$
 DECLARE
     v_rec RECORD;
 BEGIN
-    FOR v_rec IN SELECT id FROM rptas.dbo_faas_records WHERE status = 'approved' LOOP
-        PERFORM rptas.sync_faas_to_reporting(v_rec.id);
+    FOR v_rec IN SELECT id FROM rptas.faas_records WHERE status = 'approved' LOOP
+        PERFORM public.sync_faas_to_reporting(v_rec.id);
     END LOOP;
 END;
-$$ LANGUAGE plpgsql;
+$function$
+;
 
---------------------------------------------------------------------------------
--- 3. Automation (Triggers)
---------------------------------------------------------------------------------
-
-CREATE OR REPLACE FUNCTION rptas.trg_sync_faas_to_reporting()
-RETURNS TRIGGER AS $$
-BEGIN
-    -- Only sync if status changed to approved or if already approved and data changed
-    IF (TG_OP = 'INSERT' AND NEW.status = 'approved') OR
-       (TG_OP = 'UPDATE' AND (NEW.status = 'approved' OR OLD.status = 'approved')) THEN
-        PERFORM rptas.sync_faas_to_reporting(NEW.id);
-    END IF;
-    
-    IF TG_OP = 'DELETE' THEN
-        DELETE FROM rptas.rpt_property WHERE source_record_id = OLD.id;
-    END IF;
-    
-    RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
-DROP TRIGGER IF EXISTS trg_faas_records_reporting_sync ON rptas.dbo_faas_records;
-CREATE TRIGGER trg_faas_records_reporting_sync
-    AFTER INSERT OR UPDATE OR DELETE ON rptas.dbo_faas_records
-    FOR EACH ROW EXECUTE FUNCTION rptas.trg_sync_faas_to_reporting();
-
---------------------------------------------------------------------------------
--- 7. Treasury Payment Export (ETL Target)
---------------------------------------------------------------------------------
-
-CREATE TABLE IF NOT EXISTS rptas.treasury_payment_exports (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    etl_run_id UUID NOT NULL,
-    etl_version INT NOT NULL DEFAULT 1,
-    order_id UUID NOT NULL,
-    order_number TEXT NOT NULL,
-    order_description TEXT,
-    order_created_by UUID,
-    order_created_at TIMESTAMP WITH TIME ZONE,
-    paid_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    paid_by UUID NOT NULL,
-    order_amount NUMERIC,
-    property_id UUID NOT NULL,
-    pin TEXT,
-    tdn TEXT,
-    tax_beg_yr TEXT,
-    municipality_code TEXT,
-    municipality_name TEXT,
-    barangay_code TEXT,
-    barangay_name TEXT,
-    owner_name TEXT,
-    owner_address TEXT,
-    total_market_value NUMERIC,
-    total_assessed_value NUMERIC,
-    validation_errors JSONB NOT NULL DEFAULT '[]'::jsonb,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(order_id, property_id)
-);
-
-CREATE INDEX IF NOT EXISTS idx_treasury_payment_exports_paid_at ON rptas.treasury_payment_exports(paid_at);
-CREATE INDEX IF NOT EXISTS idx_treasury_payment_exports_order_id ON rptas.treasury_payment_exports(order_id);
-CREATE INDEX IF NOT EXISTS idx_treasury_payment_exports_property_id ON rptas.treasury_payment_exports(property_id);
-
-
--- To run the ETL:
--- SELECT rptas.refresh_reporting_data();
+COMMIT;

@@ -30,6 +30,9 @@ const PropertyModule = require('./modules/rptas/property/PropertyModule');
 const AssessmentModule = require('./modules/rptas/assessment/AssessmentModule');
 const OopModule = require('./modules/treasury/oop/OopModule');
 const PayorModule = require('./modules/treasury/payors/PayorModule');
+const RbacModule = require('./modules/rbac/RbacModule');
+const SystemAdminModule = require('./modules/systemAdmin/SystemAdminModule');
+const AuthModule = require('./modules/auth/AuthModule');
 
 // Initialize Database Adapter
 const dbAdapter = container.resolve('dbAdapter');
@@ -44,8 +47,12 @@ pluginManager.registerModule(PropertyModule);
 pluginManager.registerModule(AssessmentModule);
 pluginManager.registerModule(OopModule);
 pluginManager.registerModule(PayorModule);
-// Initialize all v2 modules
-pluginManager.initializeModules();
+pluginManager.registerModule(RbacModule);
+pluginManager.registerModule(SystemAdminModule);
+pluginManager.registerModule(AuthModule);
+// NOTE: pluginManager.initializeModules() is called LATER, after all the
+// global middleware (cors, body-parser, rate-limit, etc.) is set up so the
+// v2 routes get the same middleware stack as the legacy routes below.
 // -----------------------------------
 
 // Trust Proxy (for rate limiting and IP logging)
@@ -186,6 +193,12 @@ app.get('/health/ready', async (req, res) => {
     res.status(503).json({ status: 'error' });
   }
 });
+
+// Mount v2 plugin module routes (RbacModule, SystemAdminModule, FaasModule,
+// etc.) here — after all global middleware (cors, body-parser, rate-limit,
+// cookie-parser, idempotency, request logger). This is the moment of route
+// registration; module classes were registered into the DI container earlier.
+pluginManager.initializeModules();
 
 app.use('/', rptasRoutes);
 

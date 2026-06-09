@@ -489,7 +489,7 @@ class FaasService {
                 if (status === 'pending-provincial') {
                     await tx.$executeRawUnsafe(
                         `
-                        UPDATE ${DB_SCHEMA}.faas_records
+                        UPDATE ${DB_SCHEMA}.dbo_faas_records
                         SET
                           status = $1,
                           updated_at = NOW(),
@@ -527,7 +527,7 @@ class FaasService {
                 } else if (status === 'approved') {
                     await tx.$executeRawUnsafe(
                         `
-                        UPDATE ${DB_SCHEMA}.faas_records
+                        UPDATE ${DB_SCHEMA}.dbo_faas_records
                         SET
                           status = $1,
                           updated_at = NOW(),
@@ -570,7 +570,7 @@ class FaasService {
                 } else {
                     await tx.$executeRawUnsafe(
                         `
-                        UPDATE ${DB_SCHEMA}.faas_records
+                        UPDATE ${DB_SCHEMA}.dbo_faas_records
                         SET
                           status = $1,
                           updated_at = NOW(),
@@ -585,7 +585,7 @@ class FaasService {
 
                 await tx.auditLog.createMany({
                     data: eligible.map((id) => ({
-                        tableName: 'faas_records',
+                        tableName: 'dbo_faas_records',
                         recordId: id,
                         action: 'UPDATE_STATUS',
                         userEmail,
@@ -623,7 +623,7 @@ class FaasService {
     try {
         await this.supabasePrisma.auditLog.create({
             data: {
-                tableName: 'faas_records',
+                tableName: 'dbo_faas_records',
                 recordId: recordId,
                 action: action,
                 userEmail: userEmail,
@@ -675,7 +675,7 @@ class FaasService {
         if (pin) {
           const matches = await this.supabasePrisma.$queryRawUnsafe(
             `SELECT id
-             FROM ${DB_SCHEMA}.properties
+             FROM ${DB_SCHEMA}.dbo_properties
              WHERE municipality_code = $1
                AND barangay_code = $2
                AND pin = $3
@@ -714,7 +714,7 @@ class FaasService {
         if (!masterPropertyId && lotNo && blockNo) {
           const matches = await this.supabasePrisma.$queryRawUnsafe(
             `SELECT id
-             FROM ${DB_SCHEMA}.properties
+             FROM ${DB_SCHEMA}.dbo_properties
              WHERE municipality_code = $1
                AND barangay_code = $2
                AND lot_no = $3
@@ -731,7 +731,7 @@ class FaasService {
         if (!masterPropertyId && arpNo) {
           const matches = await this.supabasePrisma.$queryRawUnsafe(
             `SELECT id
-             FROM ${DB_SCHEMA}.properties
+             FROM ${DB_SCHEMA}.dbo_properties
              WHERE municipality_code = $1
                AND barangay_code = $2
                AND arp_no = $3
@@ -880,7 +880,7 @@ class FaasService {
             // 2. Create Audit Log
             await tx.auditLog.create({
               data: {
-                tableName: 'faas_records',
+                tableName: 'dbo_faas_records',
                 recordId: record.id,
                 action: 'BULK_MIGRATE',
                 userEmail: userEmail,
