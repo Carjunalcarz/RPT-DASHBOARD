@@ -14,7 +14,7 @@ router.get('/stats', protect, async (req, res) => {
     const totalProperties = Number(propertiesRow?.count || 0);
 
     const delinquentRow = await supabasePrisma.$queryRawUnsafe(
-      `SELECT COUNT(*)::int as count FROM ${DB_SCHEMA}.rpt_property WHERE payment_status = 'unpaid'::${DB_SCHEMA}.rpt_payment_status`
+      `SELECT COUNT(*)::int as count FROM ${DB_SCHEMA}.rpt_property WHERE payment_status::text = 'unpaid'`
     );
     const delinquentAccounts = Number(delinquentRow?.[0]?.count || 0);
 

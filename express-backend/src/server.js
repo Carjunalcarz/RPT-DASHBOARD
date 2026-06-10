@@ -82,8 +82,9 @@ app.use(rateLimiter);
 app.use(requestLogger);
 
 // Body Parser
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// 12mb to accommodate base64-encoded ID image uploads (≤5MB raw ≈ 6.7MB base64).
+app.use(express.json({ limit: '12mb' }));
+app.use(express.urlencoded({ extended: true, limit: '12mb' }));
 
 // Cookie Parser
 app.use(cookieParser());

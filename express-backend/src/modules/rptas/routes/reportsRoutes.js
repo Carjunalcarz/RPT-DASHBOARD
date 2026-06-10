@@ -4,6 +4,36 @@ const { PrismaClient } = require('../../../generated/supabase-client-v6');
 const prisma = new PrismaClient();
 const logger = require('../../../utils/logger');
 const protect = require('../../../middleware/auth');
+const { DB_SCHEMA } = require('../config/database');
+
+const isUuid = (value) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+
+// The Bank Deposits migration adds deposit_status/deposit_id/deposited_at to
+// treasury_payment_exports plus the treasury_bank_deposits table. Until it runs,
+// keep the existing report working by detecting the columns and degrading gracefully.
+// Only the positive result is cached. A negative result is NOT cached so that a
+// running server picks up the columns immediately after the migration is applied,
+// without needing a restart.
+let hasDepositColumnsCached = false;
+const hasDepositColumns = async () => {
+  if (hasDepositColumnsCached) return true;
+  try {
+    const rows = await prisma.$queryRawUnsafe(`
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = '${DB_SCHEMA}'
+        AND table_name = 'treasury_payment_exports'
+        AND column_name = 'deposit_status'
+      LIMIT 1
+    `);
+    const exists = Array.isArray(rows) && rows.length > 0;
+    if (exists) hasDepositColumnsCached = true;
+    return exists;
+  } catch (err) {
+    logger.error('Error checking for deposit columns:', err);
+    return false;
+  }
+};
 
 let hasTreasuryVisibilityTableCached = null;
 
@@ -414,10 +444,17 @@ router.get('/treasury-payments', protect, async (req, res) => {
     const limit = Math.min(Math.max(parseInt(String(req.query.limit || '20'), 10) || 20, 1), 100);
     const offset = (page - 1) * limit;
 
-    const { from, to, orderNumber, tdn, ownerName, municipalityCode, barangayCode, minAmount, maxAmount } = req.query;
+    const { from, to, orderNumber, tdn, ownerName, municipalityCode, barangayCode, minAmount, maxAmount, depositStatus } = req.query;
+
+    const depCols = await hasDepositColumns();
 
     let whereClause = '1=1';
     const params = [];
+
+    if (depCols && (depositStatus === 'on_treasury' || depositStatus === 'on_bank')) {
+      whereClause += ` AND t.deposit_status = $${params.length + 1}`;
+      params.push(depositStatus);
+    }
 
     if (from) {
       // Start of day in Asia/Manila (UTC+8) mapped back to UTC for database comparison
@@ -495,6 +532,15 @@ router.get('/treasury-payments', protect, async (req, res) => {
         t.total_market_value as "totalMarketValue",
         t.total_assessed_value as "totalAssessedValue",
         t.validation_errors as "validationErrors",
+        ${depCols
+          ? `t.deposit_status as "depositStatus",
+             t.deposit_id::text as "depositId",
+             t.deposited_at as "depositedAt",
+             (SELECT d.deposit_number FROM ${DB_SCHEMA}.treasury_bank_deposits d WHERE d.id = t.deposit_id) as "depositNumber",`
+          : `'on_treasury' as "depositStatus",
+             NULL::text as "depositId",
+             NULL::timestamptz as "depositedAt",
+             NULL::text as "depositNumber",`}
         t.created_at as "createdAt",
         t.updated_at as "updatedAt"
       FROM rptas.treasury_payment_exports t
@@ -517,6 +563,210 @@ router.get('/treasury-payments', protect, async (req, res) => {
   } catch (error) {
     logger.error(`Error fetching treasury payments report: ${error.message}`);
     res.status(error.statusCode || 500).json({ error: error.message || 'Failed to fetch treasury payments report' });
+  }
+});
+
+// Collection summary: total Cash on Treasury (undeposited) vs Cash in Bank (deposited).
+// Amounts are computed per distinct order, since order_amount repeats across an
+// order's property rows.
+router.get('/treasury-collection-summary', protect, async (req, res) => {
+  try {
+    await assertTreasuryAssigned(req.user);
+
+    if (!(await hasDepositColumns())) {
+      return res.json({ onTreasuryAmount: 0, onTreasuryCount: 0, onBankAmount: 0, onBankCount: 0 });
+    }
+
+    const { from, to } = req.query;
+    let whereClause = '1=1';
+    const params = [];
+    if (from) {
+      whereClause += ` AND paid_at >= $${params.length + 1}::timestamptz`;
+      params.push(`${from}T00:00:00+08:00`);
+    }
+    if (to) {
+      whereClause += ` AND paid_at <= $${params.length + 1}::timestamptz`;
+      params.push(`${to}T23:59:59.999+08:00`);
+    }
+
+    const query = `
+      SELECT
+        COALESCE(SUM(order_amount) FILTER (WHERE deposit_status = 'on_treasury'), 0)::numeric AS "onTreasuryAmount",
+        COUNT(*) FILTER (WHERE deposit_status = 'on_treasury')::int AS "onTreasuryCount",
+        COALESCE(SUM(order_amount) FILTER (WHERE deposit_status = 'on_bank'), 0)::numeric AS "onBankAmount",
+        COUNT(*) FILTER (WHERE deposit_status = 'on_bank')::int AS "onBankCount"
+      FROM (
+        SELECT DISTINCT ON (order_id) order_id, order_amount, deposit_status
+        FROM ${DB_SCHEMA}.treasury_payment_exports
+        WHERE ${whereClause}
+        ORDER BY order_id, paid_at DESC
+      ) o
+    `;
+    const rows = await prisma.$queryRawUnsafe(query, ...params);
+    const r = rows?.[0] || {};
+    res.json({
+      onTreasuryAmount: Number(r.onTreasuryAmount || 0),
+      onTreasuryCount: Number(r.onTreasuryCount || 0),
+      onBankAmount: Number(r.onBankAmount || 0),
+      onBankCount: Number(r.onBankCount || 0),
+    });
+  } catch (error) {
+    logger.error(`Error fetching collection summary: ${error.message}`);
+    res.status(error.statusCode || 500).json({ error: error.message || 'Failed to fetch collection summary' });
+  }
+});
+
+// List bank deposit slips.
+router.get('/treasury-deposits', protect, async (req, res) => {
+  try {
+    await assertTreasuryAssigned(req.user);
+
+    const page = Math.max(parseInt(String(req.query.page || '1'), 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit || '20'), 10) || 20, 1), 100);
+    const offset = (page - 1) * limit;
+
+    if (!(await hasDepositColumns())) {
+      return res.json({ data: [], meta: { total: 0, page, limit, totalPages: 0 } });
+    }
+
+    const { from, to } = req.query;
+    let whereClause = '1=1';
+    const params = [];
+    if (from) {
+      whereClause += ` AND d.deposit_date >= $${params.length + 1}::date`;
+      params.push(String(from));
+    }
+    if (to) {
+      whereClause += ` AND d.deposit_date <= $${params.length + 1}::date`;
+      params.push(String(to));
+    }
+
+    const countResult = await prisma.$queryRawUnsafe(
+      `SELECT COUNT(*)::int as count FROM ${DB_SCHEMA}.treasury_bank_deposits d WHERE ${whereClause}`,
+      ...params
+    );
+    const total = Number(countResult?.[0]?.count || 0);
+
+    const query = `
+      SELECT
+        d.id::text as id,
+        d.deposit_number as "depositNumber",
+        d.deposit_date as "depositDate",
+        d.reference_no as "referenceNo",
+        d.remarks,
+        d.total_amount as "totalAmount",
+        d.payment_count as "paymentCount",
+        d.deposited_by::text as "depositedBy",
+        COALESCE(
+          (SELECT raw_user_meta_data->>'full_name' FROM auth.users WHERE id = d.deposited_by LIMIT 1),
+          (SELECT raw_user_meta_data->>'name' FROM auth.users WHERE id = d.deposited_by LIMIT 1),
+          'System API'
+        ) as "depositedByName",
+        d.created_at as "createdAt"
+      FROM ${DB_SCHEMA}.treasury_bank_deposits d
+      WHERE ${whereClause}
+      ORDER BY d.deposit_date DESC, d.created_at DESC
+      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+    `;
+    const rows = await prisma.$queryRawUnsafe(query, ...params, limit, offset);
+    const data = (rows || []).map((r) => ({
+      ...r,
+      totalAmount: Number(r.totalAmount || 0),
+      paymentCount: Number(r.paymentCount || 0),
+    }));
+
+    res.json({ data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } });
+  } catch (error) {
+    logger.error(`Error listing treasury deposits: ${error.message}`);
+    res.status(error.statusCode || 500).json({ error: error.message || 'Failed to list treasury deposits' });
+  }
+});
+
+// Create a deposit slip: batch selected paid orders and flip them to Cash in Bank.
+router.post('/treasury-deposits', protect, async (req, res) => {
+  try {
+    await assertTreasuryAssigned(req.user);
+
+    if (!(await hasDepositColumns())) {
+      return res.status(503).json({ error: 'Bank Deposits not initialized. Run the add_treasury_bank_deposits migration first.' });
+    }
+
+    const { orderIds, depositDate, referenceNo, remarks } = req.body || {};
+    const ids = Array.isArray(orderIds) ? orderIds.filter(isUuid) : [];
+    if (ids.length === 0) {
+      return res.status(400).json({ error: 'orderIds is required (one or more valid order IDs)' });
+    }
+    const date = String(depositDate || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ error: 'depositDate is required (YYYY-MM-DD)' });
+    }
+
+    const depositedBy = isUuid(req.user?.id) ? req.user.id : null;
+
+    const result = await prisma.$transaction(async (tx) => {
+      // One row per distinct order (deposit_status is uniform across an order's rows).
+      const orders = await tx.$queryRawUnsafe(
+        `SELECT DISTINCT ON (order_id) order_id::text as "orderId", order_amount as "orderAmount", deposit_status as "depositStatus"
+         FROM ${DB_SCHEMA}.treasury_payment_exports
+         WHERE order_id = ANY($1::uuid[])
+         ORDER BY order_id, paid_at DESC`,
+        ids
+      );
+
+      if (!orders || orders.length === 0) {
+        const err = new Error('No matching payments found for deposit');
+        err.statusCode = 404;
+        throw err;
+      }
+      const alreadyDeposited = orders.filter((o) => o.depositStatus !== 'on_treasury');
+      if (alreadyDeposited.length > 0) {
+        const err = new Error('One or more selected payments have already been deposited');
+        err.statusCode = 409;
+        throw err;
+      }
+
+      const totalAmount = orders.reduce((sum, o) => sum + Number(o.orderAmount || 0), 0);
+      const paymentCount = orders.length;
+
+      // Sequential deposit number per day: DEP-YYYYMMDD-NNN
+      const seqRows = await tx.$queryRawUnsafe(
+        `SELECT COUNT(*)::int as count FROM ${DB_SCHEMA}.treasury_bank_deposits WHERE deposit_date = $1::date`,
+        date
+      );
+      const seq = Number(seqRows?.[0]?.count || 0) + 1;
+      const depositNumber = `DEP-${date.replace(/-/g, '')}-${String(seq).padStart(3, '0')}`;
+
+      const inserted = await tx.$queryRawUnsafe(
+        `INSERT INTO ${DB_SCHEMA}.treasury_bank_deposits
+           (deposit_number, deposit_date, reference_no, remarks, total_amount, payment_count, deposited_by)
+         VALUES ($1::text, $2::date, $3::text, $4::text, $5::numeric, $6::int, $7::uuid)
+         RETURNING id::text as id, deposit_number as "depositNumber"`,
+        depositNumber,
+        date,
+        referenceNo ? String(referenceNo) : null,
+        remarks ? String(remarks) : null,
+        totalAmount,
+        paymentCount,
+        depositedBy
+      );
+      const deposit = inserted?.[0];
+
+      await tx.$executeRawUnsafe(
+        `UPDATE ${DB_SCHEMA}.treasury_payment_exports
+         SET deposit_status = 'on_bank', deposit_id = $1::uuid, deposited_at = NOW(), updated_at = NOW()
+         WHERE order_id = ANY($2::uuid[])`,
+        deposit.id,
+        ids
+      );
+
+      return { ...deposit, depositDate: date, totalAmount, paymentCount };
+    });
+
+    logger.info(`Treasury deposit created: ${result.depositNumber} count=${result.paymentCount} total=${result.totalAmount}`);
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    logger.error(`Error creating treasury deposit: ${error.message}`);
+    res.status(error.statusCode || 500).json({ error: error.message || 'Failed to create treasury deposit' });
   }
 });
 

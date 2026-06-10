@@ -61,6 +61,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                   }
                 })();
                 const userData = response.data.data.user;
+
+                // Under API-key auth the backend's `protect` middleware checks the
+                // shared key before the bearer token, so /users/me always returns the
+                // mock system user (api@system.local / id 'api-user'). Don't let that
+                // clobber the real user captured at login.
+                const isApiSystemUser =
+                  userData?.id === 'api-user' || userData?.email === 'api@system.local';
+                if (isApiSystemUser) {
+                  return;
+                }
                 const resolvedFullName =
                   userData.fullName || userData.displayName || userData.name || undefined;
                 const resolvedName =

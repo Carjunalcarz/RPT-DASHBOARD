@@ -156,6 +156,70 @@ const createPayor = async ({ user, payload }) => {
   }
 };
 
+const updatePayor = async ({ id, payload }) => {
+  if (!id || !isUuid(String(id))) {
+    throw new AppError('Invalid payor id', 400);
+  }
+  const validation = validatePayorPayload(payload);
+  if (!validation.ok) {
+    throw new AppError('Validation failed', 400, { fieldErrors: validation.errors });
+  }
+  if (!(await hasPayorsTable())) {
+    throw new AppError('Payors table is missing. Apply the payors migration.', 500);
+  }
+
+  const row = toRow(payload);
+  try {
+    const updated = await supabasePrisma.$queryRawUnsafe(
+      `
+        UPDATE public.payors SET
+          first_name = $1,
+          last_name = $2,
+          address = $3,
+          id_type = $4,
+          id_number = $5,
+          contact = $6::jsonb,
+          updated_at = NOW()
+        WHERE id = $7::uuid
+        RETURNING
+          id::text as id,
+          first_name as "firstName",
+          last_name as "lastName",
+          address,
+          id_type as "idType",
+          id_number as "idNumber",
+          contact,
+          created_at as "createdAt",
+          updated_at as "updatedAt"
+      `,
+      row.firstName,
+      row.lastName,
+      row.address,
+      row.idType,
+      row.idNumber,
+      JSON.stringify(row.contact || {}),
+      String(id)
+    );
+    if (!updated?.[0]) {
+      throw new AppError('Payor not found', 404);
+    }
+    return updated[0];
+  } catch (e) {
+    if (e instanceof AppError) throw e;
+    const message = String(e?.message || '');
+    const code = e?.code || e?.meta?.code;
+    const isUniqueViolation =
+      code === 'P2002' ||
+      code === '23505' ||
+      message.includes('payors_id_type_id_number_key') ||
+      message.toLowerCase().includes('duplicate key value');
+    if (isUniqueViolation) {
+      throw new AppError('Another payor with the same ID already exists', 409);
+    }
+    throw e;
+  }
+};
+
 const bulkCreatePayors = async ({ user, rows }) => {
   if (!Array.isArray(rows) || rows.length === 0) {
     throw new AppError('No rows provided', 400);
@@ -251,5 +315,6 @@ const bulkCreatePayors = async ({ user, rows }) => {
 module.exports = {
   searchPayors,
   createPayor,
+  updatePayor,
   bulkCreatePayors,
 };

@@ -37,7 +37,7 @@ const loadPropertyOwnerRows = async (tx, propertyIds) => {
         COALESCE(o.name, rp.owner_name_snapshot) as "ownerName",
         COALESCE(o.address, rp.owner_address_snapshot) as "ownerAddress"
       FROM ${DB_SCHEMA}.rpt_property rp
-      LEFT JOIN public.owner o ON o.id = rp.owner_id
+      LEFT JOIN ${DB_SCHEMA}.owner o ON o.id = rp.owner_id
       WHERE rp.id = ANY($1::uuid[])
     `,
     propertyIds

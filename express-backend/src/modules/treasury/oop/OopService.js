@@ -137,11 +137,13 @@ class OopService {
 
   setRptPropertyPaymentStatus = async (tx, { propertyIds, fromStatus, toStatus }) => {
   if (!propertyIds.length) return [];
+  // payment_status is the `public.rpt_payment_status` enum (not ${DB_SCHEMA}.*),
+  // so compare via text and cast the new value to the public enum type.
   return tx.$queryRawUnsafe(
     `UPDATE ${DB_SCHEMA}.rpt_property
-     SET payment_status = $1::${DB_SCHEMA}.rpt_payment_status
+     SET payment_status = $1::public.rpt_payment_status
      WHERE id = ANY($2::uuid[])
-       AND payment_status = $3::${DB_SCHEMA}.rpt_payment_status
+       AND payment_status::text = $3
      RETURNING id::text as id`,
     toStatus,
     propertyIds,

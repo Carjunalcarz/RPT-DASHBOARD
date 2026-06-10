@@ -18,12 +18,38 @@ const validateIdNumber = (idType, idNumber) => {
   }
 
   if (type === 'national_id') {
-    if (!/^\d{8,12}$/.test(num)) return 'National ID must be 8-12 digits';
+    // Accepts plain 8-12 digit IDs and the 16-digit PhilSys PCN (with/without dashes).
+    if (!/^[0-9-]{8,19}$/.test(num)) return 'National ID must be 8-16 digits';
     return null;
   }
 
   if (type === 'drivers_license') {
     if (!/^[a-z0-9-]{6,20}$/i.test(num)) return "Driver's license must be 6-20 characters (letters, numbers, dashes)";
+    return null;
+  }
+
+  if (type === 'umid') {
+    if (!/^[a-z0-9-]{8,24}$/i.test(num)) return 'UMID/CRN format is invalid';
+    return null;
+  }
+
+  if (type === 'postal_id') {
+    if (!/^[a-z0-9-]{6,20}$/i.test(num)) return 'Postal ID format is invalid';
+    return null;
+  }
+
+  if (type === 'prc_id') {
+    if (!/^[a-z0-9-]{6,16}$/i.test(num)) return 'PRC ID format is invalid';
+    return null;
+  }
+
+  if (type === 'voters_id') {
+    if (!/^[a-z0-9-]{6,32}$/i.test(num)) return "Voter's ID format is invalid";
+    return null;
+  }
+
+  if (type === 'senior_id') {
+    if (!/^[a-z0-9-]{4,24}$/i.test(num)) return 'Senior Citizen ID format is invalid';
     return null;
   }
 

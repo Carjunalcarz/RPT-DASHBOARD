@@ -14,6 +14,9 @@ router.use((req, res, next) => {
 
 router.get('/search', controller.search);
 router.post('/', controller.create);
+router.put('/:id', controller.update);
 router.post('/bulk', controller.bulkCreate);
+router.post('/id-image', controller.uploadIdImage);
+router.get('/id-image/signed-url', controller.getIdImageSignedUrl);
 
 module.exports = router;

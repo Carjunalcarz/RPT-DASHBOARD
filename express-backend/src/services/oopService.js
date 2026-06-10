@@ -154,11 +154,14 @@ const getRptPropertyStatuses = async (tx, propertyIds) => {
 
 const setRptPropertyPaymentStatus = async (tx, { propertyIds, fromStatus, toStatus }) => {
   if (!propertyIds.length) return [];
+  // NOTE: rpt_property.payment_status is typed as the `public.rpt_payment_status`
+  // enum (not rptas.*), even though the table lives in the rptas schema. Compare
+  // via text and cast the new value to the column's actual (public) enum type.
   return tx.$queryRawUnsafe(
     `UPDATE rptas.rpt_property
-     SET payment_status = $1::rptas.rpt_payment_status
+     SET payment_status = $1::public.rpt_payment_status
      WHERE id = ANY($2::uuid[])
-       AND payment_status = $3::rptas.rpt_payment_status
+       AND payment_status::text = $3
      RETURNING id::text as id`,
     toStatus,
     propertyIds,
