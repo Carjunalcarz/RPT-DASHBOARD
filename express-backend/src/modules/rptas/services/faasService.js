@@ -867,7 +867,10 @@ class FaasService {
    * @param {string} userId 
    * @param {boolean} skipExisting
    */
-  async bulkMigrate(properties, migrationType, userEmail, userId, skipExisting = false) {
+  async bulkMigrate(properties, migrationType, userEmail, userId, skipExisting = false, createdByDisplay = null) {
+    // Human-readable submitter label for the createdBy column ("Submitted By").
+    // Falls back to the email when no display name was provided.
+    const createdByLabel = createdByDisplay || userEmail;
     logger.info(`Starting bulk migration for ${properties.length} properties. Type: ${migrationType}, SkipExisting: ${skipExisting}`);
     
     const results = [];
@@ -929,12 +932,12 @@ class FaasService {
                 status: 'pending-municipal',
                 updatedAt: new Date(),
                 data: propertyData,
-                createdBy: userEmail
+                createdBy: createdByLabel
               },
               create: {
                 tdn: tdn,
                 status: 'pending-municipal',
-                createdBy: userEmail,
+                createdBy: createdByLabel,
                 data: propertyData
               }
             });

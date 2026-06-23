@@ -511,6 +511,20 @@ router.get('/treasury-payments', protect, async (req, res) => {
         t.order_description as "orderDescription",
         t.order_created_by::text as "orderCreatedBy",
         t.order_created_at as "orderCreatedAt",
+        (
+          SELECT h.payload->'requestBody'->>'preparedBy'
+          FROM ${DB_SCHEMA}.oop_history h
+          WHERE h.order_id = t.order_id AND h.action = 'created'
+          ORDER BY h.timestamp ASC
+          LIMIT 1
+        ) as "preparedBy",
+        (
+          SELECT h.payload->'requestBody'->>'payerName'
+          FROM ${DB_SCHEMA}.oop_history h
+          WHERE h.order_id = t.order_id AND h.action = 'created'
+          ORDER BY h.timestamp ASC
+          LIMIT 1
+        ) as "payerName",
         t.paid_at as "paidAt",
         t.paid_by::text as "paidBy",
         COALESCE(
@@ -518,6 +532,20 @@ router.get('/treasury-payments', protect, async (req, res) => {
           (SELECT raw_user_meta_data->>'name' FROM auth.users WHERE id = t.paid_by LIMIT 1),
           'System API'
         ) as "paidByName",
+        (
+          SELECT h.payload->'requestBody'->>'approvedBy'
+          FROM ${DB_SCHEMA}.oop_history h
+          WHERE h.order_id = t.order_id AND h.action = 'paid'
+          ORDER BY h.timestamp DESC
+          LIMIT 1
+        ) as "approvedBy",
+        (
+          SELECT h.payload->'requestBody'->>'paymentMethod'
+          FROM ${DB_SCHEMA}.oop_history h
+          WHERE h.order_id = t.order_id AND h.action = 'paid'
+          ORDER BY h.timestamp DESC
+          LIMIT 1
+        ) as "paymentMethod",
         t.order_amount as "orderAmount",
         t.property_id::text as "propertyId",
         t.pin,

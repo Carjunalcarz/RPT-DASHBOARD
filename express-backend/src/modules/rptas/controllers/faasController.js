@@ -1,13 +1,37 @@
 const faasService = require('../services/faasService');
 const { AppError } = require('../../../middleware/errorHandler');
 
+/**
+ * Resolve the real acting user from the x-actor-* headers the frontend attaches
+ * (the logged-in person), falling back to the shared API-key mock user. With API
+ * key auth, req.user is always the mock Admin, so these headers are how a human
+ * identity reaches the backend for attribution.
+ */
+const resolveActor = (req) => {
+  const headerName = req.headers['x-actor-name'];
+  let actorName = null;
+  if (headerName) {
+    try {
+      actorName = decodeURIComponent(String(headerName)).trim() || null;
+    } catch {
+      actorName = String(headerName).trim() || null;
+    }
+  }
+  const actorEmail = (req.headers['x-actor-email'] || (req.user && req.user.email) || 'anonymous');
+  return {
+    // Human-readable label shown as "Submitted By"; prefer the name.
+    display: actorName || actorEmail,
+    email: actorEmail,
+  };
+};
+
 exports.saveDraft = async (req, res, next) => {
   try {
-    // Assuming req.user is populated by auth middleware
-    const userEmail = req.user ? req.user.email : 'anonymous';
+    // Record the real submitter (name when available, else email) as createdBy.
+    const actor = resolveActor(req);
     const userId = req.user ? req.user.id : null;
     const id = req.params.id || null;
-    const record = await faasService.saveDraft(req.body, userEmail, id, userId);
+    const record = await faasService.saveDraft(req.body, actor.display, id, userId);
     res.status(200).json({
       success: true,
       data: record
@@ -96,14 +120,15 @@ exports.deleteRecord = async (req, res, next) => {
 exports.bulkMigrate = async (req, res, next) => {
   try {
     const { properties, migrationType, skipExisting = false } = req.body;
-    const userEmail = req.user ? req.user.email : 'anonymous';
+    // Record the real submitter (name) as createdBy; keep the email for audit.
+    const actor = resolveActor(req);
     const userId = req.user ? req.user.id : null;
 
     if (!properties || !Array.isArray(properties)) {
       throw new AppError('Properties array is required', 400);
     }
 
-    const result = await faasService.bulkMigrate(properties, migrationType, userEmail, userId, skipExisting);
+    const result = await faasService.bulkMigrate(properties, migrationType, actor.email, userId, skipExisting, actor.display);
 
     res.status(200).json({
       success: true,
@@ -161,7 +186,8 @@ exports.updateStatus = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { status, remarks, approverName, approverPosition } = req.body;
-    const userEmail = req.user ? req.user.email : 'anonymous';
+    // Real acting user (name) for the approver/audit fields, not the mock API user.
+    const userEmail = resolveActor(req).display;
     const userId = req.user ? req.user.id : null;
 
     if (!['draft', 'for-review', 'pending-municipal', 'pending-provincial', 'approved', 'rejected', 'rejected-municipal', 'rejected-provincial'].includes(status)) {
@@ -182,7 +208,8 @@ exports.updateStatus = async (req, res, next) => {
 exports.batchUpdateStatus = async (req, res, next) => {
   try {
     const { ids, status, remarks, approverName, approverPosition } = req.body;
-    const userEmail = req.user ? req.user.email : 'anonymous';
+    // Real acting user (name) for the approver/audit fields, not the mock API user.
+    const userEmail = resolveActor(req).display;
     const userId = req.user ? req.user.id : null;
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {

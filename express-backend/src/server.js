@@ -20,6 +20,12 @@ const { runSupabaseStartupMigrations } = require('./modules/rptas/database/start
 
 const app = express();
 
+// Disable Express's default weak ETag on responses. As a JSON API we don't want
+// the browser to revalidate GETs with If-None-Match and receive empty 304s —
+// axios treats 304 as an error (non-2xx) and a 304 carries no body, which blanks
+// out paginated views (e.g. RPT reports) when switching pages.
+app.set('etag', false);
+
 // --- DI and Plugin Manager Setup ---
 const container = require('./core/di/container');
 const PluginManager = require('./core/plugins/PluginManager');

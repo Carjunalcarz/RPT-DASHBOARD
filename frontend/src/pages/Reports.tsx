@@ -1,57 +1,56 @@
-import React, { useEffect, useState } from 'react';
-import { FileText, Download, Calendar, Filter, Loader2, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
-import { getPropertyReport, getReportSummary, getTaxBegYears, PropertyReport, ReportSummary } from '@/modules/rptas/shared/services/reportsService';
+import React, { useMemo, useState } from 'react';
+import { Filter, Loader2, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { getPropertyReport, getReportSummary, getTaxBegYears } from '@/modules/rptas/shared/services/reportsService';
+
+const PAGE_LIMIT = 10;
+const CURRENT_YEAR = new Date().getFullYear().toString();
+
+type ReportFilters = {
+  municipality: string;
+  barangay: string;
+  taxBegYr: string;
+};
+
+const INITIAL_FILTERS: ReportFilters = {
+  municipality: '',
+  barangay: '',
+  taxBegYr: CURRENT_YEAR,
+};
 
 const Reports: React.FC = () => {
-  const [summary, setSummary] = useState<ReportSummary | null>(null);
-  const [properties, setProperties] = useState<PropertyReport[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [taxBegYrOptions, setTaxBegYrOptions] = useState<string[]>([]);
-  const [meta, setMeta] = useState({
-    total: 0,
-    page: 1,
-    limit: 10,
-    totalPages: 0
-  });
-  const [filters, setFilters] = useState({
-    municipality: '',
-    barangay: '',
-    taxBegYr: new Date().getFullYear().toString()
+  // Draft filters edited in the form; only promoted to `appliedFilters` on submit.
+  const [filters, setFilters] = useState<ReportFilters>(INITIAL_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState<ReportFilters>(INITIAL_FILTERS);
+  const [page, setPage] = useState(1);
+
+  const taxBegYrsQuery = useQuery({
+    queryKey: ['reports', 'tax-beg-years'],
+    queryFn: getTaxBegYears,
+    staleTime: 10 * 60 * 1000,
   });
 
-  const fetchData = async (page = 1, nextFilters = filters) => {
-    setLoading(true);
-    try {
-      const [summaryData, response] = await Promise.all([
-        getReportSummary(nextFilters),
-        getPropertyReport({ ...nextFilters, page, limit: meta.limit })
-      ]);
-      setSummary(summaryData);
-      setProperties(response.data);
-      setMeta(response.meta);
-    } catch (error) {
-      console.error('Error fetching report data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const summaryQuery = useQuery({
+    queryKey: ['reports', 'summary', appliedFilters],
+    queryFn: () => getReportSummary(appliedFilters),
+  });
 
-  useEffect(() => {
-    const init = async () => {
-      const currentYear = new Date().getFullYear().toString();
-      const initialFilters = { municipality: '', barangay: '', taxBegYr: currentYear };
-      setFilters(initialFilters);
-      try {
-        const years = await getTaxBegYears();
-        const merged = Array.from(new Set([currentYear, ...years].filter(Boolean)));
-        setTaxBegYrOptions(merged);
-      } catch (error) {
-        setTaxBegYrOptions([currentYear]);
-      }
-      await fetchData(1, initialFilters);
-    };
-    init();
-  }, []);
+  const propertiesQuery = useQuery({
+    queryKey: ['reports', 'properties', appliedFilters, page],
+    queryFn: () => getPropertyReport({ ...appliedFilters, page, limit: PAGE_LIMIT }),
+    placeholderData: keepPreviousData,
+  });
+
+  const summary = summaryQuery.data ?? null;
+  const properties = propertiesQuery.data?.data ?? [];
+  const meta = propertiesQuery.data?.meta ?? { total: 0, page, limit: PAGE_LIMIT, totalPages: 0 };
+  const loading = propertiesQuery.isLoading;
+  const isFetching = propertiesQuery.isFetching || summaryQuery.isFetching;
+
+  const taxBegYrOptions = useMemo(
+    () => Array.from(new Set([CURRENT_YEAR, ...(taxBegYrsQuery.data ?? [])].filter(Boolean))),
+    [taxBegYrsQuery.data]
+  );
 
   const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -59,13 +58,19 @@ const Reports: React.FC = () => {
   };
 
   const handleApplyFilters = () => {
-    fetchData(1, filters);
+    setPage(1);
+    setAppliedFilters(filters);
   };
 
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= meta.totalPages) {
-      fetchData(newPage, filters);
+      setPage(newPage);
     }
+  };
+
+  const handleRefresh = () => {
+    summaryQuery.refetch();
+    propertiesQuery.refetch();
   };
 
   const formatCurrency = (value: number) => {
@@ -87,12 +92,12 @@ const Reports: React.FC = () => {
             Comprehensive overview of property assessments and tax data
           </p>
         </div>
-        <button 
-          onClick={() => fetchData(meta.page, filters)} 
+        <button
+          onClick={handleRefresh}
           className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
           title="Refresh Data"
         >
-          <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+          <RefreshCw size={20} className={isFetching ? 'animate-spin' : ''} />
         </button>
       </div>
 
@@ -291,14 +296,14 @@ const Reports: React.FC = () => {
           <div className="flex gap-2">
             <button
               onClick={() => handlePageChange(meta.page - 1)}
-              disabled={meta.page <= 1 || loading}
+              disabled={meta.page <= 1 || isFetching}
               className="p-2 border border-slate-300 dark:border-slate-700 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronLeft size={20} />
             </button>
             <button
               onClick={() => handlePageChange(meta.page + 1)}
-              disabled={meta.page >= meta.totalPages || loading}
+              disabled={meta.page >= meta.totalPages || isFetching}
               className="p-2 border border-slate-300 dark:border-slate-700 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronRight size={20} />

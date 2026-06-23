@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@letta-ai/letta-client": "^1.12.1",
     "cookie-parser": "^1.4.7",
     "create-vite": "^9.0.3"
   }

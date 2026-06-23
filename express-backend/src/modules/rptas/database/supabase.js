@@ -4,7 +4,22 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_KEY;
+// This is a backend (server-side) client used for privileged operations such as
+// Storage writes that must bypass RLS — prefer the service-role key. SUPABASE_KEY
+// is only an anon-key fallback, which would fail Storage RLS ("new row violates
+// row-level security policy"), so it must NOT win over the service key.
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_KEY;
+
+// Decode the JWT role claim so a misconfigured (anon) key surfaces loudly at
+// startup instead of as a cryptic RLS error on the first Storage upload.
+const decodeJwtRole = (jwt) => {
+  try {
+    const payload = jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(Buffer.from(payload, 'base64').toString()).role;
+  } catch {
+    return null;
+  }
+};
 
 // Simple retry helper
 const withRetry = async (fn, retries = 3, delay = 1000) => {
@@ -65,6 +80,14 @@ if (!supabaseUrl || !supabaseKey) {
     }
   };
 } else {
+  const role = decodeJwtRole(supabaseKey);
+  if (role !== 'service_role') {
+    console.warn(
+      `[supabase] Backend client is using a key with role "${role || 'unknown'}", not "service_role". ` +
+      'Privileged operations (e.g. Storage uploads) will fail with RLS errors. ' +
+      'Set SUPABASE_SERVICE_KEY to the project service-role key.'
+    );
+  }
   supabase = createClient(supabaseUrl, supabaseKey);
 }
 
