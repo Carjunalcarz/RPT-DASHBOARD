@@ -286,61 +286,10 @@ const PropertyApproval: React.FC = () => {
     };
   }, [recordId, isApproving]);
 
-  useEffect(() => {
-    if (!record) return;
-    if (record.status !== 'pending-municipal') return;
-
-    const nowIso = new Date().toISOString();
-    const next: PropertyRecord = { ...record };
-
-    if (selectedMunicipalSignatory?.name) {
-      next.recApproval = selectedMunicipalSignatory.name;
-      next.cityAssessor = selectedMunicipalSignatory.name;
-    }
-    if (selectedMunicipalSignatory?.title) {
-      next.recApprovalPos = selectedMunicipalSignatory.title;
-      next.cityAssessorPos = selectedMunicipalSignatory.title;
-    }
-    next.recAppDate = nowIso;
-    next.cityAssessorDate = nowIso;
-
-    if (!next.municipalApprover && user?.email) {
-      next.municipalApprover = user.email;
-    }
-    if (!next.municipalApprovalDate) {
-      next.municipalApprovalDate = nowIso;
-    }
-
-    setRecord(next);
-  }, [record?.id, record?.status, selectedMunicipalSignatory?.id, user?.email]);
-
-  useEffect(() => {
-    if (!record) return;
-    if (record.status !== 'pending-provincial') return;
-
-    const nowIso = new Date().toISOString();
-    const next: PropertyRecord = { ...record };
-
-    if (selectedProvincialSignatory?.name) {
-      next.approved = selectedProvincialSignatory.name;
-      next.provAssessor = selectedProvincialSignatory.name;
-    }
-    if (selectedProvincialSignatory?.title) {
-      next.approvedPos = selectedProvincialSignatory.title;
-      next.provAssessorPos = selectedProvincialSignatory.title;
-    }
-    next.approvedDate = nowIso;
-    next.provAssessorDate = nowIso;
-
-    if (!next.provincialApprover && user?.email) {
-      next.provincialApprover = user.email;
-    }
-    if (!next.provincialApprovalDate) {
-      next.provincialApprovalDate = nowIso;
-    }
-
-    setRecord(next);
-  }, [record?.id, record?.status, selectedProvincialSignatory?.id, user?.email]);
+  // NOTE: The signatory fields (Recommending Approval / Approved By / City &
+  // Provincial Assessor) are NOT pre-filled here. They reflect the actual saved
+  // approval data — the backend writes them only when an approval really happens
+  // — so a pending record never looks already-approved.
 
   const fetchData = async (recordId: string) => {
     setIsLoading(true);

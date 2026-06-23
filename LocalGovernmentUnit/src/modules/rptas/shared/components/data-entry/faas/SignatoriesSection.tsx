@@ -487,12 +487,6 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({
     setFormData(defaultFormData);
   };
 
-  const handleRefresh = () => {
-    setFormData(defaultFormData);
-    setDocumentationData(defaultDocumentationData);
-    setRemarksData(defaultRemarksData);
-  };
-
   const pushNotice = (type: 'success' | 'error', message: string) => {
     setNotice({ type, message });
     setTimeout(() => setNotice(null), 2500);
@@ -1065,14 +1059,6 @@ const SignatoriesSection: React.FC<SignatoriesSectionProps> = ({
               >
                 <X size={14} />
                 Cancel
-              </button>
-              <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1 self-center" />
-              <button
-                onClick={handleRefresh}
-                className="px-3 py-1.5 text-xs bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 border border-slate-300 dark:border-slate-600 rounded shadow-sm transition-colors flex items-center gap-1.5"
-              >
-                <RefreshCw size={14} />
-                Refresh
               </button>
             </div>
 
