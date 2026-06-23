@@ -1,0 +1,1 @@
+export const BUDGET_TABLE_ROWS_PER_PAGE = 10
