@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { supabase, isSupabaseConfigured } from "@/services/supabase";
-import { isPendingUserConfirmed } from "@/services/userActivationService";
 import * as backendAuth from "@/services/authBackendService";
 
 /**
@@ -105,21 +104,11 @@ export const useAuthStore = create<AuthState>()(
         const forceAdmin = import.meta.env.VITE_FORCE_ADMIN === "true";
 
         try {
-          // 1. Pending-users gate (admin-approval workflow). Keep this as a
-          //    soft check before hitting the backend so the message is
-          //    clearer than a generic "Invalid email or password".
-          const confirmed = await isPendingUserConfirmed(normalizedEmail);
-          if (!confirmed) {
-            set({
-              error:
-                "Your account is awaiting admin confirmation. " +
-                "You'll be able to log in once approved.",
-              isLoading: false,
-            });
-            return false;
-          }
-
-          // 2. Backend login. The backend sets HTTP-only cookies AND returns
+          // 1. Backend login. The backend verifies credentials against the
+          //    database directly and enforces the pending-users approval gate
+          //    server-side (returns 403 with a clear message if unapproved),
+          //    so we no longer make a direct-to-Supabase pending_users query
+          //    here. The backend sets HTTP-only cookies AND returns
           //    { accessToken, refreshToken, user } in the response body.
           const result = await backendAuth.login({
             email: normalizedEmail,

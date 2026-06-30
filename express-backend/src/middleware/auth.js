@@ -64,11 +64,16 @@ const protect = async (req, res, next) => {
 
     // Service-to-service request: the shared API key is present and valid.
     if (apiKey === validApiKey) {
-      // Keep the API key's service-level admin authorization. If the frontend
-      // ALSO attached the logged-in user's Supabase JWT, decode it so the REAL
-      // user id is recorded for attribution (paid_by / created_by / performed_by)
-      // — without changing authorization (role stays the service 'admin').
-      const userToken = bearer && bearer !== validApiKey ? bearer : null;
+      // Keep the API key's service-level admin authorization. If the request
+      // ALSO carries the logged-in user's Supabase JWT — either as the Bearer
+      // token or the httpOnly access_token cookie the backend sets on login —
+      // decode it so the REAL user id is recorded for attribution (paid_by /
+      // created_by / performed_by), without changing authorization (role stays
+      // the service 'admin').
+      const cookieToken = req.cookies?.access_token;
+      const userToken =
+        (bearer && bearer !== validApiKey) ? bearer :
+        (cookieToken && cookieToken !== validApiKey) ? cookieToken : null;
       const claims = userToken ? verifySupabaseJwt(userToken) : null;
       const decoded = {
         sub: claims && isUuid(claims.sub) ? claims.sub : 'api-user',

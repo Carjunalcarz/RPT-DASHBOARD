@@ -16,12 +16,28 @@
  * verification, swap to supabase.auth.signUp.
  */
 
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { supabase } = require('../rptas/database/supabase');
 const { supabasePrisma } = require('../rptas/database/prisma');
 const { AppError } = require('../../middleware/errorHandler');
 const logger = require('../../utils/logger');
 
 const ALLOWED_ROLES = new Set(['admin', 'user']);
+
+// DB-direct auth (login/refresh) verifies credentials against auth.users and
+// mints Supabase-compatible HS256 JWTs signed with SUPABASE_JWT_SECRET — so the
+// app does NOT depend on the GoTrue/Kong HTTP gateway being reachable. The
+// access token's claims match what the auth middleware verifies.
+const ACCESS_TTL_SEC = 60 * 60;            // 1 hour
+const REFRESH_TTL_SEC = 60 * 60 * 24 * 7;  // 7 days
+
+function getJwtSecret() {
+  const s = process.env.SUPABASE_JWT_SECRET;
+  if (!s) throw new AppError('SUPABASE_JWT_SECRET is not configured', 500);
+  return s;
+}
 
 function shapeUser(u, profile = null) {
   if (!u) return null;
@@ -132,33 +148,128 @@ class AuthService {
     return { user: shapeUser(data.user, profile) };
   }
 
-  async login({ email, password }) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email, password,
-    });
+  // ------------------------------------------------------------------
+  // DB-direct auth helpers
+  // ------------------------------------------------------------------
+  async _findAuthUserByEmail(email) {
+    const rows = await this.prisma.$queryRawUnsafe(
+      `SELECT id::text AS id, email, encrypted_password, email_confirmed_at,
+              banned_until, raw_user_meta_data, raw_app_meta_data,
+              last_sign_in_at, created_at
+       FROM auth.users
+       WHERE lower(email) = lower($1) AND deleted_at IS NULL
+       LIMIT 1`,
+      String(email || '').trim()
+    );
+    return Array.isArray(rows) && rows[0] ? rows[0] : null;
+  }
 
-    if (error || !data?.session) {
-      throw new AppError(
-        error?.message || 'Invalid email or password', 401
+  // Build a shapeUser-compatible object from an auth.users row.
+  _shapeAuthRow(row) {
+    return {
+      id: row.id,
+      email: row.email,
+      user_metadata: row.raw_user_meta_data || {},
+      app_metadata: row.raw_app_meta_data || {},
+      last_sign_in_at: row.last_sign_in_at,
+      created_at: row.created_at,
+    };
+  }
+
+  // Mint a Supabase-compatible access token + a refresh token (both HS256,
+  // signed with SUPABASE_JWT_SECRET). Stateless: refresh re-validates the JWT.
+  _issueSession(authUser) {
+    const secret = getJwtSecret();
+    const nowSec = Math.floor(Date.now() / 1000);
+    const sessionId = crypto.randomUUID();
+    const accessToken = jwt.sign(
+      {
+        sub: authUser.id,
+        email: authUser.email,
+        role: 'authenticated',
+        aud: 'authenticated',
+        user_metadata: authUser.user_metadata || {},
+        app_metadata: authUser.app_metadata || {},
+        session_id: sessionId,
+      },
+      secret,
+      { algorithm: 'HS256', expiresIn: ACCESS_TTL_SEC }
+    );
+    const refreshToken = jwt.sign(
+      { sub: authUser.id, type: 'refresh', session_id: sessionId },
+      secret,
+      { algorithm: 'HS256', expiresIn: REFRESH_TTL_SEC }
+    );
+    return {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      token_type: 'bearer',
+      expires_in: ACCESS_TTL_SEC,
+      expires_at: nowSec + ACCESS_TTL_SEC,
+    };
+  }
+
+  // Admin-approval gate: block login if a pending_users row exists and is not
+  // yet confirmed. No-op when the table/schema isn't present (table is empty
+  // for users created outside that workflow).
+  async _assertNotPending(email) {
+    const schema = (process.env.SYSTEM_ADMIN_SCHEMA || 'admin_setup').replace(/[^A-Za-z0-9_]/g, '');
+    try {
+      const rows = await this.prisma.$queryRawUnsafe(
+        `SELECT is_confirmed FROM "${schema}".pending_users WHERE lower(email) = lower($1) LIMIT 1`,
+        String(email || '').trim()
       );
+      if (Array.isArray(rows) && rows[0] && rows[0].is_confirmed === false) {
+        throw new AppError(
+          'Your account is awaiting admin confirmation. You can log in once approved.',
+          403
+        );
+      }
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      // table/schema missing → no gate
     }
+  }
 
-    const profile = await this._loadProfile(data.user?.id);
+  async login({ email, password }) {
+    const invalid = () => new AppError('Invalid email or password', 401);
+    if (!email || !password) throw invalid();
+
+    const row = await this._findAuthUserByEmail(email);
+    if (!row || !row.encrypted_password) throw invalid();
+
+    const ok = await bcrypt.compare(String(password), String(row.encrypted_password));
+    if (!ok) throw invalid();
+
+    if (row.banned_until && new Date(row.banned_until) > new Date()) {
+      throw new AppError('This account is banned', 403);
+    }
+    await this._assertNotPending(row.email);
+
+    const authUser = this._shapeAuthRow(row);
+
+    const profile = await this._loadProfile(authUser.id);
     if (profile) {
       try {
         await this.prisma.user.update({
-          where: { id: data.user.id },
+          where: { id: authUser.id },
           data: { lastLoginAt: new Date() },
         });
       } catch { /* non-fatal */ }
     } else {
-      // First login after admin-created user without trigger — sync now.
-      await this._syncProfile(data.user);
+      await this._syncProfile(authUser);
     }
+    // Best-effort: reflect the sign-in on auth.users too.
+    try {
+      await this.prisma.$executeRawUnsafe(
+        `UPDATE auth.users SET last_sign_in_at = now() WHERE id = $1::uuid`,
+        authUser.id
+      );
+    } catch { /* non-fatal */ }
 
     return {
-      user: shapeUser(data.user, profile),
-      session: shapeSession(data.session),
+      user: shapeUser(authUser, profile),
+      session: shapeSession(this._issueSession(authUser)),
     };
   }
 
@@ -167,20 +278,33 @@ class AuthService {
       throw new AppError('Refresh token missing', 401);
     }
 
-    const { data, error } = await supabase.auth.refreshSession({
-      refresh_token: refreshToken,
-    });
-
-    if (error || !data?.session) {
-      throw new AppError(
-        error?.message || 'Refresh token is invalid or expired', 401
-      );
+    let claims;
+    try {
+      claims = jwt.verify(refreshToken, getJwtSecret(), { algorithms: ['HS256'] });
+    } catch {
+      throw new AppError('Refresh token is invalid or expired', 401);
+    }
+    if (!claims || claims.type !== 'refresh' || !claims.sub) {
+      throw new AppError('Refresh token is invalid', 401);
     }
 
-    const profile = await this._loadProfile(data.user?.id);
+    const rows = await this.prisma.$queryRawUnsafe(
+      `SELECT id::text AS id, email, banned_until, raw_user_meta_data,
+              raw_app_meta_data, last_sign_in_at, created_at
+       FROM auth.users WHERE id = $1::uuid AND deleted_at IS NULL LIMIT 1`,
+      claims.sub
+    );
+    const row = Array.isArray(rows) && rows[0] ? rows[0] : null;
+    if (!row) throw new AppError('User no longer exists', 401);
+    if (row.banned_until && new Date(row.banned_until) > new Date()) {
+      throw new AppError('This account is banned', 403);
+    }
+
+    const authUser = this._shapeAuthRow(row);
+    const profile = await this._loadProfile(authUser.id);
     return {
-      user: shapeUser(data.user, profile),
-      session: shapeSession(data.session),
+      user: shapeUser(authUser, profile),
+      session: shapeSession(this._issueSession(authUser)),
     };
   }
 
@@ -189,16 +313,10 @@ class AuthService {
    * (so the refresh token can no longer be used to mint new access tokens).
    * The cookies themselves are cleared by the controller.
    */
-  async logout({ accessToken }) {
-    if (!accessToken) return { ok: true };
-    try {
-      // admin.signOut(jwt, scope?) — 'global' kills all sessions for that
-      // user; 'local' just this one. Default 'global' for safety.
-      await supabase.auth.admin.signOut(accessToken, 'global');
-    } catch (err) {
-      // Stale token / already expired — clearing cookies still succeeds.
-      logger.warn(`AuthService.logout: supabase signOut failed: ${err.message}`);
-    }
+  async logout(/* { accessToken } */) {
+    // Tokens are stateless HS256 JWTs (DB-direct auth); there is no GoTrue
+    // session to revoke. The controller clears the httpOnly cookies, which
+    // is sufficient to end the browser session.
     return { ok: true };
   }
 

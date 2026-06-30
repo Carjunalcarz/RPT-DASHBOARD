@@ -38,6 +38,7 @@
     "@react-pdf/renderer": "^4.3.2",
     "@supabase/supabase-js": "^2.98.0",
     "awilix": "^13.0.3",
+    "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.0",
@@ -70,4 +71,3 @@
     "node": ">=18.0.0"
   }
 }
-
