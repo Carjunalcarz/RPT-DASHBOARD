@@ -83,6 +83,26 @@ const PrintBuildingDocument: React.FC<PrintBuildingDocumentProps> = ({
 }) => {
   const mainStruc = bldgStruc[0] || {} as BldgStrucRecord;
 
+  // The appraisal must coincide with the Building Assessment table, which is driven by the
+  // assessment rows (rpt_ass). Their UNIT_VALUE can differ from bldg_struc's, so pair each
+  // structure with its assessment row by index and use the assessment's area × unit value.
+  const buildingList: Partial<BldgStrucRecord>[] = bldgStruc.length ? bldgStruc : [mainStruc];
+  const buildingBaseValue = (idx: number, s: Partial<BldgStrucRecord>) => {
+    const row = assessmentRows[idx];
+    const area = Number(row?.area ?? s?.Total_Area ?? s?.Floor_area) || 0;
+    const unit = Number(row?.unitValue ?? s?.UNIT_VALUE) || 0;
+    return { area, unit, value: area * unit };
+  };
+  const totalBuildingMarketValue = buildingList
+    .reduce((acc, s, idx) => acc + buildingBaseValue(idx, s).value, 0);
+  const totalAdditionalItems = bldgAdj
+    .reduce((acc, a) => acc + (Number(a.Market_Val) || 0), 0);
+  // Gross = building bases + additional items. Depreciation brings it down to the adjusted
+  // (net) market value — the assessment total the form must tie to.
+  const grossAppraisedValue = totalBuildingMarketValue + totalAdditionalItems;
+  const totalDepreciation = Math.max(0, grossAppraisedValue - (summary?.totalAdjustedMarketValue || 0));
+  const totalAppraisedValue = summary?.totalAdjustedMarketValue ?? grossAppraisedValue;
+
   const formatNumber = (value: number | string) => {
     const numValue = typeof value === 'string' ? parseFloat(value) : value;
     return new Intl.NumberFormat('en-PH', {
@@ -643,17 +663,21 @@ const PrintBuildingDocument: React.FC<PrintBuildingDocumentProps> = ({
               </tr>
             </thead>
             <tbody>
-               {/* Main Building */}
-               <tr>
-                  <td>
-                     <div className="font-bold">{mainStruc.KIND || 'MAIN BUILDING'}</div>
-                     <div className="text-xs">{mainStruc.Struc_type}</div>
-                  </td>
-                  <td className="text-right">{mainStruc.Total_Area || mainStruc.Floor_area}</td>
-                  <td className="text-right">{formatNumber(mainStruc.UNIT_VALUE)}</td>
-                  <td className="text-right">{formatNumber(mainStruc.Market_Val)}</td>
-               </tr>
-               {/* Adjustments/Additional Items mapped to Appraisal if needed, or kept separate */}
+               {/* All Buildings — values mirror the Building Assessment table (assessment rows) */}
+               {buildingList.map((struc, idx) => {
+                  const b = buildingBaseValue(idx, struc);
+                  return (
+                     <tr key={idx}>
+                        <td>
+                           <div className="font-bold">{struc.KIND || 'MAIN BUILDING'}</div>
+                           <div className="text-xs">{struc.Struc_type}</div>
+                        </td>
+                        <td className="text-right">{b.area || (struc.Total_Area || struc.Floor_area)}</td>
+                        <td className="text-right">{formatNumber(b.unit)}</td>
+                        <td className="text-right">{formatNumber(b.value)}</td>
+                     </tr>
+                  );
+               })}
             </tbody>
           </table>
 
@@ -681,9 +705,15 @@ const PrintBuildingDocument: React.FC<PrintBuildingDocumentProps> = ({
                   </tr>
                 ))
               )}
+               {totalDepreciation > 0 && (
+                 <tr>
+                  <td colSpan={3} className="text-right">Less: Depreciation</td>
+                  <td className="text-right">({formatNumber(totalDepreciation)})</td>
+                 </tr>
+               )}
                <tr className="faas-table-total">
                 <td colSpan={3} className="text-right font-bold">TOTAL</td>
-                <td className="text-right font-bold">{formatNumber(summary.totalAdjustedMarketValue)}</td>
+                <td className="text-right font-bold">{formatNumber(totalAppraisedValue)}</td>
               </tr>
             </tbody>
           </table>
@@ -763,7 +793,7 @@ const PrintBuildingDocument: React.FC<PrintBuildingDocumentProps> = ({
                          <span className="text-[8pt] font-bold uppercase">{propertyInfo.backPart.signatories.recommending || 'FELIX S. BALANSAG, JR.'}</span>
                       </div>
                       <div className="w-24 border-b border-black text-center min-h-[16px]">
-                         <span className="text-[8pt]"></span>
+                         <span className="text-[8pt]">{formatDate((propertyInfo.backPart.signatories.recommendingDate && propertyInfo.backPart.signatories.recommendingDate !== 'N/A') ? propertyInfo.backPart.signatories.recommendingDate : propertyInfo.declarationDate)}</span>
                       </div>
                    </div>
                    <div className="flex gap-4 text-[7pt] mt-1 pl-4">

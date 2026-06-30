@@ -85,8 +85,8 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({
         subClass: r.SUB_CLASS || '',
         area: r.AREA || 0,
         unitValue: r.UNIT_VALUE || 0,
-        baseMarketValue: (r.STRUCTURE_MARKET_VAL ?? r.MARKET_VAL) || 0,
-        adjustedMarketValue: (r.STRUCTURE_MARKET_VAL ?? r.MARKET_VAL) || 0,
+        baseMarketValue: (r.AREA || 0) * (r.UNIT_VALUE || 0), // Base = Area × Unit Value
+        adjustedMarketValue: (r.STRUCTURE_MARKET_VAL ?? r.MARKET_VAL) || 0, // Net value (after depreciation / additional items)
         assessmentLevel: r.ASS_LEVEL || 0,
         assessedValue: r.ASS_VALUE || 0,
         taxable: r.TAXABLE_RATE > 0, // Simplified logic
@@ -199,8 +199,8 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({
       // Update Selected Record and Records Array (to persist changes locally and avoid revert on Cancel)
       if (selectedRecord) {
         const baseMarketValue = newArea * newUnitValue;
-        const adjustedMarketValue = baseMarketValue * (selectedRecord.assessmentLevel / 100);
-        const assessedValue = adjustedMarketValue; // Simplified logic matches existing code
+        const adjustedMarketValue = baseMarketValue; // Base (+ adjustments); level is NOT applied here
+        const assessedValue = adjustedMarketValue * (selectedRecord.assessmentLevel / 100);
 
         const updatedRecord = {
           ...selectedRecord,
@@ -287,12 +287,13 @@ const BuildingAssessment: React.FC<BuildingAssessmentProps> = ({
 
     // Base Market Value = Area × Unit Value
     const baseMarketValue = area * unitValue;
-    
-    // Adjusted Market Value = Base Market Value × (Assessment Level / 100)
-    const adjustedMarketValue = baseMarketValue * (assessmentLevel / 100);
-    
-    // Assessed Value = Adjusted Market Value (simplified - in reality may have more factors)
-    const assessedValue = adjustedMarketValue;
+
+    // Adjusted Market Value = Base Market Value (+ adjustments / − depreciation).
+    // No assessment level here — the level only applies to derive the Assessed Value.
+    const adjustedMarketValue = baseMarketValue;
+
+    // Assessed Value = Adjusted Market Value × (Assessment Level / 100)
+    const assessedValue = adjustedMarketValue * (assessmentLevel / 100);
 
     setComputedValues({
       baseMarketValue,

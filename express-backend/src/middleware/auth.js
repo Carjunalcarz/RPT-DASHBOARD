@@ -1,8 +1,26 @@
+const jwt = require('jsonwebtoken');
 const { AppError } = require('./errorHandler');
 const { runWithContext } = require('../utils/context');
 const logger = require('../utils/logger');
 const rateLimit = require('express-rate-limit');
 const { supabasePrisma } = require('../modules/rptas/database/prisma');
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isUuid = (v) => typeof v === 'string' && UUID_RE.test(v);
+
+// Verify a Supabase user access token (HS256, signed with the project's JWT
+// secret). Returns the decoded claims ({ sub, email, role, user_metadata, ... })
+// or null if absent/invalid/expired. Used to capture the REAL logged-in user so
+// actions are attributed to them instead of the shared mock 'api-user'.
+function verifySupabaseJwt(token) {
+  const secret = process.env.SUPABASE_JWT_SECRET;
+  if (!secret || !token) return null;
+  try {
+    return jwt.verify(token, secret, { algorithms: ['HS256'] });
+  } catch (err) {
+    return null;
+  }
+}
 
 // Implement rate limiting for API access
 const apiLimiter = rateLimit({
@@ -16,13 +34,18 @@ const apiLimiter = rateLimit({
 const protect = async (req, res, next) => {
   // Apply rate limiter manually in middleware
   apiLimiter(req, res, async () => {
+    // The Authorization: Bearer token may be EITHER the shared API key OR the
+    // logged-in user's Supabase JWT (the frontend sends the JWT here and the
+    // API key in x-api-key).
+    const bearer = (req.headers.authorization && req.headers.authorization.startsWith('Bearer'))
+      ? req.headers.authorization.split(' ')[1]
+      : null;
+
     let apiKey;
-    
-    // Check for API key in custom header or Authorization header
     if (req.headers['x-api-key']) {
       apiKey = req.headers['x-api-key'];
-    } else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-      apiKey = req.headers.authorization.split(' ')[1];
+    } else if (bearer) {
+      apiKey = bearer;
     } else if (req.cookies && req.cookies.access_token) {
       // Support for Swagger UI 'cookieAuth'
       apiKey = req.cookies.access_token;
@@ -39,25 +62,43 @@ const protect = async (req, res, next) => {
       return next(new AppError('Server configuration error.', 500));
     }
 
-    if (apiKey !== validApiKey) {
-      logger.warn(`Invalid API key attempt from IP: ${req.ip || req.connection.remoteAddress}`);
-      return next(new AppError('Invalid API key.', 401));
+    // Service-to-service request: the shared API key is present and valid.
+    if (apiKey === validApiKey) {
+      // Keep the API key's service-level admin authorization. If the frontend
+      // ALSO attached the logged-in user's Supabase JWT, decode it so the REAL
+      // user id is recorded for attribution (paid_by / created_by / performed_by)
+      // — without changing authorization (role stays the service 'admin').
+      const userToken = bearer && bearer !== validApiKey ? bearer : null;
+      const claims = userToken ? verifySupabaseJwt(userToken) : null;
+      const decoded = {
+        sub: claims && isUuid(claims.sub) ? claims.sub : 'api-user',
+        email: claims?.email || 'api@system.local',
+        role: 'admin', // service-level role from the API key (authorization unchanged)
+        user_metadata: claims?.user_metadata || { name: 'API System User' },
+        app_metadata: claims?.app_metadata || {},
+      };
+      return await processUser(req, res, next, decoded, { serviceAdmin: true });
     }
 
-    // API Key is valid. Construct a mock user object to maintain backward compatibility.
-    const decoded = {
-      sub: 'api-user',
-      email: 'api@system.local',
-      role: 'admin', // Grant admin role to the API key by default
-      user_metadata: { name: 'API System User' },
-      app_metadata: {}
-    };
-    
-    return await processUser(req, res, next, decoded);
+    // No service key — the token must be a valid Supabase user access token.
+    const claims = verifySupabaseJwt(apiKey);
+    if (claims && claims.sub) {
+      const decoded = {
+        sub: claims.sub,
+        email: claims.email || null,
+        role: claims.role || 'authenticated',
+        user_metadata: claims.user_metadata || {},
+        app_metadata: claims.app_metadata || {},
+      };
+      return await processUser(req, res, next, decoded, {});
+    }
+
+    logger.warn(`Invalid API key / token attempt from IP: ${req.ip || req.connection.remoteAddress}`);
+    return next(new AppError('Invalid API key.', 401));
   });
 };
 
-async function processUser(req, res, next, decoded) {
+async function processUser(req, res, next, decoded, opts = {}) {
     // Fetch user role from database
     let dbUser = null;
     try {
@@ -96,10 +137,13 @@ async function processUser(req, res, next, decoded) {
     // If DB fetch failed or user not in DB, dbUser is null.
     // If dbUser is null, we default to 'user' role unless the token explicitly says otherwise (unlikely for app roles).
     
-    req.user = { 
-      ...decoded, 
+    req.user = {
+      ...decoded,
       id: decoded.sub, // Ensure ID is accessible as req.user.id
-      role: dbUser?.role || decoded?.role || 'user', // Default to decoded role or 'user' if DB role is missing
+      // Service requests (valid API key) keep the API key's 'admin' role even when
+      // a real user JWT is attached — so attribution changes but authorization does
+      // not. Pure user-JWT requests resolve the role from the DB (or token).
+      role: opts.serviceAdmin ? (decoded?.role || 'admin') : (dbUser?.role || decoded?.role || 'user'),
       email: decoded?.email || dbUser?.email || null,
       municipalityCode: dbUser?.municipalityCode || null,
       fullName: dbUser?.fullName || null,

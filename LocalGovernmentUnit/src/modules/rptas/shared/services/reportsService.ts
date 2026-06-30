@@ -23,6 +23,9 @@ export interface PropertyReport {
   transCode: string;
   taxYear: string;
   paymentStatus?: 'unpaid' | 'pending' | 'paid';
+  // Latest payment approval (paid) time for the property; null if never paid.
+  // Used to order the Order-of-Payment list (recently approved first).
+  approvedAt?: string | null;
 }
 
 export interface ReportSummary {

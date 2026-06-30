@@ -299,7 +299,7 @@ const TreasuryPaymentsReport: React.FC = () => {
         'Municipality': r.municipalityName || r.municipalityCode || '',
         'Order Amount': r.orderAmount || 0,
         'Paid At': formatDateTime(r.paidAt),
-        'Approved By': r.paidBy === '00000000-0000-0000-0000-000000000000' ? 'System API' : (r.paidByName || r.paidBy),
+        'Approved By': r.approvedBy || (r.paidBy === '00000000-0000-0000-0000-000000000000' ? 'System API' : (r.paidByName || r.paidBy)),
         'Status': (r.validationErrors || []).length > 0 ? 'Warnings' : 'Success',
       }));
 
@@ -889,8 +889,8 @@ const TreasuryPaymentsReport: React.FC = () => {
                                 {r.ownerName || '-'}
                               </TableCell>
                               <TableCell className="px-4 py-3 whitespace-nowrap">
-                                <div className="font-medium text-slate-900 dark:text-slate-100 truncate" title={r.paidByName || r.paidBy}>
-                                  {r.paidBy === '00000000-0000-0000-0000-000000000000' ? 'System API' : (r.paidByName || 'Unknown')}
+                                <div className="font-medium text-slate-900 dark:text-slate-100 truncate" title={r.approvedBy || r.paidByName || r.paidBy}>
+                                  {r.approvedBy || (r.paidBy === '00000000-0000-0000-0000-000000000000' ? 'System API' : (r.paidByName || 'Unknown'))}
                                 </div>
                                 <div className="text-[10px] text-slate-500 font-mono" title={r.paidBy}>
                                   {r.paidBy === '00000000-0000-0000-0000-000000000000' ? '-' : (r.paidBy ? r.paidBy.substring(0, 8) + '...' : '-')}

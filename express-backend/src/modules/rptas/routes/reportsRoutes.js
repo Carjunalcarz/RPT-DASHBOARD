@@ -276,11 +276,15 @@ router.get('/properties', protect, async (req, res) => {
           rp.tax_beg_yr as "taxBegYr",
           rp.trans_code as "transCode",
           rp.tax_beg_yr as "taxYear",
-          ${paymentStatusSelect}
+          ${paymentStatusSelect},
+          (SELECT MAX(te.paid_at) FROM rptas.treasury_payment_exports te WHERE te.property_id = rp.id) as "approvedAt"
         FROM rptas.rpt_property rp
         LEFT JOIN rptas.rpt_assessment ra ON ra.property_id = rp.id
         WHERE ${whereClause}
-        ORDER BY rp.created_at DESC, ra.id ASC
+        ORDER BY
+          (SELECT MAX(te.paid_at) FROM rptas.treasury_payment_exports te WHERE te.property_id = rp.id) DESC NULLS FIRST,
+          rp.created_at DESC,
+          ra.id ASC
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}
       `;
     };
@@ -530,6 +534,10 @@ router.get('/treasury-payments', protect, async (req, res) => {
         COALESCE(
           (SELECT raw_user_meta_data->>'full_name' FROM auth.users WHERE id = t.paid_by LIMIT 1),
           (SELECT raw_user_meta_data->>'name' FROM auth.users WHERE id = t.paid_by LIMIT 1),
+          (SELECT NULLIF(TRIM(u.full_name), '') FROM public.users u WHERE u.id::text = t.paid_by::text LIMIT 1),
+          (SELECT NULLIF(TRIM(u.display_name), '') FROM public.users u WHERE u.id::text = t.paid_by::text LIMIT 1),
+          (SELECT u.username FROM public.users u WHERE u.id::text = t.paid_by::text LIMIT 1),
+          (SELECT u.email FROM public.users u WHERE u.id::text = t.paid_by::text LIMIT 1),
           'System API'
         ) as "paidByName",
         (
@@ -688,6 +696,10 @@ router.get('/treasury-deposits', protect, async (req, res) => {
         COALESCE(
           (SELECT raw_user_meta_data->>'full_name' FROM auth.users WHERE id = d.deposited_by LIMIT 1),
           (SELECT raw_user_meta_data->>'name' FROM auth.users WHERE id = d.deposited_by LIMIT 1),
+          (SELECT NULLIF(TRIM(u.full_name), '') FROM public.users u WHERE u.id::text = d.deposited_by::text LIMIT 1),
+          (SELECT NULLIF(TRIM(u.display_name), '') FROM public.users u WHERE u.id::text = d.deposited_by::text LIMIT 1),
+          (SELECT u.username FROM public.users u WHERE u.id::text = d.deposited_by::text LIMIT 1),
+          (SELECT u.email FROM public.users u WHERE u.id::text = d.deposited_by::text LIMIT 1),
           'System API'
         ) as "depositedByName",
         d.created_at as "createdAt"
