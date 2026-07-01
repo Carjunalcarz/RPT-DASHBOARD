@@ -18,6 +18,13 @@ const API_URL = normalizeApiV1Base(
   import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1'
 );
 
+/**
+ * Canonical `.../api/v1` base, derived from VITE_API_BASE_URL (single switch).
+ * Import this instead of hardcoding a host when you need an absolute endpoint
+ * (e.g. passing a full URL to a component prop that can't use the axios base).
+ */
+export const API_V1_BASE = API_URL;
+
 const api = axios.create({
   baseURL: API_URL,
   timeout: 30000,

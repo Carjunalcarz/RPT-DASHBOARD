@@ -14,9 +14,25 @@ import { supabase } from "./supabase";
  * the error so the caller can route the user to /login.
  */
 
-const BASE_URL =
-  (import.meta.env.VITE_BACKEND_URL as string | undefined)?.replace(/\/$/, "") ||
-  "http://localhost:3000";
+/**
+ * Backend host root (no /api suffix) — the RBAC/auth calls prefix /api/v1
+ * themselves. Resolution order:
+ *   1. VITE_BACKEND_URL      — explicit override, used as-is.
+ *   2. VITE_API_BASE_URL     — the shared var; strip a trailing /api or /api/v1
+ *                              so a single env var can drive both clients.
+ *   3. localhost fallback for local dev.
+ */
+function resolveBackendBase(): string {
+  const explicit = (import.meta.env.VITE_BACKEND_URL as string | undefined)?.trim();
+  if (explicit) return explicit.replace(/\/$/, "");
+
+  const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+  if (apiBase) return apiBase.replace(/\/$/, "").replace(/\/api(\/v\d+)?$/, "");
+
+  return "http://localhost:3000";
+}
+
+const BASE_URL = resolveBackendBase();
 
 const API_KEY = import.meta.env.VITE_API_ACCESS_KEY as string | undefined;
 const FORCE_ADMIN = import.meta.env.VITE_FORCE_ADMIN === "true";

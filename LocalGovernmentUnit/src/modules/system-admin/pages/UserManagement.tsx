@@ -20,6 +20,7 @@ import { Users, Plus, RefreshCw } from "lucide-react";
 import {
   getRoles,
   assignRoleToUser as assignRoleToUserBackend,
+  setUserRoles as setUserRolesBackend,
   getUserRoles as getUserRolesBackend,
   getFacilities,
   setUserFacilities,
@@ -261,7 +262,10 @@ const UserManagement = () => {
       }
       setIsSaving(true);
       try {
-        await assignRoleToUserBackend(editingUserId, selectedUserRole);
+        // Replace (not append) so changing an existing user's role actually
+        // swaps it out instead of leaving the previous role attached. See the
+        // note in handleAssignRoleToUser.
+        await setUserRolesBackend(editingUserId, [selectedUserRole]);
         toast.success("Role updated");
         resetForm();
         await loadData();
@@ -459,10 +463,13 @@ const UserManagement = () => {
     }
 
     try {
-      await assignRoleToUserBackend(
-        selectedUserForRole,
-        selectedRoleForAssignment,
-      );
+      // Replace the user's roles with the single selected one. This UI is
+      // one-role-per-user (the list shows userRoles[0]), so a plain
+      // assignRoleToUser — which only ADDS the new role and leaves the old
+      // one attached — makes "change role" look like a no-op. setUserRoles
+      // does a full delete+recreate, so the change actually takes effect and
+      // any stale/duplicate role is cleaned up.
+      await setUserRolesBackend(selectedUserForRole, [selectedRoleForAssignment]);
       setSelectedUserForRole("");
       setSelectedRoleForAssignment("");
       setEditingUserRoleId(null);

@@ -7,6 +7,7 @@ import SelectionModal from './SelectionModal';
 import { useSelectionModal } from './useSelectionModal';
 import { useAlert } from '@/modules/rptas/context/AlertContext';
 import { PdfPrintButton } from '../common/PdfPrintButton';
+import { API_V1_BASE } from '@/modules/rptas/shared/services/api';
 import '@/styles/print.css';
 
 const AssessmentTable: React.FC = () => {
@@ -241,7 +242,7 @@ const AssessmentTable: React.FC = () => {
           <PdfPrintButton
             contentRef={printRef}
             documentTitle="Assessment Sheet"
-            pdfEndpoint="http://localhost:3000/api/v1/pdf/generate-pdf"
+            pdfEndpoint={`${API_V1_BASE}/pdf/generate-pdf`}
             pdfData={{
               tdNo: propertyInfo.tdNo,
               arpNo: propertyInfo.arpNo,

@@ -10,7 +10,7 @@ const RPTASSettingsPage = () => {
           <p className="text-gray-600 text-sm mb-4">Configure connection to the main application API.</p>
           <input 
             type="text" 
-            defaultValue={import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1"}
+            defaultValue={import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1"}
             className="w-full border rounded px-4 py-2 text-gray-700 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary/50 outline-none"
             readOnly
           />

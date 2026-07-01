@@ -158,7 +158,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // I will use `api.post` but with a path that traverses up if axios supports it, 
       // or better, I will just create a one-off request for login or use the full URL.
       
-      const API_BASE = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/v1', '') : 'http://localhost:3000/api';
+      const envApiUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
+      const API_BASE = envApiUrl ? envApiUrl.replace('/v1', '') : 'http://localhost:3000/api';
       const response = await api.post(`${API_BASE}/auth/login`, { email, password });
       
       if (response.data.status === 'success') {
