@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { useThemeColor } from '@/modules/rptas/context/ThemeColorContext';
 import { useAuth } from '@/modules/rptas/context/AuthContext';
 import { useAlert } from '@/modules/rptas/context/AlertContext';
+import { useRBAC } from '@/hooks/useRBAC';
 import { getRptMastDataDirect, updateSignatory } from '@/modules/rptas/shared/services/rptMastService';
 import { getRptAssByTdn } from '@/modules/rptas/shared/services/rptAssService';
 import { getFaasRecord, updateFaasStatus } from '@/modules/rptas/shared/services/faasService';   
@@ -26,6 +27,7 @@ const PropertyApproval: React.FC = () => {
   const navigate = useNavigate();
   const { headerColor } = useThemeColor();
   const { user } = useAuth();
+  const { roles: rbacRoles, isSuperAdmin } = useRBAC();
   const { showConfirm } = useAlert();
 
   const searchParams = new URLSearchParams(location.search);
@@ -406,20 +408,32 @@ const PropertyApproval: React.FC = () => {
   const handleApprove = async () => {
     if (!record) return;
     
-    // Check permissions
-    // Allow admin/Administrator always
-    // If pending-municipal, allow 'approver' or 'municipal_assessor'
-    // If pending-provincial, allow 'approver' or 'provincial_assessor'
+    // Check permissions.
+    // Consider BOTH the legacy single `users.role` string AND the user's
+    // RBAC-assigned roles (from user_roles) — a user can hold e.g. a
+    // "Provincial Assessor" role via RBAC even when users.role is something
+    // else. super_admin / administrator can always approve.
     const userRole = user?.role?.toLowerCase() || '';
-    const isAdmin = userRole === 'admin' || userRole === 'administrator';
-    
-    if (!isAdmin && userRole !== 'approver') {
+    const rbacRoleText = (rbacRoles || [])
+      .map((r) => `${r.roleName || ''} ${r.roleCode || ''}`)
+      .join(' ')
+      .toLowerCase();
+    const allRoles = `${userRole} ${rbacRoleText}`;
+    const isAdmin =
+      isSuperAdmin ||
+      userRole === 'admin' ||
+      userRole === 'administrator' ||
+      rbacRoleText.includes('administrator') ||
+      rbacRoleText.includes('super admin') ||
+      rbacRoleText.includes('super_admin');
+
+    if (!isAdmin && !allRoles.includes('approver')) {
          // Add specific checks if roles are defined
-         if (record.status === 'pending-municipal' && !userRole.includes('municipal')) {
+         if (record.status === 'pending-municipal' && !allRoles.includes('municipal')) {
              toast.error('Only Municipal Assessors can perform this approval.');
              return;
          }
-         if (record.status === 'pending-provincial' && !userRole.includes('provincial')) {
+         if (record.status === 'pending-provincial' && !allRoles.includes('provincial')) {
              toast.error('Only Provincial Assessors can perform this approval.');
              return;
          }
