@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { supabase, isSupabaseConfigured } from "@/services/supabase";
 import * as backendAuth from "@/services/authBackendService";
+import * as tokenStore from "@/services/tokenStore";
 
 /**
  * Authentication store.
@@ -115,6 +116,14 @@ export const useAuthStore = create<AuthState>()(
             password,
           });
 
+          // 2. Persist the backend-issued tokens. apiClient sends the access
+          //    token as Bearer on every request and refreshes it via the
+          //    backend /auth/refresh endpoint — independent of supabase-js,
+          //    which cannot refresh these custom tokens and would otherwise
+          //    drop the session (making the app fall back to the shared
+          //    x-api-key service account => phantom "Super Admin").
+          tokenStore.setTokens(result.accessToken, result.refreshToken);
+
           // 3. Sync supabase-js with the returned tokens so direct
           //    supabase.from(...) calls (RBACContext, admin pages, image
           //    uploads) are authenticated too.
@@ -205,6 +214,7 @@ export const useAuthStore = create<AuthState>()(
         } catch (err) {
           console.warn("supabase.auth.signOut failed:", err);
         }
+        tokenStore.clearTokens();
         set({ user: null, isAuthenticated: false, error: null });
       },
 

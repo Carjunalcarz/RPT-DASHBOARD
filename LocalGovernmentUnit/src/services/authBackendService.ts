@@ -1,4 +1,5 @@
 import { apiClient } from "./apiClient";
+import * as tokenStore from "./tokenStore";
 
 /**
  * Client for /api/v1/auth/* — the backend's auth lifecycle endpoints.
@@ -80,7 +81,16 @@ export function login(input: {
  * via auth.setSession().
  */
 export function refresh(): Promise<LoginResponse> {
-  return unwrap(apiClient.post<Envelope<LoginResponse>>(`${BASE}/refresh`));
+  // Send the refresh token in the body as well as relying on the cookie — a
+  // different-origin HTTP backend can't receive the httpOnly cookie, so the
+  // body is what actually works cross-origin.
+  const refreshToken = tokenStore.getRefreshToken() ?? undefined;
+  return unwrap(
+    apiClient.post<Envelope<LoginResponse>>(
+      `${BASE}/refresh`,
+      refreshToken ? { refreshToken } : undefined,
+    ),
+  );
 }
 
 export function logout(): Promise<{ ok: boolean }> {

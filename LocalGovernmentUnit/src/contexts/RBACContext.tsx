@@ -161,7 +161,14 @@ export const RBACProvider: React.FC<{ children: React.ReactNode }> = ({
         return;
       }
 
-      const isAdmin = !!meResult.isSuperAdmin;
+      // A bare x-api-key (no user JWT) resolves to the backend's "service
+      // account", which reports isSuperAdmin:true. That must NOT make a browser
+      // user appear as super-admin — otherwise a missing/expired session shows
+      // a phantom "Super Admin". Only trust isSuperAdmin for a real user.
+      const isServiceAccount =
+        meResult.user?.isService === true ||
+        meResult.user?.id === "service-account";
+      const isAdmin = !!meResult.isSuperAdmin && !isServiceAccount;
       setBackendSuperAdmin(isAdmin);
 
       // The user's assigned RBAC roles (from user_roles), independent of the
